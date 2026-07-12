@@ -139,6 +139,95 @@ def _web_api_issues(comp: Component) -> list[Issue]:
     ]
 
 
+# CSS properties with no clean React Native equivalent.
+RN_INCOMPATIBLE_CSS_PROPS = frozenset({
+    "cursor", "float", "clear", "boxShadow", "textShadow", "transition",
+    "transitionProperty", "transitionDuration", "animation", "filter",
+    "backdropFilter", "backgroundImage", "background", "clipPath", "content",
+    "overflowX", "overflowY", "whiteSpace", "wordBreak", "textOverflow",
+    "listStyle", "willChange", "userSelect", "appearance", "outline",
+})
+
+
+def _text_wrap_issues(comp: Component) -> list[Issue]:
+    bare = [t for t in comp.textNodes if t.isBare]
+    if not bare:
+        return []
+    sample = ", ".join(sorted({t.text for t in bare})[:3])
+    return [
+        Issue(
+            code=codes.MISSING_TEXT_WRAP,
+            severity="info",  # the codemod wraps these deterministically
+            message=(
+                f"{len(bare)} bare text child(ren) must be wrapped in <Text> for RN "
+                "(auto-handled by the codemod)."
+            ),
+            evidence=Evidence(file=comp.file, detail=f"e.g. {sample}"),
+        )
+    ]
+
+
+def _flex_row_issues(comp: Component) -> list[Issue]:
+    implicit = [
+        h for h in comp.layoutHints
+        if h.hasFlexClass and h.flexDirection is None and not h.isGrid
+    ]
+    if not implicit:
+        return []
+    tags = ", ".join(sorted({h.elementTag for h in implicit}))
+    return [
+        Issue(
+            code=codes.IMPLICIT_FLEX_ROW,
+            severity="warning",
+            message=(
+                f"{len(implicit)} flex container(s) rely on web's default row; RN "
+                "defaults to column, so flexDirection:'row' must be made explicit."
+            ),
+            evidence=Evidence(file=comp.file, detail=f"elements: {tags}"),
+        )
+    ]
+
+
+def _image_issues(comp: Component) -> list[Issue]:
+    unsized = [i for i in comp.images if not i.hasExplicitSize]
+    if not unsized:
+        return []
+    return [
+        Issue(
+            code=codes.UNSIZED_IMAGE,
+            severity="warning",
+            message=(
+                f"{len(unsized)} <img> without an explicit size; RN <Image> needs "
+                "width/height or it renders 0×0."
+            ),
+            evidence=Evidence(
+                file=comp.file,
+                detail="src: " + ", ".join(i.src or "?" for i in unsized),
+            ),
+        )
+    ]
+
+
+def _inline_style_issues(comp: Component) -> list[Issue]:
+    issues: list[Issue] = []
+    for style in comp.inlineStyles:
+        bad = sorted(RN_INCOMPATIBLE_CSS_PROPS.intersection(style.properties))
+        if not bad:
+            continue
+        issues.append(
+            Issue(
+                code=codes.RN_INCOMPATIBLE_CSS_PROP,
+                severity="warning",
+                message=(
+                    f"<{style.elementTag}> uses inline CSS props with no RN "
+                    f"equivalent: {', '.join(bad)}."
+                ),
+                evidence=Evidence(file=comp.file, detail=f"props: {', '.join(bad)}"),
+            )
+        )
+    return issues
+
+
 def analyze_component(comp: Component) -> ComponentFinding:
     """Analyze a single component into a ComponentFinding."""
     issues: list[Issue] = []
@@ -146,6 +235,10 @@ def analyze_component(comp: Component) -> ComponentFinding:
     issues += _event_issues(comp)
     issues += component_styling_issues(comp)
     issues += _web_api_issues(comp)
+    issues += _text_wrap_issues(comp)
+    issues += _flex_row_issues(comp)
+    issues += _image_issues(comp)
+    issues += _inline_style_issues(comp)
 
     score, difficulty = score_component(issues)
     return ComponentFinding(

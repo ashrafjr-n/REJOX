@@ -113,6 +113,32 @@ def test_sample_app_has_no_blockers(report: AnalysisReport) -> None:
     assert report.blockers == []
 
 
+# --- Conversion-fact rules (Converter Part 1) -------------------------------
+
+
+def _codes(report: AnalysisReport, name: str) -> set[str]:
+    return {i.code for i in _component(report, name).issues}
+
+
+def test_implicit_flex_row_flagged(report: AnalysisReport) -> None:
+    # Spinner's outer div is `flex` with no explicit direction (web row, RN column).
+    assert "IMPLICIT_FLEX_ROW" in _codes(report, "Spinner")
+
+
+def test_unsized_image_flagged(report: AnalysisReport) -> None:
+    # ProductCard's <img> uses a CSS-Module class → no statically-known size.
+    assert "UNSIZED_IMAGE" in _codes(report, "ProductCard")
+    # CartItem's <img> has explicit h-14/w-14 → not flagged.
+    assert "UNSIZED_IMAGE" not in _codes(report, "CartItem")
+
+
+def test_missing_text_wrap_flagged(report: AnalysisReport) -> None:
+    # Navbar has bare text inside <NavLink> (not a text-ish element).
+    assert "MISSING_TEXT_WRAP" in _codes(report, "Navbar")
+    # ...and Rating's glyph sits inside <span> (already text-ish) → not flagged.
+    assert "MISSING_TEXT_WRAP" not in _codes(report, "Rating")
+
+
 # --- Routing ----------------------------------------------------------------
 
 
