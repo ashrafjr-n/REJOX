@@ -22,6 +22,12 @@ GROUP_SELECTOR = "GROUP_SELECTOR"           # group / group-hover: — no equiva
 DYNAMIC_CLASSNAME = "DYNAMIC_CLASSNAME"     # className built at runtime
 CSS_MODULE = "CSS_MODULE"                   # *.module.css — manual conversion
 
+# Layout / structure (conversion facts)
+MISSING_TEXT_WRAP = "MISSING_TEXT_WRAP"    # bare text not inside <Text> — RN crash
+IMPLICIT_FLEX_ROW = "IMPLICIT_FLEX_ROW"    # flex w/o direction — web=row, RN=column
+UNSIZED_IMAGE = "UNSIZED_IMAGE"            # <img> without explicit size — RN needs it
+RN_INCOMPATIBLE_CSS_PROP = "RN_INCOMPATIBLE_CSS_PROP"  # inline style prop RN can't do
+
 # Source / APIs
 WEB_API_USAGE = "WEB_API_USAGE"            # localStorage/window/document...
 
