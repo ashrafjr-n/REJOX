@@ -251,3 +251,65 @@ migrationScore = 0.40·components + 0.25·libraries + 0.20·styling
 
 On the benchmark `sample-app`, this yields **migrationScore ≈ 83.6**
 (components 91.8, libraries 85.7, styling 62.0, routing 80.0, api 100.0).
+
+---
+
+## Planner stage — implementation
+
+The Planner turns an `AnalysisReport` (plus the KG it came from) into an ordered
+**Migration Plan** and the **Questions** the Ask stage puts to the user. Pure and
+deterministic — it plans, it does not convert. Entry point:
+
+```python
+from app.pipeline.planner import plan_migration   # plan_migration(report, kg) -> MigrationPlan
+```
+
+Schema in `app/models/plan.py`: `Question` / `QuestionOption` / `PlanStep`
+(`kind ∈ setup|routing|components|styling|state|api|assets|navigation|validation`)
+/ `ManualReviewCandidate` / `UnsupportedItem` / `MigrationPlan`. The API returns a
+`PlanResponse { report, plan }` so the frontend gets both together.
+
+### Question-generation rules
+
+A question is emitted **only** when a finding justifies it, and exactly one
+option per question is recommended (rule in parentheses):
+
+| Question | Emitted when | Recommended (why) |
+| -------- | ------------ | ----------------- |
+| `project-type` | always | **Expo** — fastest path to a runnable MVP app |
+| `styling-engine` | `styling.tailwindClassCount > 0` | **NativeWind** — Tailwind is the dominant approach; preserves the most classes |
+| `navigation-library` | `routing.library` set (react-router) | **React Navigation** — mature, works with Expo *and* bare RN |
+| `icons` | an icon library is in `dependencies` | **@expo/vector-icons** — zero-config in Expo |
+| `storage` | `localStorage`/`sessionStorage` in a component's `webApis` | **AsyncStorage** — the standard RN key-value store |
+
+Every `context` string cites real numbers from the report (e.g. *"138 Tailwind
+classes across 20 components (18 unmappable), 1 CSS Module"*).
+
+### Step-ordering algorithm
+
+Steps are derived from the report, not hardcoded, and a **content step with no
+targets is omitted** (no router → no routing/navigation step, no stores → no
+state step, etc.). Emission order (which sets `order` and the `dependsOn` DAG):
+
+```
+setup → routing → state → api → component-waves… → styling → assets
+      → navigation → validation
+```
+
+- **setup** is always first (`affectedByQuestions` = all questions);
+  **validation** is always last (depends on every prior step).
+- **Component conversion is split into dependency waves** via the KG `renders`
+  edges, using Kahn's algorithm: a component is placed in a wave only once every
+  component it renders is already placed — so **leaf/shared components convert
+  first and pages last**. Each wave is one `components` step depending on the
+  previous wave. A render cycle (recursive components) is placed as one
+  deterministic final wave rather than looping.
+- `manualReviewCandidates` = every component with difficulty medium/hard/blocked
+  **plus** every `CSS_MODULE` / `DYNAMIC_CLASSNAME` target, each with its reason.
+- `unsupportedItems` = each `unsupported` library with a concrete suggestion
+  (e.g. redux → *"Port state to zustand before conversion"*).
+
+On the benchmark `sample-app` this produces **3 questions** (project-type,
+styling-engine, navigation-library) and **13 steps**, with the 21 components
+split into **5 render-topology waves of [9, 5, 4, 2, 1]** (Button/Rating/Spinner
+→ … → ProductCard → ProductGrid → ProductsPage → App).
