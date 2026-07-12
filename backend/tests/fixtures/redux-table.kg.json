@@ -1,0 +1,79 @@
+{
+  "project": {
+    "name": "redux-table-app",
+    "root": "synthetic",
+    "framework": "react",
+    "language": "ts",
+    "bundler": "vite",
+    "dependencies": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0",
+      "redux": "^4.2.1",
+      "react-redux": "^9.1.0"
+    }
+  },
+  "files": [
+    {
+      "path": "package.json",
+      "type": "config",
+      "loc": 15
+    },
+    {
+      "path": "src/Dashboard.tsx",
+      "type": "component",
+      "loc": 42
+    }
+  ],
+  "components": [
+    {
+      "id": "src/Dashboard.tsx#Dashboard",
+      "name": "Dashboard",
+      "file": "src/Dashboard.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [
+        "useDispatch",
+        "useSelector"
+      ],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 1,
+        "table": 1,
+        "thead": 1,
+        "tbody": 1,
+        "tr": 3,
+        "td": 6,
+        "th": 3
+      },
+      "eventHandlers": [
+        "onClick"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "flex",
+        "grid",
+        "grid-cols-2",
+        "hover:bg-gray-100"
+      ],
+      "cssModuleImports": [],
+      "webApis": [
+        "localStorage"
+      ]
+    }
+  ],
+  "hooks": [],
+  "routes": [],
+  "stateManagement": {
+    "library": "none",
+    "stores": []
+  },
+  "apiLayer": {
+    "clients": [],
+    "endpoints": []
+  },
+  "assets": [],
+  "edges": [],
+  "warnings": []
+}
