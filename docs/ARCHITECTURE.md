@@ -249,8 +249,10 @@ migrationScore = 0.40·components + 0.25·libraries + 0.20·styling
 - **routing** = `100` if no router, else `80 − 20·(object-router blockers)`.
 - **api** = `100 − 10·(endpoints with an unresolved URL)`.
 
-On the benchmark `sample-app`, this yields **migrationScore ≈ 83.6**
-(components 91.8, libraries 85.7, styling 62.0, routing 80.0, api 100.0).
+On the benchmark `sample-app`, this yields **migrationScore ≈ 81.1**
+(components 85.7, libraries 85.7, styling 62.0, routing 80.0, api 100.0) — the
+component sub-score dropped from ~91.8 once the Converter-Part-1 conversion
+rules (MISSING_TEXT_WRAP, IMPLICIT_FLEX_ROW, UNSIZED_IMAGE) began firing.
 
 ---
 
@@ -313,3 +315,73 @@ On the benchmark `sample-app` this produces **3 questions** (project-type,
 styling-engine, navigation-library) and **13 steps**, with the 21 components
 split into **5 render-topology waves of [9, 5, 4, 2, 1]** (Button/Rating/Spinner
 → … → ProductCard → ProductGrid → ProductsPage → App).
+
+---
+
+## Converter stage — Part 1 (deterministic)
+
+The Converter runs in two parts. **Part 1 (this stage) is fully deterministic —
+no LLM.** It builds every mechanical transform; only what AST rules genuinely
+cannot express is recorded in an `unhandled` list for **Part 2 (LLM-assisted)**.
+
+### Two-worker design
+
+Parsing and codemodding both stay in Node (best-in-class TS/JSX tooling),
+orchestrated from Python via subprocess — the same pattern for both:
+
+```
+backend/
+├── parser-worker/     # React → Knowledge Graph (facts)          → app/pipeline/parser.py
+├── codemod-worker/    # one React file → one React Native file   → app/pipeline/converter.py
+│   └── src/transforms/{links,events,elements,text,imports}.ts    # composable, ordered
+└── app/pipeline/
+    ├── scaffold.py    # Expo(TS) project skeleton from answers (templates/)
+    └── converter.py   # convert_component(file, options) -> ConversionResult
+```
+
+The parser-worker feeds the codemod the **conversion facts** it is blind
+without (added to the KG in Part 1): `textNodes` (bare text → the #1 silent RN
+bug), `layoutHints` (web flex = row, RN = column), `images` (explicit size /
+`src` kind), `inlineStyles` (RN-incompatible CSS props). New Analyzer rules —
+`MISSING_TEXT_WRAP`, `IMPLICIT_FLEX_ROW`, `UNSIZED_IMAGE`,
+`RN_INCOMPATIBLE_CSS_PROP` — score off these.
+
+### Codemod transform order
+
+`links → events → elements → text → imports`. Events run while host tags are
+still lowercase, so custom components are never touched; text-wrapping runs
+after element renames so parent tags are already RN. Each transform is
+idempotent and re-queries the tree after every edit (avoids stale ts-morph
+node refs).
+
+### Output contract — `unhandled` → LLM (Part 2)
+
+The codemod-worker prints one JSON document:
+
+```json
+{ "file": "...", "code": "<RN source>",
+  "warnings": [{ "code", "message", "line" }],
+  "unhandled": [{ "code", "snippet" }] }
+```
+
+- **`code`** is guaranteed **syntactically valid TS** — the worker re-parses its
+  own output and refuses to emit on any syntax error.
+- **`unhandled`** is precisely the Part-2 spec: everything the deterministic
+  pass could not safely resolve (`NAV_LINK`, `NAV_ACTIVE`, `NAV_HOOK`,
+  `CSS_MODULE`, `IMAGE_PROPS`, `PROPS_HTML_TYPE`, `EVENT_ADAPTER`,
+  `WEB_ONLY_ELEMENT`). Each also leaves a `// REJOX-TODO(<CODE>)` comment in the
+  output, so nothing is ever silently dropped.
+
+### Scaffold
+
+`generate_scaffold(out_dir, answers, source_dependencies)` renders an Expo (TS)
+skeleton from the answered questions, wiring NativeWind (babel `jsxImportSource`
++ `nativewind/babel`, metro `withNativeWind` + `global.css`, `tailwind.config.js`)
+and the chosen navigation library, carrying over compatible deps (zustand,
+axios). Templates are real files under `app/pipeline/templates/`. No source is
+copied — skeleton only.
+
+On the benchmark `sample-app`, **14 of 21 components convert with zero unhandled
+items**; the remainder concentrate on navigation (`NAV_LINK`×7, `NAV_ACTIVE`,
+`NAV_HOOK`), images (`IMAGE_PROPS`×3), one CSS Module, and one web DOM prop type
+— that list is the Part 2 backlog.

@@ -39,6 +39,36 @@ add a row here **first**, then implement it.
 | `onSubmit` / `onMouseEnter` / `onKeyDown` | — (no equivalent)                    | Low        | Analyzer code `WEB_ONLY_EVENT`. No mouse/keyboard/submit on touch. |
 | Redux / Three.js / Next.js / Electron | — (unsupported in MVP)                   | Low        | Analyzer code `UNSUPPORTED_LIBRARY` (blocker). See `PRD.md`. |
 
+## Automated by the codemod (Part 1)
+
+These rules are implemented as **deterministic** transforms in
+`backend/codemod-worker` (ts-morph) — no LLM. All are Confidence **High**
+(mechanical). The worker self-checks that its output is syntactically valid TS
+before emitting.
+
+| Rule (implemented)                              | Transform                                            | Confidence |
+| ----------------------------------------------- | ---------------------------------------------------- | ---------- |
+| `div`/`section`/`header`/`footer`/`nav`/`ul`/`li`/`form` → `View` | tag rename            | ✅ High |
+| `span`/`p`/`h1`-`h6`/`label`/`small`/`strong`/`em` → `Text`       | tag rename            | ✅ High |
+| `img` → `Image`                                 | tag rename (+ `IMAGE_PROPS` unhandled: `src`→`source`) | ✅ High |
+| `button` → `Pressable`                          | tag rename                                           | ✅ High |
+| container/text element with `onPress` → `Pressable` | interactive override                             | ✅ High |
+| Bare text / `{expr}` child of non-`Text` parent → wrap in `<Text>` | text-wrap pass       | ✅ High |
+| `onClick` → `onPress` (host elements only)      | attribute rename                                     | ✅ High |
+| `onChange` on `input`/`textarea`/`select` → `onChangeText` | rename (+ `EVENT_ADAPTER` unhandled)      | ✅ High |
+| `onSubmit` → dropped (+ `FORM_SUBMIT` unhandled) | attribute removal                                   | ✅ High |
+| `onMouseEnter`/`onKeyDown`/… → dropped          | attribute removal (+ warning)                        | ✅ High |
+| Inject `import { … } from 'react-native'`       | for every RN component actually used                 | ✅ High |
+| Drop `react-dom` imports                        | import removal                                       | ✅ High |
+| `className` (any form)                          | **preserved verbatim** (styling is Part 2)           | ✅ High |
+
+**Handed to Part 2 (LLM) via `unhandled`** — the deterministic codemod records
+these but does not resolve them: `NAV_LINK`/`NAV_ACTIVE` (`Link`/`NavLink` →
+navigation), `NAV_HOOK` (`useParams`/`useNavigate`), `CSS_MODULE`,
+`IMAGE_PROPS` (`src`→`source`, sizing), `PROPS_HTML_TYPE` (web DOM prop types),
+`EVENT_ADAPTER`, `WEB_ONLY_ELEMENT`. Every one also leaves a
+`// REJOX-TODO(<CODE>)` comment in the output.
+
 ## Legend / conventions
 
 - **Text rule**: any bare string in JSX must be wrapped in `<Text>` in RN.
