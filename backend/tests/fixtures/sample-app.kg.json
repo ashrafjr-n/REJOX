@@ -1,0 +1,1616 @@
+{
+  "project": {
+    "name": "sample-app",
+    "root": "test-projects/sample-app",
+    "framework": "react",
+    "language": "ts",
+    "bundler": "vite",
+    "dependencies": {
+      "axios": "^1.18.1",
+      "react": "^19.2.7",
+      "react-dom": "^19.2.7",
+      "react-router-dom": "^7.18.1",
+      "zustand": "^5.0.14"
+    }
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "type": "other",
+      "loc": 25
+    },
+    {
+      "path": ".oxlintrc.json",
+      "type": "other",
+      "loc": 9
+    },
+    {
+      "path": "index.html",
+      "type": "other",
+      "loc": 14
+    },
+    {
+      "path": "package-lock.json",
+      "type": "other",
+      "loc": 2172
+    },
+    {
+      "path": "package.json",
+      "type": "config",
+      "loc": 31
+    },
+    {
+      "path": "public/favicon.svg",
+      "type": "asset",
+      "loc": 0
+    },
+    {
+      "path": "public/icons.svg",
+      "type": "asset",
+      "loc": 0
+    },
+    {
+      "path": "README.md",
+      "type": "other",
+      "loc": 33
+    },
+    {
+      "path": "src/api/client.ts",
+      "type": "api",
+      "loc": 7
+    },
+    {
+      "path": "src/api/products.ts",
+      "type": "api",
+      "loc": 40
+    },
+    {
+      "path": "src/App.tsx",
+      "type": "component",
+      "loc": 20
+    },
+    {
+      "path": "src/assets/hero.png",
+      "type": "asset",
+      "loc": 0
+    },
+    {
+      "path": "src/assets/vite.svg",
+      "type": "asset",
+      "loc": 0
+    },
+    {
+      "path": "src/components/Button.tsx",
+      "type": "component",
+      "loc": 23
+    },
+    {
+      "path": "src/components/CartBadge.tsx",
+      "type": "component",
+      "loc": 22
+    },
+    {
+      "path": "src/components/CartItem.tsx",
+      "type": "component",
+      "loc": 40
+    },
+    {
+      "path": "src/components/CartSummary.tsx",
+      "type": "component",
+      "loc": 38
+    },
+    {
+      "path": "src/components/ErrorMessage.tsx",
+      "type": "component",
+      "loc": 13
+    },
+    {
+      "path": "src/components/FeatureCard.tsx",
+      "type": "component",
+      "loc": 21
+    },
+    {
+      "path": "src/components/Footer.tsx",
+      "type": "component",
+      "loc": 12
+    },
+    {
+      "path": "src/components/Hero.tsx",
+      "type": "component",
+      "loc": 25
+    },
+    {
+      "path": "src/components/Layout.tsx",
+      "type": "component",
+      "loc": 17
+    },
+    {
+      "path": "src/components/Navbar.tsx",
+      "type": "component",
+      "loc": 39
+    },
+    {
+      "path": "src/components/ProductCard.module.css",
+      "type": "style",
+      "loc": 23
+    },
+    {
+      "path": "src/components/ProductCard.tsx",
+      "type": "component",
+      "loc": 43
+    },
+    {
+      "path": "src/components/ProductGrid.tsx",
+      "type": "component",
+      "loc": 21
+    },
+    {
+      "path": "src/components/QuantityStepper.tsx",
+      "type": "component",
+      "loc": 31
+    },
+    {
+      "path": "src/components/Rating.tsx",
+      "type": "component",
+      "loc": 21
+    },
+    {
+      "path": "src/components/SettingToggle.tsx",
+      "type": "component",
+      "loc": 38
+    },
+    {
+      "path": "src/components/Spinner.tsx",
+      "type": "component",
+      "loc": 9
+    },
+    {
+      "path": "src/hooks/useFetch.ts",
+      "type": "hook",
+      "loc": 43
+    },
+    {
+      "path": "src/index.css",
+      "type": "style",
+      "loc": 2
+    },
+    {
+      "path": "src/lib/types.ts",
+      "type": "other",
+      "loc": 18
+    },
+    {
+      "path": "src/main.tsx",
+      "type": "other",
+      "loc": 14
+    },
+    {
+      "path": "src/pages/HomePage.tsx",
+      "type": "component",
+      "loc": 35
+    },
+    {
+      "path": "src/pages/ProductDetailPage.tsx",
+      "type": "component",
+      "loc": 49
+    },
+    {
+      "path": "src/pages/ProductsPage.tsx",
+      "type": "component",
+      "loc": 23
+    },
+    {
+      "path": "src/pages/SettingsPage.tsx",
+      "type": "component",
+      "loc": 38
+    },
+    {
+      "path": "src/store/cartStore.ts",
+      "type": "store",
+      "loc": 57
+    },
+    {
+      "path": "tsconfig.app.json",
+      "type": "config",
+      "loc": 27
+    },
+    {
+      "path": "tsconfig.json",
+      "type": "config",
+      "loc": 8
+    },
+    {
+      "path": "tsconfig.node.json",
+      "type": "config",
+      "loc": 24
+    },
+    {
+      "path": "vite.config.ts",
+      "type": "config",
+      "loc": 8
+    }
+  ],
+  "components": [
+    {
+      "id": "src/App.tsx#App",
+      "name": "App",
+      "file": "src/App.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [],
+      "childComponents": [
+        "HomePage",
+        "Layout",
+        "ProductDetailPage",
+        "ProductsPage",
+        "Route",
+        "Routes",
+        "SettingsPage"
+      ],
+      "jsxElements": {},
+      "eventHandlers": [],
+      "stylingApproach": [
+        "none"
+      ],
+      "tailwindClasses": [],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/Button.tsx#Button",
+      "name": "Button",
+      "file": "src/components/Button.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "variant",
+          "type": "'primary' | 'ghost'",
+          "optional": true
+        }
+      ],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "button": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-indigo-600",
+        "bg-transparent",
+        "disabled:opacity-40",
+        "font-medium",
+        "hover:bg-indigo-50",
+        "hover:bg-indigo-500",
+        "px-4",
+        "py-2",
+        "rounded-lg",
+        "text-indigo-600",
+        "text-sm",
+        "text-white",
+        "transition-colors"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/CartBadge.tsx#CartBadge",
+      "name": "CartBadge",
+      "file": "src/components/CartBadge.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [
+        "useCartStore"
+      ],
+      "childComponents": [
+        "Link"
+      ],
+      "jsxElements": {
+        "span": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "-right-1",
+        "-top-1",
+        "absolute",
+        "bg-indigo-600",
+        "flex",
+        "font-semibold",
+        "h-5",
+        "hover:bg-slate-100",
+        "items-center",
+        "justify-center",
+        "min-w-5",
+        "px-1",
+        "px-2",
+        "py-1",
+        "relative",
+        "rounded-full",
+        "rounded-md",
+        "text-slate-700",
+        "text-white",
+        "text-xs"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/CartItem.tsx#CartItem",
+      "name": "CartItem",
+      "file": "src/components/CartItem.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "line",
+          "type": "CartLine",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [
+        "useCartStore"
+      ],
+      "childComponents": [
+        "QuantityStepper"
+      ],
+      "jsxElements": {
+        "div": 2,
+        "p": 2,
+        "button": 1,
+        "img": 1
+      },
+      "eventHandlers": [
+        "onChange",
+        "onClick"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "flex",
+        "flex-1",
+        "font-medium",
+        "gap-3",
+        "h-14",
+        "hover:text-red-500",
+        "items-center",
+        "line-clamp-1",
+        "min-w-0",
+        "object-cover",
+        "py-3",
+        "rounded-md",
+        "text-slate-400",
+        "text-slate-500",
+        "text-sm",
+        "w-14"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/CartSummary.tsx#CartSummary",
+      "name": "CartSummary",
+      "file": "src/components/CartSummary.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [
+        "useCartStore"
+      ],
+      "childComponents": [
+        "Button",
+        "CartItem"
+      ],
+      "jsxElements": {
+        "div": 5,
+        "p": 2
+      },
+      "eventHandlers": [
+        "onClick"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-white",
+        "border-slate-200",
+        "border-t",
+        "divide-slate-100",
+        "divide-y",
+        "flex",
+        "font-semibold",
+        "items-center",
+        "justify-between",
+        "mt-4",
+        "p-4",
+        "p-6",
+        "pt-4",
+        "ring-1",
+        "ring-slate-200",
+        "rounded-xl",
+        "text-center",
+        "text-slate-500",
+        "text-sm",
+        "text-xl"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/ErrorMessage.tsx#ErrorMessage",
+      "name": "ErrorMessage",
+      "file": "src/components/ErrorMessage.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "message",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-red-50",
+        "px-4",
+        "py-3",
+        "ring-1",
+        "ring-red-200",
+        "rounded-lg",
+        "text-red-700",
+        "text-sm"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/FeatureCard.tsx#FeatureCard",
+      "name": "FeatureCard",
+      "file": "src/components/FeatureCard.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "icon",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 1,
+        "span": 1,
+        "h3": 1,
+        "p": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-white",
+        "flex",
+        "flex-col",
+        "font-semibold",
+        "gap-2",
+        "hover:shadow-md",
+        "p-5",
+        "ring-1",
+        "ring-slate-200",
+        "rounded-xl",
+        "text-2xl",
+        "text-slate-500",
+        "text-slate-900",
+        "text-sm",
+        "transition-shadow"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/Footer.tsx#Footer",
+      "name": "Footer",
+      "file": "src/components/Footer.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "footer": 1,
+        "div": 1,
+        "span": 2
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-white",
+        "border-slate-200",
+        "border-t",
+        "flex",
+        "flex-col",
+        "gap-2",
+        "items-center",
+        "justify-between",
+        "max-w-6xl",
+        "mx-auto",
+        "px-4",
+        "py-6",
+        "sm:flex-row",
+        "text-slate-500",
+        "text-sm"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/Hero.tsx#Hero",
+      "name": "Hero",
+      "file": "src/components/Hero.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [],
+      "childComponents": [
+        "Button",
+        "Link"
+      ],
+      "jsxElements": {
+        "section": 1,
+        "div": 1,
+        "h1": 1,
+        "p": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-gradient-to-br",
+        "bg-white",
+        "flex",
+        "flex-col",
+        "font-bold",
+        "from-indigo-600",
+        "gap-6",
+        "hover:bg-indigo-50",
+        "items-center",
+        "max-w-lg",
+        "mt-3",
+        "p-8",
+        "rounded-2xl",
+        "sm:flex-row",
+        "sm:justify-between",
+        "sm:p-12",
+        "sm:text-4xl",
+        "text-3xl",
+        "text-indigo-100",
+        "text-indigo-700",
+        "text-white",
+        "to-violet-600"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/Layout.tsx#Layout",
+      "name": "Layout",
+      "file": "src/components/Layout.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [],
+      "childComponents": [
+        "Footer",
+        "Navbar",
+        "Outlet"
+      ],
+      "jsxElements": {
+        "div": 1,
+        "main": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-slate-50",
+        "flex",
+        "flex-1",
+        "flex-col",
+        "max-w-6xl",
+        "min-h-screen",
+        "mx-auto",
+        "px-4",
+        "py-8",
+        "text-slate-900",
+        "w-full"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/Navbar.tsx#Navbar",
+      "name": "Navbar",
+      "file": "src/components/Navbar.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [],
+      "childComponents": [
+        "CartBadge",
+        "NavLink"
+      ],
+      "jsxElements": {
+        "header": 1,
+        "nav": 1,
+        "div": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "backdrop-blur",
+        "bg-white/90",
+        "border-b",
+        "border-slate-200",
+        "flex",
+        "font-bold",
+        "font-medium",
+        "gap-1",
+        "hover:bg-slate-100",
+        "items-center",
+        "justify-between",
+        "max-w-6xl",
+        "mx-auto",
+        "px-3",
+        "px-4",
+        "py-1.5",
+        "py-3",
+        "rounded-md",
+        "sticky",
+        "text-indigo-600",
+        "text-lg",
+        "text-slate-600",
+        "text-sm",
+        "top-0",
+        "transition-colors",
+        "z-10"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/ProductCard.tsx#ProductCard",
+      "name": "ProductCard",
+      "file": "src/components/ProductCard.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "product",
+          "type": "Product",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [
+        "useCartStore"
+      ],
+      "childComponents": [
+        "Button",
+        "Link",
+        "Rating"
+      ],
+      "jsxElements": {
+        "div": 3,
+        "span": 1,
+        "img": 1
+      },
+      "eventHandlers": [
+        "onClick"
+      ],
+      "stylingApproach": [
+        "css-module",
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "flex",
+        "flex-1",
+        "flex-col",
+        "font-medium",
+        "font-semibold",
+        "gap-2",
+        "hover:text-indigo-600",
+        "items-center",
+        "justify-between",
+        "line-clamp-2",
+        "mt-auto",
+        "p-4",
+        "pt-2",
+        "text-slate-800",
+        "text-slate-900",
+        "text-sm"
+      ],
+      "cssModuleImports": [
+        "./ProductCard.module.css"
+      ]
+    },
+    {
+      "id": "src/components/ProductGrid.tsx#ProductGrid",
+      "name": "ProductGrid",
+      "file": "src/components/ProductGrid.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "products",
+          "type": "Product[]",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [],
+      "childComponents": [
+        "ProductCard"
+      ],
+      "jsxElements": {
+        "div": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "gap-4",
+        "grid",
+        "grid-cols-1",
+        "lg:grid-cols-3",
+        "sm:grid-cols-2",
+        "xl:grid-cols-4"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/QuantityStepper.tsx#QuantityStepper",
+      "name": "QuantityStepper",
+      "file": "src/components/QuantityStepper.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "quantity",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "onChange",
+          "type": "(quantity: number) => void",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 1,
+        "button": 2,
+        "span": 1
+      },
+      "eventHandlers": [
+        "onClick"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-slate-100",
+        "flex",
+        "font-medium",
+        "gap-2",
+        "h-7",
+        "hover:bg-slate-200",
+        "items-center",
+        "rounded-md",
+        "text-center",
+        "text-slate-700",
+        "text-sm",
+        "w-6",
+        "w-7"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/Rating.tsx#Rating",
+      "name": "Rating",
+      "file": "src/components/Rating.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "value",
+          "type": "number",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 1,
+        "span": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "flex",
+        "gap-0.5",
+        "items-center",
+        "text-amber-400",
+        "text-slate-300"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/SettingToggle.tsx#SettingToggle",
+      "name": "SettingToggle",
+      "file": "src/components/SettingToggle.tsx",
+      "exportType": "default",
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "checked",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onChange",
+          "type": "(checked: boolean) => void",
+          "optional": false
+        }
+      ],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 2,
+        "p": 2,
+        "button": 1,
+        "span": 1
+      },
+      "eventHandlers": [
+        "onClick"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-indigo-600",
+        "bg-slate-300",
+        "flex",
+        "font-medium",
+        "gap-4",
+        "items-center",
+        "justify-between",
+        "py-4",
+        "text-slate-500",
+        "text-slate-900",
+        "text-sm",
+        "translate-x-0.5",
+        "translate-x-5"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/components/Spinner.tsx#Spinner",
+      "name": "Spinner",
+      "file": "src/components/Spinner.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 2
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "animate-spin",
+        "border-4",
+        "border-slate-200",
+        "border-t-indigo-600",
+        "flex",
+        "h-8",
+        "items-center",
+        "justify-center",
+        "py-16",
+        "rounded-full",
+        "w-8"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/pages/HomePage.tsx#HomePage",
+      "name": "HomePage",
+      "file": "src/pages/HomePage.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [],
+      "childComponents": [
+        "FeatureCard",
+        "Hero"
+      ],
+      "jsxElements": {
+        "div": 2
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "flex",
+        "flex-col",
+        "gap-4",
+        "gap-8",
+        "grid",
+        "grid-cols-1",
+        "md:grid-cols-3"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "name": "ProductDetailPage",
+      "file": "src/pages/ProductDetailPage.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [
+        "useCartStore",
+        "useFetch",
+        "useParams"
+      ],
+      "childComponents": [
+        "Button",
+        "ErrorMessage",
+        "Link",
+        "Rating",
+        "Spinner"
+      ],
+      "jsxElements": {
+        "div": 3,
+        "h1": 1,
+        "p": 2,
+        "img": 1
+      },
+      "eventHandlers": [
+        "onClick"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-slate-100",
+        "capitalize",
+        "flex",
+        "flex-col",
+        "font-bold",
+        "font-semibold",
+        "gap-4",
+        "gap-6",
+        "gap-8",
+        "grid",
+        "grid-cols-1",
+        "hover:underline",
+        "md:grid-cols-2",
+        "object-cover",
+        "rounded-xl",
+        "text-2xl",
+        "text-3xl",
+        "text-indigo-600",
+        "text-slate-500",
+        "text-sm",
+        "w-fit",
+        "w-full"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/pages/ProductsPage.tsx#ProductsPage",
+      "name": "ProductsPage",
+      "file": "src/pages/ProductsPage.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [
+        "useFetch"
+      ],
+      "childComponents": [
+        "ErrorMessage",
+        "ProductGrid",
+        "Spinner"
+      ],
+      "jsxElements": {
+        "div": 2,
+        "h1": 1,
+        "p": 1
+      },
+      "eventHandlers": [],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "flex",
+        "flex-col",
+        "font-bold",
+        "gap-6",
+        "text-2xl",
+        "text-slate-500"
+      ],
+      "cssModuleImports": []
+    },
+    {
+      "id": "src/pages/SettingsPage.tsx#SettingsPage",
+      "name": "SettingsPage",
+      "file": "src/pages/SettingsPage.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [
+        "useState"
+      ],
+      "childComponents": [
+        "CartSummary",
+        "SettingToggle"
+      ],
+      "jsxElements": {
+        "div": 2,
+        "section": 2,
+        "h1": 1,
+        "p": 1,
+        "h2": 1
+      },
+      "eventHandlers": [
+        "onChange"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "bg-white",
+        "divide-slate-100",
+        "divide-y",
+        "flex",
+        "flex-col",
+        "font-bold",
+        "gap-8",
+        "mb-4",
+        "mt-2",
+        "px-4",
+        "ring-1",
+        "ring-slate-200",
+        "rounded-xl",
+        "text-2xl",
+        "text-slate-500",
+        "text-xl"
+      ],
+      "cssModuleImports": []
+    }
+  ],
+  "hooks": [
+    {
+      "id": "src/hooks/useFetch.ts#useFetch",
+      "name": "useFetch",
+      "file": "src/hooks/useFetch.ts",
+      "isCustom": true,
+      "usedBy": [
+        "ProductDetailPage",
+        "ProductsPage"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "path": "/",
+      "componentName": "HomePage",
+      "file": "src/pages/HomePage.tsx",
+      "hasParams": false,
+      "params": []
+    },
+    {
+      "path": "products",
+      "componentName": "ProductsPage",
+      "file": "src/pages/ProductsPage.tsx",
+      "hasParams": false,
+      "params": []
+    },
+    {
+      "path": "products/:id",
+      "componentName": "ProductDetailPage",
+      "file": "src/pages/ProductDetailPage.tsx",
+      "hasParams": true,
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "path": "settings",
+      "componentName": "SettingsPage",
+      "file": "src/pages/SettingsPage.tsx",
+      "hasParams": false,
+      "params": []
+    }
+  ],
+  "stateManagement": {
+    "library": "zustand",
+    "stores": [
+      {
+        "id": "src/store/cartStore.ts#useCartStore",
+        "name": "useCartStore",
+        "file": "src/store/cartStore.ts",
+        "stateKeys": [
+          "lines",
+          "add",
+          "remove",
+          "setQuantity",
+          "clear",
+          "count",
+          "total"
+        ],
+        "usedBy": [
+          "CartBadge",
+          "CartItem",
+          "CartSummary",
+          "ProductCard",
+          "ProductDetailPage"
+        ]
+      }
+    ]
+  },
+  "apiLayer": {
+    "clients": [
+      {
+        "id": "src/api/client.ts#client",
+        "library": "axios",
+        "file": "src/api/client.ts",
+        "baseURL": "https://jsonplaceholder.typicode.com"
+      }
+    ],
+    "endpoints": [
+      {
+        "method": "GET",
+        "url": "/photos",
+        "file": "src/api/products.ts"
+      },
+      {
+        "method": "GET",
+        "url": "/photos/${id}",
+        "file": "src/api/products.ts"
+      }
+    ]
+  },
+  "assets": [
+    {
+      "path": "public/favicon.svg",
+      "type": "svg",
+      "referencedBy": []
+    },
+    {
+      "path": "public/icons.svg",
+      "type": "svg",
+      "referencedBy": []
+    },
+    {
+      "path": "src/assets/hero.png",
+      "type": "png",
+      "referencedBy": []
+    },
+    {
+      "path": "src/assets/vite.svg",
+      "type": "svg",
+      "referencedBy": []
+    }
+  ],
+  "edges": [
+    {
+      "from": "src/App.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/HomePage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/ProductsPage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/ProductDetailPage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/SettingsPage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/api/products.ts",
+      "to": "src/api/client.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/api/products.ts",
+      "to": "src/lib/types.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/CartBadge.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/CartItem.tsx",
+      "to": "src/lib/types.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/CartItem.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/CartItem.tsx",
+      "to": "src/components/QuantityStepper.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/CartSummary.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/CartSummary.tsx",
+      "to": "src/components/CartItem.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/CartSummary.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/Hero.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/Navbar.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/Footer.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/Navbar.tsx",
+      "to": "src/components/CartBadge.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/lib/types.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/components/Rating.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/components/ProductCard.module.css",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ProductGrid.tsx",
+      "to": "src/lib/types.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ProductGrid.tsx",
+      "to": "src/components/ProductCard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/index.css",
+      "kind": "imports"
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/App.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/HomePage.tsx",
+      "to": "src/components/Hero.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/HomePage.tsx",
+      "to": "src/components/FeatureCard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/api/products.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/hooks/useFetch.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/Spinner.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/ErrorMessage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/Rating.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/api/products.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/hooks/useFetch.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/components/ProductGrid.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/components/Spinner.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/components/ErrorMessage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx",
+      "to": "src/components/SettingToggle.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx",
+      "to": "src/components/CartSummary.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/store/cartStore.ts",
+      "to": "src/lib/types.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/HomePage.tsx#HomePage",
+      "kind": "renders"
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/components/Layout.tsx#Layout",
+      "kind": "renders"
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "kind": "renders"
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/ProductsPage.tsx#ProductsPage",
+      "kind": "renders"
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/SettingsPage.tsx#SettingsPage",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/CartBadge.tsx#CartBadge",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store"
+    },
+    {
+      "from": "src/components/CartItem.tsx#CartItem",
+      "to": "src/components/QuantityStepper.tsx#QuantityStepper",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/CartItem.tsx#CartItem",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store"
+    },
+    {
+      "from": "src/components/CartSummary.tsx#CartSummary",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/CartSummary.tsx#CartSummary",
+      "to": "src/components/CartItem.tsx#CartItem",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/CartSummary.tsx#CartSummary",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store"
+    },
+    {
+      "from": "src/components/Hero.tsx#Hero",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/Layout.tsx#Layout",
+      "to": "src/components/Footer.tsx#Footer",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/Layout.tsx#Layout",
+      "to": "src/components/Navbar.tsx#Navbar",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/Navbar.tsx#Navbar",
+      "to": "src/components/CartBadge.tsx#CartBadge",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/ProductCard.tsx#ProductCard",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/ProductCard.tsx#ProductCard",
+      "to": "src/components/Rating.tsx#Rating",
+      "kind": "renders"
+    },
+    {
+      "from": "src/components/ProductCard.tsx#ProductCard",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store"
+    },
+    {
+      "from": "src/components/ProductGrid.tsx#ProductGrid",
+      "to": "src/components/ProductCard.tsx#ProductCard",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/HomePage.tsx#HomePage",
+      "to": "src/components/FeatureCard.tsx#FeatureCard",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/HomePage.tsx#HomePage",
+      "to": "src/components/Hero.tsx#Hero",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/ErrorMessage.tsx#ErrorMessage",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/Rating.tsx#Rating",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/Spinner.tsx#Spinner",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store"
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/hooks/useFetch.ts#useFetch",
+      "kind": "uses-hook"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/components/ErrorMessage.tsx#ErrorMessage",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/components/ProductGrid.tsx#ProductGrid",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/components/Spinner.tsx#Spinner",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/hooks/useFetch.ts#useFetch",
+      "kind": "uses-hook"
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx#SettingsPage",
+      "to": "src/components/CartSummary.tsx#CartSummary",
+      "kind": "renders"
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx#SettingsPage",
+      "to": "src/components/SettingToggle.tsx#SettingToggle",
+      "kind": "renders"
+    },
+    {
+      "from": "src/api/products.ts",
+      "to": "src/api/client.ts",
+      "kind": "calls-api"
+    }
+  ],
+  "warnings": []
+}
