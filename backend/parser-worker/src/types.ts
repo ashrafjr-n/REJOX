@@ -56,6 +56,8 @@ export interface Component {
   stylingApproach: StylingApproach[];
   tailwindClasses: string[];
   cssModuleImports: string[];
+  /** Browser globals referenced (localStorage, window, document, ...). */
+  webApis: string[];
 }
 
 export interface Hook {

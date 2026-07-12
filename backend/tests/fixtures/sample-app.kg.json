@@ -253,7 +253,8 @@
         "none"
       ],
       "tailwindClasses": [],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/Button.tsx#Button",
@@ -291,7 +292,8 @@
         "text-white",
         "transition-colors"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/CartBadge.tsx#CartBadge",
@@ -334,7 +336,8 @@
         "text-white",
         "text-xs"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/CartItem.tsx#CartItem",
@@ -385,7 +388,8 @@
         "text-sm",
         "w-14"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/CartSummary.tsx#CartSummary",
@@ -432,7 +436,8 @@
         "text-sm",
         "text-xl"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/ErrorMessage.tsx#ErrorMessage",
@@ -465,7 +470,8 @@
         "text-red-700",
         "text-sm"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/FeatureCard.tsx#FeatureCard",
@@ -518,7 +524,8 @@
         "text-sm",
         "transition-shadow"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/Footer.tsx#Footer",
@@ -554,7 +561,8 @@
         "text-slate-500",
         "text-sm"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/Hero.tsx#Hero",
@@ -601,7 +609,8 @@
         "text-white",
         "to-violet-600"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/Layout.tsx#Layout",
@@ -636,7 +645,8 @@
         "text-slate-900",
         "w-full"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/Navbar.tsx#Navbar",
@@ -686,7 +696,8 @@
         "transition-colors",
         "z-10"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/ProductCard.tsx#ProductCard",
@@ -740,7 +751,8 @@
       ],
       "cssModuleImports": [
         "./ProductCard.module.css"
-      ]
+      ],
+      "webApis": []
     },
     {
       "id": "src/components/ProductGrid.tsx#ProductGrid",
@@ -773,7 +785,8 @@
         "sm:grid-cols-2",
         "xl:grid-cols-4"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/QuantityStepper.tsx#QuantityStepper",
@@ -820,7 +833,8 @@
         "w-6",
         "w-7"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/Rating.tsx#Rating",
@@ -851,7 +865,8 @@
         "text-amber-400",
         "text-slate-300"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/SettingToggle.tsx#SettingToggle",
@@ -909,7 +924,8 @@
         "translate-x-0.5",
         "translate-x-5"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/components/Spinner.tsx#Spinner",
@@ -939,7 +955,8 @@
         "rounded-full",
         "w-8"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/pages/HomePage.tsx#HomePage",
@@ -968,7 +985,8 @@
         "grid-cols-1",
         "md:grid-cols-3"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
@@ -1024,7 +1042,8 @@
         "w-fit",
         "w-full"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/pages/ProductsPage.tsx#ProductsPage",
@@ -1057,7 +1076,8 @@
         "text-2xl",
         "text-slate-500"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     },
     {
       "id": "src/pages/SettingsPage.tsx#SettingsPage",
@@ -1103,7 +1123,8 @@
         "text-slate-500",
         "text-xl"
       ],
-      "cssModuleImports": []
+      "cssModuleImports": [],
+      "webApis": []
     }
   ],
   "hooks": [

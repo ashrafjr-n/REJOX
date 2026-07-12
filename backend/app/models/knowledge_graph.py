@@ -73,6 +73,8 @@ class Component(KGBase):
     stylingApproach: list[StylingApproach] = Field(default_factory=list)
     tailwindClasses: list[str] = Field(default_factory=list)
     cssModuleImports: list[str] = Field(default_factory=list)
+    # Browser globals referenced (localStorage, window, document, ...).
+    webApis: list[str] = Field(default_factory=list)
 
 
 # --- Hooks ------------------------------------------------------------------
