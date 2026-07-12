@@ -9,7 +9,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from app.models.analysis import AnalysisReport
 from app.models.knowledge_graph import KnowledgeGraph
+from app.pipeline.analyzer import analyze_graph
 from app.pipeline.parser import ParserError, parse_project
 
 app = FastAPI(
@@ -48,3 +50,13 @@ def parse(req: ParseRequest) -> KnowledgeGraph:
         return parse_project(Path(req.path))
     except ParserError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/analyze", response_model=AnalysisReport)
+def analyze(req: ParseRequest) -> AnalysisReport:
+    """Analysis stage: parse the project, then analyze migratability."""
+    try:
+        kg = parse_project(Path(req.path))
+    except ParserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return analyze_graph(kg)
