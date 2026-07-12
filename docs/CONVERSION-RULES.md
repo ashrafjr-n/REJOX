@@ -25,6 +25,19 @@ add a row here **first**, then implement it.
 | `<ul>` / `<ol>` / `<li>`          | `<FlatList>` / `<View>` + `<Text>`          | Medium     | Long/dynamic lists → `FlatList`; small static → mapped Views. |
 | CSS `display: flex`               | `flex` (default in RN)                       | High       | RN is flexbox by default; `flexDirection` defaults to `column`, not `row`. |
 | CSS responsive grid / media query | `Dimensions` / `useWindowDimensions`         | Low        | No CSS grid or media queries; requires manual/LLM-assisted reflow. |
+| Tailwind `grid` / `grid-cols-*`   | flexbox + `flex-wrap` (manual reflow)        | Low        | Analyzer code `CSS_GRID`. No CSS grid in RN. |
+| Tailwind `hover:*`                | `Pressable` pressed/`onPressIn` state        | Low        | Analyzer code `HOVER_STATE`. No hover on touch. |
+| Tailwind `sm:`/`md:`/`lg:` prefixes | NativeWind breakpoints / `useWindowDimensions` | Medium  | Analyzer code `RESPONSIVE_BREAKPOINT`. Needs NativeWind config. |
+| Tailwind `bg-gradient`/`from-`/`to-` | `expo-linear-gradient`                    | Medium     | Analyzer code `GRADIENT`. Not a core RN feature. |
+| Tailwind `group`/`group-hover:`   | — (no equivalent)                            | Low        | Analyzer code `GROUP_SELECTOR`. No descendant selectors. |
+| Dynamic `className` (clsx/cva)    | resolve statically or hand-convert           | Low        | Analyzer code `DYNAMIC_CLASSNAME`. Runtime classes can't be mapped statically. |
+| CSS Module (`*.module.css`)       | `StyleSheet.create` / NativeWind             | Medium     | Analyzer code `CSS_MODULE`. Hand-convert per file. |
+| `<table>` / `<canvas>` / `<iframe>` | — (no equivalent)                          | Low        | Analyzer code `WEB_ONLY_ELEMENT` (blocker). Out of MVP. |
+| `<select>`                        | `@react-native-picker/picker`                | Medium     | Component/library swap. |
+| `<form>`                          | `<View>` + controlled state                  | Medium     | No native form submit; wire `onSubmit` into state. |
+| `onChange`                        | `onChangeText` / `onValueChange`             | High       | Analyzer code `EVENT_CONVERSION`. |
+| `onSubmit` / `onMouseEnter` / `onKeyDown` | — (no equivalent)                    | Low        | Analyzer code `WEB_ONLY_EVENT`. No mouse/keyboard/submit on touch. |
+| Redux / Three.js / Next.js / Electron | — (unsupported in MVP)                   | Low        | Analyzer code `UNSUPPORTED_LIBRARY` (blocker). See `PRD.md`. |
 
 ## Legend / conventions
 
