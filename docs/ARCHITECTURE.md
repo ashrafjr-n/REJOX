@@ -149,7 +149,7 @@ definitions):
 | ----------------- | --------------- |
 | `project`         | `{ name, root, framework:"react", language:"ts"|"js"|"mixed", bundler, dependencies:{name:version} }` |
 | `files`           | `[{ path, type:"component"|"hook"|"store"|"api"|"style"|"config"|"asset"|"other", loc }]` |
-| `components`      | `[{ id, name, file, exportType, props:[{name,type,optional}], hooksUsed, childComponents, jsxElements:{tag:count}, eventHandlers, stylingApproach:["tailwind"|"css-module"|"inline"|"none"], tailwindClasses, cssModuleImports }]` |
+| `components`      | `[{ id, name, file, exportType, props:[{name,type,optional}], hooksUsed, childComponents, jsxElements:{tag:count}, eventHandlers, stylingApproach:["tailwind"|"css-module"|"inline"|"none"], tailwindClasses, cssModuleImports, webApis }]` |
 | `hooks`           | `[{ id, name, file, isCustom, usedBy }]` (project-defined custom hooks) |
 | `routes`          | `[{ path, componentName, file, hasParams, params }]` |
 | `stateManagement` | `{ library:"zustand"|"context"|"none", stores:[{ id, name, file, stateKeys, usedBy }] }` |
@@ -183,3 +183,71 @@ listed honestly so the Analyzer stage can account for them:
   scope entirely.
 - **Non-import asset references** (assets referenced by string URL rather than a
   JS import) are listed as assets with an empty `referencedBy`.
+
+---
+
+## Analyzer stage — implementation
+
+The Analyzer is **pure, deterministic functions over the Knowledge Graph**. No
+LLM, no source re-parsing — every finding traces to a KG fact (if a fact is
+missing, it is added to the Node worker first; that is why the KG carries
+`webApis`). Entry point:
+
+```python
+from app.pipeline.analyzer import analyze_graph   # analyze_graph(kg) -> AnalysisReport
+```
+
+```
+backend/app/pipeline/
+├── analyzer.py           # composes the rules into an AnalysisReport
+└── rules/
+    ├── codes.py          # stable issue codes (report contract)
+    ├── libraries.py      # KNOWN_LIBRARIES table → LibraryFinding[]
+    ├── components.py      # ELEMENT_MAP / EVENT_MAP → per-component issues
+    ├── styling.py         # Tailwind class classifier + styling report
+    ├── routing.py         # react-router → proposed React Navigation stack
+    └── scoring.py         # sub-scores + weighted migration score
+```
+
+### Rule groups
+
+- **Library rules** — a declarative `KNOWN_LIBRARIES` table (data, not code)
+  gives each dependency a category/status/compatibility and RN equivalents.
+  Findings come from `project.dependencies` **plus** usage-derived signals the
+  KG carries: Tailwind (from `stylingApproach`) and the bundler
+  (`project.bundler`). The PRD "NOT supported" list (redux, three.js, next,
+  electron…) maps to `status:"unsupported"` → a **blocker**. Unknown deps →
+  `status:"unknown"` (never guessed).
+- **Component rules** — per component: web-only JSX elements via a declarative
+  `ELEMENT_MAP` (div→View trivial/silent, img→Image info, `table`/`canvas`/
+  `iframe`→**blocker**); event handlers via `EVENT_MAP` (onClick→onPress info,
+  onSubmit/onMouse*→warning); Tailwind classes classified against NativeWind
+  support (`hover:`/`grid`/`group`/gradient → unmappable); CSS Modules →
+  warning; dynamic className (tailwind approach but 0 static classes) → warning;
+  and `WEB_API_USAGE` from `component.webApis`.
+- **Routing rules** — react-router → a `needs-conversion` finding plus a proposed
+  React Navigation stack (screen name + params per route). A worker
+  `createBrowserRouter` warning surfaces as an `OBJECT_ROUTER_UNPARSED` blocker.
+
+### Score formula
+
+Each sub-score is a pure function of findings, `0-100` (higher = more
+migratable), combined by fixed weights that sum to `1.0`:
+
+```
+migrationScore = 0.40·components + 0.25·libraries + 0.20·styling
+               + 0.10·routing    + 0.05·api
+```
+
+- **components** = mean of per-component scores. A component's score is
+  `100 − Σ penalty` where `info=2, warning=10, blocker=40`; any blocker forces
+  difficulty `blocked` (score capped at 20). Buckets: `≥90 trivial · ≥75 easy ·
+  ≥55 medium · <55 hard`.
+- **libraries** = mean `compatibility` across findings.
+- **styling** = `100 −` per-component penalties for grid(3)/hover(2)/responsive(1)
+  /gradient(2)/group(2)/css-module(4)/dynamic(5).
+- **routing** = `100` if no router, else `80 − 20·(object-router blockers)`.
+- **api** = `100 − 10·(endpoints with an unresolved URL)`.
+
+On the benchmark `sample-app`, this yields **migrationScore ≈ 83.6**
+(components 91.8, libraries 85.7, styling 62.0, routing 80.0, api 100.0).
