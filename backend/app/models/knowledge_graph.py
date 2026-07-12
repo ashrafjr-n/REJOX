@@ -59,6 +59,40 @@ class PropInfo(KGBase):
     optional: bool = False
 
 
+class TextNodeInfo(KGBase):
+    """A raw text / expression child in JSX."""
+
+    jsxParentTag: str
+    # Static text, or the literal string "dynamic" for an expression child.
+    text: str
+    # True when not already inside a text-ish element (needs <Text> in RN).
+    isBare: bool
+
+
+class LayoutHint(KGBase):
+    """Flex/grid layout info for one element."""
+
+    elementTag: str
+    hasFlexClass: bool
+    flexDirection: Optional[Literal["row", "column"]] = None
+    isGrid: bool
+
+
+class ImageInfo(KGBase):
+    """Info about one ``<img>``."""
+
+    hasExplicitSize: bool
+    srcKind: Literal["import", "literal", "dynamic"]
+    src: Optional[str] = None
+
+
+class InlineStyleInfo(KGBase):
+    """An element carrying an inline ``style={{…}}`` object."""
+
+    elementTag: str
+    properties: list[str] = Field(default_factory=list)
+
+
 class Component(KGBase):
     id: str
     name: str
@@ -75,6 +109,11 @@ class Component(KGBase):
     cssModuleImports: list[str] = Field(default_factory=list)
     # Browser globals referenced (localStorage, window, document, ...).
     webApis: list[str] = Field(default_factory=list)
+    # --- Conversion facts (Converter Part 1) ---
+    textNodes: list[TextNodeInfo] = Field(default_factory=list)
+    layoutHints: list[LayoutHint] = Field(default_factory=list)
+    images: list[ImageInfo] = Field(default_factory=list)
+    inlineStyles: list[InlineStyleInfo] = Field(default_factory=list)
 
 
 # --- Hooks ------------------------------------------------------------------
