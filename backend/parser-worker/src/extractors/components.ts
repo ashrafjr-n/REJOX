@@ -15,6 +15,12 @@ import {
   type FunctionLike,
 } from '../util';
 import { extractStyling } from './styling';
+import {
+  extractImages,
+  extractInlineStyles,
+  extractLayoutHints,
+  extractTextNodes,
+} from './conversion';
 import type { FileImports } from './imports';
 import type { Component, PropInfo } from '../types';
 
@@ -199,6 +205,10 @@ export function extractComponents(
       tailwindClasses: styling.tailwindClasses,
       cssModuleImports: styling.cssModuleImports,
       webApis: extractWebApis(fn),
+      textNodes: extractTextNodes(fn),
+      layoutHints: extractLayoutHints(fn),
+      images: extractImages(fn, imports),
+      inlineStyles: extractInlineStyles(fn),
     });
   }
 

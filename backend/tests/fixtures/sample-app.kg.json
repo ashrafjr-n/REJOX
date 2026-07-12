@@ -254,7 +254,11 @@
       ],
       "tailwindClasses": [],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [],
+      "layoutHints": [],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/Button.tsx#Button",
@@ -293,7 +297,11 @@
         "transition-colors"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [],
+      "layoutHints": [],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/CartBadge.tsx#CartBadge",
@@ -337,7 +345,29 @@
         "text-xs"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "Link",
+          "text": "\ud83d\uded2",
+          "isBare": true
+        },
+        {
+          "jsxParentTag": "span",
+          "text": "dynamic",
+          "isBare": false
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "span",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/CartItem.tsx#CartItem",
@@ -389,7 +419,45 @@
         "w-14"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "$",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "button",
+          "text": "\u2715",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [
+        {
+          "hasExplicitSize": true,
+          "srcKind": "dynamic",
+          "src": "product.thumbnailUrl"
+        }
+      ],
+      "inlineStyles": []
     },
     {
       "id": "src/components/CartSummary.tsx#CartSummary",
@@ -437,7 +505,44 @@
         "text-xl"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "div",
+          "text": "Your cart is empty.",
+          "isBare": true
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "Total",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "$",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "Button",
+          "text": "Clear cart",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/ErrorMessage.tsx#ErrorMessage",
@@ -471,7 +576,17 @@
         "text-sm"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "div",
+          "text": "dynamic",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/FeatureCard.tsx#FeatureCard",
@@ -525,7 +640,34 @@
         "transition-shadow"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "span",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "h3",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/Footer.tsx#Footer",
@@ -562,7 +704,29 @@
         "text-sm"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "span",
+          "text": "\u00a9 2026 Sample Store \u2014 a Rejox migration benchmark.",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "span",
+          "text": "Built with React + Vite",
+          "isBare": false
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/Hero.tsx#Hero",
@@ -610,7 +774,34 @@
         "to-violet-600"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "h1",
+          "text": "Everything you need, in one place.",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "A small but realistic storefront used as the migration benchmark for\n          Rejox AI.",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "Button",
+          "text": "Shop products",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "section",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/Layout.tsx#Layout",
@@ -646,7 +837,18 @@
         "w-full"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/Navbar.tsx#Navbar",
@@ -697,7 +899,35 @@
         "z-10"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "NavLink",
+          "text": "Sample&nbsp;Store",
+          "isBare": true
+        },
+        {
+          "jsxParentTag": "NavLink",
+          "text": "dynamic",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "nav",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        },
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/ProductCard.tsx#ProductCard",
@@ -752,7 +982,51 @@
       "cssModuleImports": [
         "./ProductCard.module.css"
       ],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "Link",
+          "text": "dynamic",
+          "isBare": true
+        },
+        {
+          "jsxParentTag": "span",
+          "text": "$",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "span",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "Button",
+          "text": "Add",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        },
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [
+        {
+          "hasExplicitSize": false,
+          "srcKind": "dynamic",
+          "src": "product.thumbnailUrl"
+        }
+      ],
+      "inlineStyles": []
     },
     {
       "id": "src/components/ProductGrid.tsx#ProductGrid",
@@ -786,7 +1060,18 @@
         "xl:grid-cols-4"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": false,
+          "flexDirection": null,
+          "isGrid": true
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/QuantityStepper.tsx#QuantityStepper",
@@ -834,7 +1119,34 @@
         "w-7"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "button",
+          "text": "\u2212",
+          "isBare": true
+        },
+        {
+          "jsxParentTag": "span",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "button",
+          "text": "+",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/Rating.tsx#Rating",
@@ -866,7 +1178,24 @@
         "text-slate-300"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "span",
+          "text": "\u2605",
+          "isBare": false
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/SettingToggle.tsx#SettingToggle",
@@ -925,7 +1254,29 @@
         "translate-x-5"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/components/Spinner.tsx#Spinner",
@@ -956,7 +1307,18 @@
         "w-8"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": null,
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/pages/HomePage.tsx#HomePage",
@@ -986,7 +1348,24 @@
         "md:grid-cols-3"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        },
+        {
+          "elementTag": "div",
+          "hasFlexClass": false,
+          "flexDirection": null,
+          "isGrid": true
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
@@ -1043,7 +1422,77 @@
         "w-full"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "Link",
+          "text": "\u2190 Back to products",
+          "isBare": true
+        },
+        {
+          "jsxParentTag": "h1",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "$",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "Product #",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "dynamic",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": ". A benchmark item for the Rejox migration engine.",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "Button",
+          "text": "Add to cart",
+          "isBare": true
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        },
+        {
+          "elementTag": "div",
+          "hasFlexClass": false,
+          "flexDirection": null,
+          "isGrid": true
+        },
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        }
+      ],
+      "images": [
+        {
+          "hasExplicitSize": false,
+          "srcKind": "dynamic",
+          "src": "data.url"
+        }
+      ],
+      "inlineStyles": []
     },
     {
       "id": "src/pages/ProductsPage.tsx#ProductsPage",
@@ -1077,7 +1526,29 @@
         "text-slate-500"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "h1",
+          "text": "Products",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "Browse the full catalogue.",
+          "isBare": false
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     },
     {
       "id": "src/pages/SettingsPage.tsx#SettingsPage",
@@ -1124,7 +1595,34 @@
         "text-xl"
       ],
       "cssModuleImports": [],
-      "webApis": []
+      "webApis": [],
+      "textNodes": [
+        {
+          "jsxParentTag": "h1",
+          "text": "Your cart",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "p",
+          "text": "Review items before checkout.",
+          "isBare": false
+        },
+        {
+          "jsxParentTag": "h2",
+          "text": "Preferences",
+          "isBare": false
+        }
+      ],
+      "layoutHints": [
+        {
+          "elementTag": "div",
+          "hasFlexClass": true,
+          "flexDirection": "column",
+          "isGrid": false
+        }
+      ],
+      "images": [],
+      "inlineStyles": []
     }
   ],
   "hooks": [

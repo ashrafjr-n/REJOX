@@ -43,6 +43,36 @@ export interface PropInfo {
   optional: boolean;
 }
 
+/** A raw text / expression child in JSX (conversion fact). */
+export interface TextNodeInfo {
+  jsxParentTag: string;
+  /** Static text, or the literal string "dynamic" for an expression child. */
+  text: string;
+  /** True when the text is not already inside a text-ish element (needs <Text>). */
+  isBare: boolean;
+}
+
+/** Flex/grid layout info for one element (conversion fact). */
+export interface LayoutHint {
+  elementTag: string;
+  hasFlexClass: boolean;
+  flexDirection: 'row' | 'column' | null;
+  isGrid: boolean;
+}
+
+/** Info about one <img> (conversion fact). */
+export interface ImageInfo {
+  hasExplicitSize: boolean;
+  srcKind: 'import' | 'literal' | 'dynamic';
+  src: string | null;
+}
+
+/** An element carrying an inline style object (conversion fact). */
+export interface InlineStyleInfo {
+  elementTag: string;
+  properties: string[];
+}
+
 export interface Component {
   id: string;
   name: string;
@@ -58,6 +88,11 @@ export interface Component {
   cssModuleImports: string[];
   /** Browser globals referenced (localStorage, window, document, ...). */
   webApis: string[];
+  // --- Conversion facts (Converter Part 1) ---
+  textNodes: TextNodeInfo[];
+  layoutHints: LayoutHint[];
+  images: ImageInfo[];
+  inlineStyles: InlineStyleInfo[];
 }
 
 export interface Hook {
