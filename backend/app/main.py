@@ -11,8 +11,10 @@ from pydantic import BaseModel, Field
 
 from app.models.analysis import AnalysisReport
 from app.models.knowledge_graph import KnowledgeGraph
+from app.models.plan import PlanResponse
 from app.pipeline.analyzer import analyze_graph
 from app.pipeline.parser import ParserError, parse_project
+from app.pipeline.planner import plan_migration
 
 app = FastAPI(
     title="Rejox AI",
@@ -60,3 +62,15 @@ def analyze(req: ParseRequest) -> AnalysisReport:
     except ParserError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return analyze_graph(kg)
+
+
+@app.post("/api/plan", response_model=PlanResponse)
+def plan(req: ParseRequest) -> PlanResponse:
+    """Plan stage: parse + analyze + plan; returns the report and plan together."""
+    try:
+        kg = parse_project(Path(req.path))
+    except ParserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    report = analyze_graph(kg)
+    migration_plan = plan_migration(report, kg)
+    return PlanResponse(report=report, plan=migration_plan)
