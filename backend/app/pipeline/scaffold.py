@@ -1,0 +1,210 @@
+"""Scaffold generator.
+
+Generates a fresh **Expo (TypeScript)** project skeleton from the answered Ask
+questions. Deterministic, template-driven, no source code copied — just the
+project shell wired for the chosen styling engine and navigation library.
+
+Getting the NativeWind babel/metro wiring right is the common failure point, so
+those live as real template files under ``templates/`` and are asserted in the
+tests.
+
+    generate_scaffold(out_dir, answers, source_dependencies) -> ScaffoldResult
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+
+# Base Expo dependency set (recent, coherent SDK).
+_BASE_DEPS = {
+    "expo": "~52.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+}
+_BASE_DEV_DEPS = {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~18.3.12",
+    "typescript": "^5.3.3",
+}
+# Source deps that carry over unchanged when present.
+_CARRY_OVER = ("zustand", "axios")
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+@dataclass
+class ScaffoldResult:
+    out_dir: Path
+    files: list[str] = field(default_factory=list)
+    dependencies: dict[str, str] = field(default_factory=dict)
+    dev_dependencies: dict[str, str] = field(default_factory=dict)
+
+
+def _slug(name: str) -> str:
+    return _SLUG_RE.sub("-", name.strip().lower()).strip("-") or "rejox-app"
+
+
+def _render(template_name: str, subs: dict[str, str]) -> str:
+    text = (TEMPLATES_DIR / template_name).read_text()
+    for key, value in subs.items():
+        text = text.replace(f"{{{{{key}}}}}", value)
+    return text
+
+
+def _build_dependencies(
+    styling: str, navigation: str | None, source_deps: dict[str, str]
+) -> tuple[dict[str, str], dict[str, str]]:
+    deps = dict(_BASE_DEPS)
+    dev = dict(_BASE_DEV_DEPS)
+
+    if styling == "nativewind":
+        deps["nativewind"] = "^4.1.23"
+        dev["tailwindcss"] = "^3.4.17"
+
+    if navigation == "react-navigation":
+        deps["@react-navigation/native"] = "^7.0.0"
+        deps["@react-navigation/native-stack"] = "^7.1.0"
+        deps["react-native-screens"] = "~4.4.0"
+        deps["react-native-safe-area-context"] = "~4.12.0"
+    elif navigation == "expo-router":
+        deps["expo-router"] = "~4.0.0"
+        deps["react-native-screens"] = "~4.4.0"
+        deps["react-native-safe-area-context"] = "~4.12.0"
+        deps["expo-linking"] = "~7.0.0"
+        deps["expo-constants"] = "~17.0.0"
+
+    for lib in _CARRY_OVER:
+        if lib in source_deps:
+            deps[lib] = source_deps[lib]
+
+    return dict(sorted(deps.items())), dict(sorted(dev.items()))
+
+
+def generate_scaffold(
+    out_dir: Path,
+    answers: dict[str, str],
+    source_dependencies: dict[str, str] | None = None,
+    app_name: str = "Rejox App",
+) -> ScaffoldResult:
+    """Render an Expo TS scaffold into ``out_dir`` from the answered questions.
+
+    Args:
+        out_dir: Directory to write the scaffold into (created if missing).
+        answers: questionId → optionId (e.g. ``{"styling-engine": "nativewind"}``).
+        source_dependencies: the source project's deps, for carry-over versions.
+        app_name: Human-facing app name.
+    """
+    source_deps = source_dependencies or {}
+    styling = answers.get("styling-engine", "stylesheet")
+    navigation = answers.get("navigation-library")
+    nativewind = styling == "nativewind"
+    slug = _slug(app_name)
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    deps, dev = _build_dependencies(styling, navigation, source_deps)
+    written: list[str] = []
+
+    def write(rel: str, content: str) -> None:
+        target = out_dir / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+        written.append(rel)
+
+    main = "expo-router/entry" if navigation == "expo-router" else "index.ts"
+
+    # package.json
+    write("package.json", _render("package.json.tmpl", {
+        "APP_SLUG": slug,
+        "MAIN": main,
+        "DEPENDENCIES": json.dumps(deps, indent=2).replace("\n", "\n  "),
+        "DEV_DEPENDENCIES": json.dumps(dev, indent=2).replace("\n", "\n  "),
+    }))
+
+    # app.json
+    plugins = json.dumps(["expo-router"]) if navigation == "expo-router" else "[]"
+    write("app.json", _render("app.json.tmpl", {
+        "APP_NAME": app_name,
+        "APP_SLUG": slug,
+        "PLUGINS": plugins,
+    }))
+
+    # tsconfig.json
+    includes = ["**/*.ts", "**/*.tsx"]
+    if nativewind:
+        includes.append("nativewind-env.d.ts")
+    write("tsconfig.json", _render("tsconfig.json.tmpl", {
+        "TS_INCLUDE": json.dumps(includes),
+    }))
+
+    # babel.config.js
+    if nativewind:
+        babel_presets = (
+            '      ["babel-preset-expo", { jsxImportSource: "nativewind" }],\n'
+            '      "nativewind/babel",'
+        )
+    else:
+        babel_presets = '      "babel-preset-expo",'
+    write("babel.config.js", _render("babel.config.js.tmpl", {
+        "BABEL_PRESETS": babel_presets,
+    }))
+
+    # metro.config.js
+    if nativewind:
+        metro_imports = 'const { withNativeWind } = require("nativewind/metro");'
+        metro_export = 'withNativeWind(config, { input: "./global.css" })'
+    else:
+        metro_imports = ""
+        metro_export = "config"
+    write("metro.config.js", _render("metro.config.js.tmpl", {
+        "METRO_IMPORTS": metro_imports,
+        "METRO_EXPORT": metro_export,
+    }))
+
+    # NativeWind extras
+    if nativewind:
+        write("global.css", _render("global.css.tmpl", {}))
+        write("tailwind.config.js", _render("tailwind.config.js.tmpl", {}))
+        write("nativewind-env.d.ts", _render("nativewind-env.d.ts.tmpl", {}))
+
+    # Entry points (skeleton only)
+    if navigation == "expo-router":
+        css_import = 'import "../global.css";\n' if nativewind else ""
+        write("app/_layout.tsx",
+              f'{css_import}import {{ Stack }} from "expo-router";\n\n'
+              "export default function RootLayout() {\n"
+              "  return <Stack />;\n}\n")
+        write("app/index.tsx",
+              'import { Text, View } from "react-native";\n\n'
+              "export default function Index() {\n"
+              '  return (\n    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>\n'
+              f"      <Text>{app_name} — scaffold ready</Text>\n"
+              "    </View>\n  );\n}\n")
+    else:
+        css_import = 'import "./global.css";\n' if nativewind else ""
+        write("App.tsx", _render("App.tsx.tmpl", {
+            "APP_CSS_IMPORT": css_import,
+            "APP_NAME": app_name,
+        }))
+        write("index.ts", _render("index.ts.tmpl", {}))
+
+    # Empty src/ tree mirroring the source layout.
+    for sub in ("components", "screens", "store", "api", "hooks"):
+        write(f"src/{sub}/.gitkeep", "")
+
+    # A minimal .gitignore for the generated project.
+    write(".gitignore", "node_modules/\n.expo/\ndist/\n*.log\n")
+
+    return ScaffoldResult(
+        out_dir=out_dir,
+        files=sorted(written),
+        dependencies=deps,
+        dev_dependencies=dev,
+    )
