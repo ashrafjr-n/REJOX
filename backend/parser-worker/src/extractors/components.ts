@@ -126,6 +126,51 @@ function extractJsxUsage(fn: FunctionLike): JsxUsage {
   };
 }
 
+// Browser globals with no React Native equivalent. Detected so the Analyzer can
+// flag WEB_API_USAGE from a KG fact (parsing stays in Node, never in Python).
+const WEB_GLOBALS = new Set([
+  'localStorage',
+  'sessionStorage',
+  'document',
+  'window',
+  'navigator',
+  'location',
+  'history',
+  'alert',
+  'confirm',
+  'prompt',
+  'matchMedia',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+]);
+
+/** Collect browser-global references used inside a component body. */
+function extractWebApis(fn: FunctionLike): string[] {
+  const found = new Set<string>();
+  for (const id of fn.getDescendantsOfKind(SyntaxKind.Identifier)) {
+    const text = id.getText();
+    if (!WEB_GLOBALS.has(text)) continue;
+
+    // Skip when the identifier is a property name (`foo.window`), an object
+    // property key, or a locally declared/imported binding that shadows it.
+    const parent = id.getParent();
+    if (
+      Node.isPropertyAccessExpression(parent) &&
+      parent.getNameNode() === id
+    ) {
+      continue;
+    }
+    if (
+      Node.isPropertyAssignment(parent) &&
+      parent.getNameNode() === id
+    ) {
+      continue;
+    }
+    found.add(text);
+  }
+  return [...found].sort();
+}
+
 export function extractComponents(
   sourceFile: SourceFile,
   fileRel: string,
@@ -153,6 +198,7 @@ export function extractComponents(
       stylingApproach: styling.stylingApproach,
       tailwindClasses: styling.tailwindClasses,
       cssModuleImports: styling.cssModuleImports,
+      webApis: extractWebApis(fn),
     });
   }
 
