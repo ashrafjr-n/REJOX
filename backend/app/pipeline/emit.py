@@ -35,6 +35,7 @@ from app.models.emission import EmittedFile, EmittedProject, SkippedFile
 from app.models.knowledge_graph import KnowledgeGraph
 from app.models.plan import MigrationPlan
 from app.models.transformation import TransformResult
+from app.ai.navigation import generate_navigator, stack_spec_from_routes
 from app.pipeline.analyzer import analyze_graph
 from app.pipeline.scaffold import generate_scaffold
 from app.pipeline.transformer import build_transform_options, transform_component
@@ -92,54 +93,16 @@ def _todo_codes(code: str) -> list[str]:
 def _navigator_source(routes: list[RouteMapping], nativewind: bool) -> tuple[str, list[str]]:
     """Generate ``src/navigation/AppNavigator.tsx`` from the route table.
 
-    Screen names match the Analyzer's route table exactly, so the
-    ``navigation.navigate('Screen', …)`` calls the transformer emitted resolve.
-    Returns (source, todoCodes). The shared-chrome wrapper (``<Layout>`` /
-    ``<Outlet>``) is a navigator-shape decision → recorded as NAV_CONTAINER
-    residue, never silently invented.
+    Navigator wiring is a **rule**, not a judgment call (NAV_CONTAINER tier 2):
+    given the route table, the AI Resolution Engine's navigation generator emits
+    a complete native-stack — screen names match the Analyzer's route table
+    exactly, so the transformer's ``navigation.navigate('Screen', …)`` calls
+    resolve. No NAV_CONTAINER TODO survives; the navigator SHAPE (stack vs tabs
+    vs drawer) is a separate design decision surfaced as a Planner question
+    (``navigation.resolver.infer_navigator_shape``), not code residue.
     """
-    seen: dict[str, RouteMapping] = {}
-    for r in routes:
-        if r.componentName and r.screenName not in seen:
-            seen[r.screenName] = r
-    ordered = list(seen.values())
-
-    imports = [
-        "import { NavigationContainer } from '@react-navigation/native';",
-        "import { createNativeStackNavigator } from '@react-navigation/native-stack';",
-    ]
-    for r in ordered:
-        imports.append(f"import {r.componentName} from '../screens/{r.componentName}';")
-
-    screens = "\n".join(
-        f"        <Stack.Screen name=\"{r.screenName}\" component={{{r.componentName}}} />"
-        for r in ordered
-    )
-    initial = ordered[0].screenName if ordered else "Home"
-
-    todo = (
-        "// ===== REJOX-TODO: 1 item(s) need attention =====\n"
-        "// REJOX-TODO(NAV_CONTAINER): the source wrapped routes in a shared "
-        "<Layout>/<Outlet>; a native-stack was generated from the route table. "
-        "Re-express the shared chrome (Navbar/Footer) as a header or nested "
-        "navigator if desired.\n"
-    )
-
-    src = (
-        "\n".join(imports)
-        + "\n\n"
-        + todo
-        + "\nconst Stack = createNativeStackNavigator();\n\n"
-        + "export function AppNavigator() {\n"
-        + "  return (\n"
-        + "    <NavigationContainer>\n"
-        + f'      <Stack.Navigator initialRouteName="{initial}">\n'
-        + screens
-        + "\n      </Stack.Navigator>\n"
-        + "    </NavigationContainer>\n"
-        + "  );\n}\n"
-    )
-    return src, ["NAV_CONTAINER"]
+    spec = stack_spec_from_routes(routes)
+    return generate_navigator(spec, routes), []
 
 
 def _app_source(has_navigator: bool, nativewind: bool, app_name: str) -> str:
@@ -230,6 +193,25 @@ def emit_project(
             skipped.append(SkippedFile(path=src_rel, reason="source file not found on disk"))
             continue
         result = transform_component(abs_src, options)
+
+        # NAV_CONTAINER (tier 2): a shared <Layout>/<Outlet>/<Routes> component
+        # is router structure, subsumed by the generated navigator. Skip it
+        # rather than emit a dead <Outlet/> + a TODO — the shared chrome
+        # (Navbar/Footer) becomes the navigator-shape decision (Planner question).
+        if any(u.code == "NAV_CONTAINER" for u in result.unhandled):
+            skipped.append(SkippedFile(
+                path=src_rel,
+                reason=(
+                    "router-structure component (Outlet/Routes) subsumed by the "
+                    "generated navigator; re-express its chrome via the chosen "
+                    "navigator shape (see the navigation plan question)"
+                ),
+            ))
+            # Defensive: drop any stale emission of this file from a prior run
+            # into a reused out_dir, so a now-skipped file never lingers.
+            (out_dir / _target_rel(src_rel)).unlink(missing_ok=True)
+            continue
+
         target_rel = _target_rel(src_rel)
         target = out_dir / target_rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -257,9 +239,11 @@ def emit_project(
             EmittedFile(
                 path=nav_rel,
                 sourceFile="src/App.tsx",
-                provenance=ConfidenceSource.UNHANDLED,  # navigator shape is residue
+                # Navigator wiring is a rule (generated from the route table);
+                # the SHAPE decision lives in the Planner question, not here.
+                provenance=ConfidenceSource.DETERMINISTIC_WARNING,
                 unhandled=[],
-                todoCodes=nav_todos,
+                todoCodes=nav_todos,  # [] — no NAV_CONTAINER TODO survives
             )
         )
 

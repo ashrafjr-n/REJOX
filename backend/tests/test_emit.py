@@ -79,8 +79,22 @@ def test_navigator_generated_from_route_table(emitted: EmittedProject) -> None:
         assert f'name="{screen}"' in text
     assert "createNativeStackNavigator" in text
     assert "NavigationContainer" in text
-    # Navigator shape is a design decision → recorded as residue, not invented.
-    assert "REJOX-TODO(NAV_CONTAINER)" in text
+    # Navigator wiring is now a RULE (NAV_CONTAINER tier 2): a complete navigator
+    # is generated from the route table, so NO NAV_CONTAINER TODO survives. The
+    # navigator SHAPE decision is a Planner question, not code residue.
+    assert "REJOX-TODO(NAV_CONTAINER)" not in text
+    assert "REJOX-TODO" not in text
+
+
+def test_layout_shell_subsumed_by_navigator(emitted: EmittedProject) -> None:
+    # The shared <Layout> (Outlet/Routes) is router structure → skipped, not
+    # emitted as a dead <Outlet/> + TODO.
+    out = _out(emitted)
+    assert not (out / "src" / "components" / "Layout.tsx").exists()
+    skipped = {s.path for s in emitted.skipped}
+    assert "src/components/Layout.tsx" in skipped
+    # And no emitted file carries a NAV_CONTAINER residue anymore.
+    assert all("NAV_CONTAINER" not in f.todoCodes for f in emitted.files)
 
 
 def test_app_wires_the_navigator(emitted: EmittedProject) -> None:
