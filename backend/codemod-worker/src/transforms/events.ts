@@ -1,7 +1,12 @@
 /**
- * Event transform (runs while host tags are still lowercase, so custom
- * components are never touched):
- *   - onClick → onPress
+ * Event transform (runs while host tags are still lowercase):
+ *   - onClick → onPress on host elements
+ *   - onClick → onPress on PROJECT components whose props are graph-resolved
+ *     as DOM-derived (options.componentEvents; e.g. Button extends
+ *     ButtonHTMLAttributes) — renamed consistently with the definition side,
+ *     which the props-type transform rewrites to PressableProps.
+ *   - a local props interface declaring its own `onClick` prop is renamed to
+ *     `onPress` (declaration + all in-file references) so both sides agree.
  *   - onChange on input/textarea/select → onChangeText (+ adapter TODO)
  *   - onSubmit → dropped (+ TODO)
  *   - web-only mouse/key events → dropped (+ warning)
@@ -22,11 +27,24 @@ function ownerTag(attr: Node): string | null {
 }
 
 function transformOne(sf: SourceFile, ctx: Ctx): boolean {
+  const componentEvents = ctx.options.componentEvents ?? {};
+
   for (const attr of sf.getDescendantsOfKind(SyntaxKind.JsxAttribute)) {
     const tag = ownerTag(attr);
-    if (!tag || !isHostTag(tag)) continue; // host elements only
+    if (!tag) continue;
     const name = attr.getNameNode().getText();
     const line = attr.getStartLineNumber();
+
+    // Project components: rename only what the Knowledge Graph proved is a
+    // DOM-derived prop — a component's own (value: T) => void API is never touched.
+    if (!isHostTag(tag)) {
+      const renamed = componentEvents[tag]?.[name];
+      if (renamed && renamed !== name) {
+        attr.getNameNode().replaceWithText(renamed);
+        return true;
+      }
+      continue;
+    }
 
     if (name === 'onClick') {
       attr.getNameNode().replaceWithText('onPress');
@@ -61,6 +79,27 @@ function transformOne(sf: SourceFile, ctx: Ctx): boolean {
   return false;
 }
 
+/**
+ * Definition side of the custom-component rename: a local props interface that
+ * declares its own `onClick` becomes `onPress` (declaration + all in-file
+ * references), matching the caller-side rename driven by componentEvents.
+ */
+function renameLocalOnClickProps(sf: SourceFile, ctx: Ctx): void {
+  for (const iface of sf.getInterfaces()) {
+    const prop = iface.getProperty('onClick');
+    if (!prop) continue;
+    const line = prop.getStartLineNumber();
+    prop.rename('onPress');
+    recordWarning(
+      ctx,
+      'EVENT_PROP_RENAMED',
+      `Own prop onClick → onPress on ${iface.getName()} (line ${line}); callers are renamed via the graph.`,
+      line,
+    );
+  }
+}
+
 export function transformEvents(sf: SourceFile, ctx: Ctx): void {
+  renameLocalOnClickProps(sf, ctx);
   applyUntilStable(() => transformOne(sf, ctx));
 }

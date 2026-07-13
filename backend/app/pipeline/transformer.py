@@ -19,6 +19,8 @@ from typing import Any, Optional
 
 from pydantic import ValidationError
 
+from app.models.analysis import AnalysisReport
+from app.models.knowledge_graph import KnowledgeGraph
 from app.models.transformation import TransformResult
 
 # codemod-worker lives at backend/codemod-worker; this file is backend/app/pipeline.
@@ -78,15 +80,66 @@ def ensure_worker_built(force: bool = False) -> None:
         )
 
 
+# Any DOM attributes interface carries the DOM onClick — a component whose
+# props extend one gets its DOM events renamed at every call site, consistent
+# with the props-type transform rewriting the definition side (PressableProps).
+_DOM_ATTRIBUTES_SUFFIX = "HTMLAttributes"
+_DOM_EVENT_RENAMES = {"onClick": "onPress"}
+
+
+def build_transform_options(
+    kg: KnowledgeGraph,
+    report: AnalysisReport,
+    answers: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Derive the codemod-worker options from the Knowledge Graph + report.
+
+    Everything here is graph-resolved — no guessing in the worker:
+
+    - ``routes``: the normalized route table (absolute path → screen name +
+      params), which makes ``<Link to>`` → ``navigation.navigate()`` a rule.
+    - ``componentEvents``: project components whose props are DOM-derived
+      (``propsExtends`` includes a ``*HTMLAttributes`` interface) or that
+      declare an explicit ``onClick`` prop → rename DOM events consistently
+      on both sides of the call.
+    """
+    options: dict[str, Any] = dict(answers or {})
+
+    routes = []
+    for mapping in report.routing.routes:
+        path = mapping.path or "/"
+        if not path.startswith("/"):
+            path = f"/{path}"
+        routes.append(
+            {"path": path, "screen": mapping.screenName, "params": mapping.params}
+        )
+    if routes:
+        options["routes"] = routes
+
+    component_events: dict[str, dict[str, str]] = {}
+    for comp in kg.components:
+        dom_derived = any(
+            base.endswith(_DOM_ATTRIBUTES_SUFFIX) for base in comp.propsExtends
+        )
+        explicit_onclick = any(p.name == "onClick" for p in comp.props)
+        if dom_derived or explicit_onclick:
+            component_events[comp.name] = dict(_DOM_EVENT_RENAMES)
+    if component_events:
+        options["componentEvents"] = component_events
+
+    return options
+
+
 def transform_component(
     file: Path, options: Optional[dict[str, Any]] = None
 ) -> TransformResult:
-    """Convert a single React source file into React Native.
+    """Transform a single React source file into React Native.
 
     Args:
-        file: Path to the source ``.tsx``/``.jsx`` file to convert.
-        options: The answered Ask-stage options (e.g.
-            ``{"stylingEngine": "nativewind", "navigationLibrary": "react-navigation"}``).
+        file: Path to the source ``.tsx``/``.jsx`` file to transform.
+        options: The answered Ask-stage options plus graph-derived facts —
+            build them with :func:`build_transform_options` (e.g.
+            ``{"stylingEngine": "nativewind", "routes": [...], "componentEvents": {...}}``).
 
     Raises:
         TransformerError: if the file is missing, the worker fails (including when

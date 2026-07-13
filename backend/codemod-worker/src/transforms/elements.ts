@@ -73,14 +73,8 @@ function decideMapping(el: JsxTagLike, tag: string, ctx: Ctx): string | null {
     mapped = 'Pressable';
   }
 
-  if (tag === 'img') {
-    recordUnhandled(
-      ctx,
-      'IMAGE_PROPS',
-      `<img> → <Image>: convert src→source={{ uri }} and add explicit width/height.`,
-      el.getText().slice(0, 120),
-    );
-  }
+  // img → Image needs no residue entry: the images transform resolves
+  // src→source/alt/size deterministically right after this pass.
   return mapped;
 }
 
