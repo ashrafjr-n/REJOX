@@ -8,6 +8,7 @@ Keep in sync with ``app/pipeline/analyzer.py`` and its ``rules`` submodule.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,6 +24,32 @@ LibraryStatus = Literal[
     "compatible", "needs-conversion", "partial", "unsupported", "unknown"
 ]
 Difficulty = Literal["trivial", "easy", "medium", "hard", "blocked"]
+
+RiskLevel = Literal["low", "medium", "high"]
+
+
+class ConfidenceSource(str, Enum):
+    """Provenance of a migrated unit — Confidence is COMPUTED from this, never
+    estimated. The AI values are reserved so the AI Resolution Engine plugs in
+    without schema churn.
+    """
+
+    DETERMINISTIC = "deterministic"                    # rule, no warning
+    DETERMINISTIC_WARNING = "deterministic-warning"    # rule + warning
+    AI_VALIDATED = "ai-validated"                      # AI-resolved, validator passed
+    AI_FAILED = "ai-failed"                            # AI-resolved, validator failed
+    UNHANDLED = "unhandled"                            # residue — excluded from Confidence
+
+
+# Confidence value per provenance. ``None`` = excluded from Confidence — the
+# unit counts against Coverage instead (it was not migrated).
+CONFIDENCE_BY_SOURCE: dict[ConfidenceSource, Optional[int]] = {
+    ConfidenceSource.DETERMINISTIC: 100,
+    ConfidenceSource.DETERMINISTIC_WARNING: 80,
+    ConfidenceSource.AI_VALIDATED: 65,
+    ConfidenceSource.AI_FAILED: 0,
+    ConfidenceSource.UNHANDLED: None,
+}
 
 
 class AnalysisBase(BaseModel):
@@ -110,7 +137,21 @@ class StylingReport(AnalysisBase):
     cssModuleCount: int = 0
 
 
-# --- Summary + score --------------------------------------------------------
+# --- Domains ----------------------------------------------------------------
+
+
+class DomainRisk(AnalysisBase):
+    """A functional domain detected in the project (evidence-based, from KG
+    facts only — a domain with no signal is simply absent, never "unknown")."""
+
+    domain: str
+    risk: RiskLevel
+    reason: str
+    rnNotes: str
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+# --- Summary + scores ---------------------------------------------------------
 
 
 class Summary(AnalysisBase):
@@ -121,40 +162,17 @@ class Summary(AnalysisBase):
     storeCount: int
 
 
-class SubScore(AnalysisBase):
-    """A weighted component of the migration score (0-100 with its weight)."""
+class ScoreContribution(AnalysisBase):
+    """One explainable, signed step of the Coverage figure.
 
-    score: float = Field(ge=0, le=100)
-    weight: float = Field(ge=0, le=1)
+    The contract: ``sum(c.delta for c in contributions) == coverage`` (base 0;
+    positive rows grant an area's budget, negative rows subtract deductions).
+    """
 
-
-class ScoreBreakdown(AnalysisBase):
-    components: SubScore
-    libraries: SubScore
-    styling: SubScore
-    routing: SubScore
-    api: SubScore
-
-    def weighted_total(self) -> float:
-        """Weighted sum of sub-scores → the overall migration score."""
-        parts = (
-            self.components,
-            self.libraries,
-            self.styling,
-            self.routing,
-            self.api,
-        )
-        return sum(p.score * p.weight for p in parts)
-
-    def weight_sum(self) -> float:
-        parts = (
-            self.components,
-            self.libraries,
-            self.styling,
-            self.routing,
-            self.api,
-        )
-        return sum(p.weight for p in parts)
+    label: str
+    delta: float
+    reason: str
+    evidence: str
 
 
 # --- Root -------------------------------------------------------------------
@@ -167,7 +185,16 @@ class AnalysisReport(AnalysisBase):
     components: list[ComponentFinding] = Field(default_factory=list)
     routing: RoutingReport
     styling: StylingReport
+    domains: list[DomainRisk] = Field(default_factory=list)
     blockers: list[Issue] = Field(default_factory=list)
     warnings: list[Issue] = Field(default_factory=list)
-    migrationScore: float = Field(ge=0, le=100)
-    scoreBreakdown: ScoreBreakdown
+    # --- The three independent axes (never conflated) ---
+    # Coverage: how much of the project can be / was migrated.
+    coverage: float = Field(ge=0, le=100)
+    # Confidence: how sure we are that what WAS migrated is correct —
+    # computed from provenance (ConfidenceSource), never estimated.
+    confidence: float = Field(ge=0, le=100)
+    # Risk: worst detected functional-domain risk ("low" when none detected).
+    risk: RiskLevel
+    # Explainable breakdown; deltas sum exactly to `coverage`.
+    contributions: list[ScoreContribution] = Field(default_factory=list)

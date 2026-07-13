@@ -149,19 +149,82 @@ def test_routing_maps_to_navigation_stack(report: AnalysisReport) -> None:
     assert detail.componentName == "ProductDetailPage"
 
 
-# --- Score ------------------------------------------------------------------
+# --- Coverage / Confidence / Risk ---------------------------------------------
 
 
-def test_migration_score_in_expected_band(report: AnalysisReport) -> None:
-    assert 60 <= report.migrationScore <= 95
+def test_coverage_confidence_risk_all_present(report: AnalysisReport) -> None:
+    assert 0 <= report.coverage <= 100
+    assert 0 <= report.confidence <= 100
+    assert report.risk in ("low", "medium", "high")
 
 
-def test_score_breakdown_weights_sum_to_one(report: AnalysisReport) -> None:
-    assert report.scoreBreakdown.weight_sum() == pytest.approx(1.0)
-    # And the reported score equals the weighted sum of sub-scores.
-    assert report.migrationScore == pytest.approx(
-        round(report.scoreBreakdown.weighted_total(), 1), abs=0.05
+def test_coverage_and_confidence_are_independent_axes(report: AnalysisReport) -> None:
+    # THE POINT of the score overhaul: sample-app is mostly deterministic, so
+    # Confidence (how sure we are about what WAS migrated) is high, while
+    # Coverage (how much of the project migrates) is dragged down by residue
+    # (hover/grid/CSS Modules). A single conflated score would hide exactly
+    # this distinction — assert they differ so it can never silently return.
+    assert report.confidence > 90
+    assert report.coverage < 90
+    assert report.coverage != report.confidence
+
+
+def test_contributions_sum_exactly_to_coverage(report: AnalysisReport) -> None:
+    # The breakdown is not decorative — the arithmetic must actually work.
+    assert sum(c.delta for c in report.contributions) == pytest.approx(
+        report.coverage, abs=0.01
     )
+
+
+def test_contributions_are_explainable(report: AnalysisReport) -> None:
+    labels = {c.label for c in report.contributions}
+    assert "Functional components" in labels
+    assert any(l.startswith("axios") for l in labels)
+    assert "Hover styling" in labels  # a real negative with evidence
+    hover = next(c for c in report.contributions if c.label == "Hover styling" and c.delta < -1)
+    assert "component(s)" in hover.evidence
+    for c in report.contributions:
+        assert c.label and c.reason and c.evidence
+
+
+def test_confidence_is_computed_from_provenance(report: AnalysisReport) -> None:
+    # Everything the transformer resolves deterministically scores 100/80;
+    # residue is excluded. With no AI in play the figure must sit between
+    # the warning grade and the clean grade.
+    assert 80 <= report.confidence <= 100
+
+
+# --- Domains --------------------------------------------------------------------
+
+
+def test_sample_app_detects_no_high_risk_domain(report: AnalysisReport) -> None:
+    # A storefront benchmark: no auth, no payments, no uploads.
+    assert [d for d in report.domains if d.risk == "high"] == []
+    assert report.risk in ("low", "medium")
+
+
+def test_auth_app_detects_authentication_domain() -> None:
+    auth_report = analyze_graph(_load("auth-app.kg.json"))
+    domains = {d.domain: d for d in auth_report.domains}
+    assert "authentication" in domains
+    auth = domains["authentication"]
+    assert auth.risk == "high"
+    # Triggered by the API endpoint (strong signal), corroborated by the
+    # login component and the token in localStorage.
+    details = " | ".join(e.detail for e in auth.evidence)
+    assert "/auth/login" in details
+    assert "LoginForm" in details
+    assert "localStorage" in details
+    assert auth_report.risk == "high"
+
+
+def test_domains_require_strong_signals() -> None:
+    # redux-table has a Dashboard component using localStorage — but no auth
+    # dependency and no auth endpoint/route. Corroborating signals alone must
+    # never trigger a domain.
+    redux = analyze_graph(_load("redux-table.kg.json"))
+    assert redux.domains == []
+    assert redux.risk == "low"
 
 
 def test_summary_counts(report: AnalysisReport) -> None:
@@ -199,11 +262,15 @@ def test_web_api_usage_flagged(redux_report: AnalysisReport) -> None:
     assert any(i.code == "WEB_API_USAGE" for i in dashboard.issues)
 
 
-def test_score_drops_for_unsupported_project(
+def test_coverage_drops_for_unsupported_project(
     report: AnalysisReport, redux_report: AnalysisReport
 ) -> None:
-    assert redux_report.migrationScore < report.migrationScore
-    assert redux_report.migrationScore < 60
+    assert redux_report.coverage < report.coverage
+    assert redux_report.coverage < 60
+    # ...and its contributions still sum exactly to its coverage.
+    assert sum(c.delta for c in redux_report.contributions) == pytest.approx(
+        redux_report.coverage, abs=0.01
+    )
 
 
 # --- API endpoint -----------------------------------------------------------
@@ -215,7 +282,9 @@ def test_analyze_endpoint_returns_report() -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["projectName"] == "sample-app"
-    assert 60 <= body["migrationScore"] <= 95
+    assert 60 <= body["coverage"] <= 95
+    assert body["confidence"] > body["coverage"]  # deterministic-heavy project
+    assert body["risk"] == "low"
     assert body["summary"]["componentCount"] == 21
 
 
