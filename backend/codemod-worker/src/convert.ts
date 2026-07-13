@@ -2,7 +2,7 @@
  * Conversion orchestrator.
  *
  * Composes the individually-testable transforms over one source file and emits
- * the RN code plus structured warnings and the `unhandled` list (Part 2 input).
+ * the RN code plus structured warnings and the `unhandled` list (AI Resolution Engine residue).
  * The transform order matters:
  *   links → events → elements → text → imports → TODO header.
  */
@@ -30,7 +30,7 @@ function renderTodoHeader(ctx: Ctx): string {
   if (ctx.todos.length === 0) return '';
   const lines = ctx.todos.map((t) => `// REJOX-TODO(${t.code}): ${t.message}`);
   return (
-    `// ===== REJOX-TODO: ${ctx.todos.length} item(s) need manual/LLM attention =====\n` +
+    `// ===== REJOX-TODO: ${ctx.todos.length} item(s) need manual/AI attention =====\n` +
     lines.join('\n') +
     '\n'
   );

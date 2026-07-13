@@ -88,7 +88,7 @@ export interface Component {
   cssModuleImports: string[];
   /** Browser globals referenced (localStorage, window, document, ...). */
   webApis: string[];
-  // --- Conversion facts (Converter Part 1) ---
+  // --- Conversion facts (feed the Deterministic Transformer) ---
   textNodes: TextNodeInfo[];
   layoutHints: LayoutHint[];
   images: ImageInfo[];

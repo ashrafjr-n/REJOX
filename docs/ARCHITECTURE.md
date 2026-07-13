@@ -2,61 +2,74 @@
 
 ## Guiding principle
 
-**Parsing is deterministic. The LLM is a scalpel, not a hammer.**
-Everything that can be derived structurally from the source (AST shape, imports,
-JSX elements, prop usage) is computed with real parsers. The LLM is only invoked
-where AST rules are insufficient — ambiguous layout intent, non-mechanical
-refactors, prose in the report.
+**Rejox AI is an AI-assisted migration system that combines deterministic code
+transformation with targeted AI reasoning to safely migrate React applications
+into React Native.**
+
+**Core principle: resolve by rules whatever rules can resolve. Invoke AI only
+where genuine reasoning is required.** Everything that can be derived
+structurally from the source (AST shape, imports, JSX elements, prop usage) is
+computed with real parsers and transformed with real codemods. The AI Resolution
+Engine is only invoked over the residue — ambiguous layout intent,
+non-mechanical refactors, prose in the report. Rejox is never a "code
+converter"; every new capability must first be attempted deterministically.
 
 ## Data flow
 
 ```
-                ┌──────────────┐
-   React src ──▶│    Parse     │  Babel / TypeScript Compiler API → AST
-                └──────┬───────┘
-                       ▼
-                ┌──────────────┐
-                │ Knowledge    │  Normalized JSON graph of the project:
-                │ Graph (JSON) │  files, components, hooks, imports, deps,
-                └──────┬───────┘  JSX tree, styling, routes.
-                       ▼
-                ┌──────────────┐
-                │   Analyzer   │  Classifies patterns, flags unsupported ones,
-                └──────┬───────┘  scores migratability.
-                       ▼
-                ┌──────────────┐
-                │  Migration   │  Human-readable summary of findings +
-                │   Report     │  confidence per area.
-                └──────┬───────┘
-                       ▼
-                ┌──────────────┐
-                │     Plan     │  Ordered, concrete steps.
-                └──────┬───────┘
-                       ▼
-                ┌──────────────┐
-                │ User choices │  "Ask" stage — resolve ambiguities /
-                └──────┬───────┘  unsupported features.
-                       ▼
-                ┌──────────────┐
-                │  Converter   │  AST transforms first; LLM-assisted where
-                └──────┬───────┘  deterministic rules fall short.
-                       ▼
-                ┌──────────────┐
-                │  Validator   │  Runs `tsc` + Metro against the OUTPUT
-                └──────┬───────┘  project to prove it compiles and boots.
-                       ▼
-                ┌──────────────┐
-                │    Report    │  Final migration report + package for Download.
-                └──────────────┘
+                ┌──────────────────┐
+   React src ──▶│     Project      │  Parser + dependency scanner + AST builder
+                │   Intelligence   │  + metadata extractor + graph builder
+                │      Engine      │  (Node parser-worker, ts-morph).
+                └────────┬─────────┘
+                         ▼
+                ┌──────────────────┐
+                │  Knowledge Graph │  Normalized JSON graph of the project:
+                │      (JSON)      │  files, components, hooks, imports, deps,
+                └────────┬─────────┘  JSX tree, styling, routes.
+                         ▼
+                ┌──────────────────┐
+                │     Analyzer     │  Classifies patterns, assesses domain risk,
+                └────────┬─────────┘  computes Coverage / Confidence / Risk.
+                         ▼
+                ┌──────────────────┐
+                │ Migration Report │  Human-readable summary of findings +
+                └────────┬─────────┘  the explainable score breakdown.
+                         ▼
+                ┌──────────────────┐
+                │       Plan       │  Ordered, concrete steps.
+                └────────┬─────────┘
+                         ▼
+                ┌──────────────────┐
+                │   User choices   │  "Ask" stage — resolve ambiguities /
+                └────────┬─────────┘  unsupported features.
+                         ▼
+                ┌──────────────────────────────────────────┐
+                │             Migration Engine             │
+                │ ┌──────────────┐ ┌────────────┐ ┌──────┐ │
+                │ │Deterministic │▶│ AI Resolut.│▶│Valid.│ │
+                │ │ Transformer  │ │   Engine   │ │      │ │
+                │ └──────────────┘ └────────────┘ └──────┘ │
+                │  AST codemods →  residue only →  tsc +   │
+                │  (codemod-worker)  (next)        Metro   │
+                └────────────────────┬─────────────────────┘
+                                     ▼
+                ┌──────────────────┐
+                │      Report      │  Final migration report + package for
+                └──────────────────┘  Download.
 ```
 
 ## Stage detail
 
-### Parse
+### Project Intelligence Engine
+- Parser + dependency scanner + AST builder + metadata extractor + graph
+  builder in one deterministic stage.
 - Tooling: a dedicated **Node parser-worker** built on **ts-morph** (a typed
   wrapper over the TypeScript Compiler API) — best-in-class TS/JSX parsing.
+  (The worker directory keeps the name `parser-worker`.)
 - Output: the Knowledge Graph JSON (below). No interpretation, no LLM.
-- See **[Parser stage — implementation](#parser-stage--implementation)**.
+- Python module: `app/pipeline/intelligence.py` (`build_knowledge_graph`).
+- See **[Project Intelligence Engine — implementation](#project-intelligence-engine--implementation)**.
 
 ### Knowledge Graph (JSON)
 - A single normalized, serializable JSON document describing the whole project.
@@ -77,34 +90,39 @@ refactors, prose in the report.
 - Migration Planner converts findings into an ordered step list.
 - Anything ambiguous or unsupported becomes a question for the user.
 
-### Converter
-- Applies deterministic AST codemods driven by `docs/CONVERSION-RULES.md`.
-- Falls back to LLM assistance **only** where a rule cannot be expressed as a
-  mechanical transform (e.g. reflowing a responsive grid into RN layout).
+### Migration Engine
+Composed of three sub-engines, run in order:
 
-### Validator
-- Runs `tsc --noEmit` and a Metro build against the generated RN project.
-- Failures loop back with actionable diagnostics; success gates Download.
+1. **Deterministic Transformer** — AST codemods driven by
+   `docs/CONVERSION-RULES.md` (the Node codemod-worker). Resolves everything
+   rules can resolve; records the rest as `unhandled`.
+2. **AI Resolution Engine** *(next session — not yet implemented)* — targeted
+   reasoning over the `unhandled` residue **only**, never the default path.
+3. **Validator** — runs `tsc --noEmit` and a Metro build against the generated
+   RN project. Failures loop back with actionable diagnostics; success gates
+   Download.
 
-## Where the LLM is (and isn't) used
+## Where the AI Resolution Engine is (and isn't) used
 
-| Task                                   | Deterministic AST | LLM |
-| -------------------------------------- | :---------------: | :-: |
-| Detect imports / dependencies          |         ✅        |     |
-| `div`→`View`, `onClick`→`onPress`, etc.|         ✅        |     |
-| Build the knowledge graph              |         ✅        |     |
-| Run tsc / Metro validation             |         ✅        |     |
-| Reflow ambiguous responsive layout     |                   |  ✅ |
-| Explain a finding in the report        |                   |  ✅ |
-| Resolve genuinely ambiguous intent     |                   |  ✅ |
+| Task                                   | Deterministic rules | AI  |
+| -------------------------------------- | :-----------------: | :-: |
+| Detect imports / dependencies          |         ✅          |     |
+| `div`→`View`, `onClick`→`onPress`, etc.|         ✅          |     |
+| Build the knowledge graph              |         ✅          |     |
+| Navigation links / params (route table)|         ✅          |     |
+| Tailwind → NativeWind (supported set)  |         ✅          |     |
+| Run tsc / Metro validation             |         ✅          |     |
+| Reflow ambiguous responsive layout     |                     |  ✅ |
+| Explain a finding in the report        |                     |  ✅ |
+| Resolve genuinely ambiguous intent     |                     |  ✅ |
 
 ---
 
-## Parser stage — implementation
+## Project Intelligence Engine — implementation
 
-The Parse stage is implemented as a small **Node worker orchestrated from
-Python**. Python never parses JS/TS itself; the worker is the single source of
-parsing truth.
+The stage is implemented as a small **Node worker orchestrated from Python**
+(the worker directory keeps the name `parser-worker`). Python never parses
+JS/TS itself; the worker is the single source of parsing truth.
 
 ```
 backend/
@@ -122,11 +140,11 @@ backend/
 │           ├── styling.ts      # tailwind / css-module / inline detection
 │           ├── api.ts          # axios / fetch clients + endpoints
 │           └── state.ts        # zustand stores + state keys
-└── app/pipeline/parser.py      # runs the worker via subprocess, validates with pydantic
+└── app/pipeline/intelligence.py  # runs the worker via subprocess, validates with pydantic
 ```
 
 **Contract.** The worker prints a single JSON document (the Knowledge Graph) to
-stdout; diagnostics go to stderr. `parser.py::parse_project(path)` runs it,
+stdout; diagnostics go to stderr. `intelligence.py::build_knowledge_graph(path)` runs it,
 captures stdout, and validates it into the `KnowledgeGraph` pydantic model
 (`app/models/knowledge_graph.py`). The worker is built automatically on first
 run (`npm install && npm run build`), or manually:

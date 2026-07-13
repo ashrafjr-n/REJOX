@@ -22,7 +22,7 @@ import {
   type JsxTagLike,
 } from '../util';
 
-/** Flag web-only elements once (they are left unchanged for Part 2). */
+/** Flag web-only elements once (left unchanged; redesign needs judgment). */
 function flagWebOnly(sf: SourceFile, ctx: Ctx): void {
   const seen = new Set<string>();
   const tags = [

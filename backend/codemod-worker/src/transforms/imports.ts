@@ -1,7 +1,7 @@
 /**
  * Import transform (runs last, after JSX is fully converted):
  *   - drop react-router-dom / react-dom imports (routers/hooks become TODOs)
- *   - flag CSS-Module imports (kept verbatim; styling is Part 2)
+ *   - flag CSS-Module imports (kept verbatim; restyling needs judgment)
  *   - flag web-only React DOM types (e.g. ButtonHTMLAttributes)
  *   - inject a single `react-native` import for every RN component now used
  */

@@ -113,7 +113,7 @@ def test_sample_app_has_no_blockers(report: AnalysisReport) -> None:
     assert report.blockers == []
 
 
-# --- Conversion-fact rules (Converter Part 1) -------------------------------
+# --- Conversion-fact rules (Deterministic Transformer facts) ----------------
 
 
 def _codes(report: AnalysisReport, name: str) -> set[str]:

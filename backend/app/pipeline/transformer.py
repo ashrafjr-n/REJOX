@@ -1,10 +1,12 @@
-"""Converter stage (Part 1 — deterministic).
+"""Migration Engine — Deterministic Transformer.
 
-Orchestrates the Node **codemod-worker** (ts-morph) from Python, exactly like
-``parser.py`` orchestrates the parser-worker. Converts ONE React source file at
-a time into React Native, returning a validated :class:`ConversionResult`. The
-codemod is fully deterministic — no LLM. Anything it cannot safely transform is
-recorded in ``unhandled`` for Part 2.
+First (and largest) part of the Migration Engine. Orchestrates the Node
+**codemod-worker** (ts-morph) from Python, exactly like ``intelligence.py``
+orchestrates the parser-worker. Transforms ONE React source file at a time into
+React Native, returning a validated :class:`TransformResult`. Fully
+deterministic — no LLM. Anything it cannot safely resolve is recorded in
+``unhandled``: that list is the input contract of the AI Resolution Engine,
+which handles only genuine-reasoning residue.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from typing import Any, Optional
 
 from pydantic import ValidationError
 
-from app.models.conversion import ConversionResult
+from app.models.transformation import TransformResult
 
 # codemod-worker lives at backend/codemod-worker; this file is backend/app/pipeline.
 WORKER_DIR = Path(__file__).resolve().parents[2] / "codemod-worker"
@@ -28,14 +30,14 @@ CONVERT_TIMEOUT_SECONDS = 120
 BUILD_TIMEOUT_SECONDS = 600
 
 
-class ConverterError(RuntimeError):
-    """Raised when the codemod-worker cannot produce a valid ConversionResult."""
+class TransformerError(RuntimeError):
+    """Raised when the codemod-worker cannot produce a valid TransformResult."""
 
 
 def _require_node() -> str:
     node = shutil.which("node")
     if node is None:
-        raise ConverterError(
+        raise TransformerError(
             "Node.js is required to run the codemod-worker but `node` was not "
             "found on PATH. Install Node 18+ and try again."
         )
@@ -54,7 +56,7 @@ def ensure_worker_built(force: bool = False) -> None:
     _require_node()
     npm = shutil.which("npm")
     if npm is None:
-        raise ConverterError(
+        raise TransformerError(
             "`npm` was not found on PATH; it is required to build the "
             "codemod-worker on first run."
         )
@@ -62,23 +64,23 @@ def ensure_worker_built(force: bool = False) -> None:
     if not (WORKER_DIR / "node_modules").exists():
         install = _run([npm, "install"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
         if install.returncode != 0:
-            raise ConverterError(
+            raise TransformerError(
                 "Failed to install codemod-worker dependencies.\n"
                 f"stderr:\n{install.stderr}"
             )
 
     build = _run([npm, "run", "build"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
     if build.returncode != 0:
-        raise ConverterError(f"Failed to build codemod-worker.\nstderr:\n{build.stderr}")
+        raise TransformerError(f"Failed to build codemod-worker.\nstderr:\n{build.stderr}")
     if not WORKER_ENTRY.exists():
-        raise ConverterError(
+        raise TransformerError(
             f"codemod-worker build reported success but {WORKER_ENTRY} is missing."
         )
 
 
-def convert_component(
+def transform_component(
     file: Path, options: Optional[dict[str, Any]] = None
-) -> ConversionResult:
+) -> TransformResult:
     """Convert a single React source file into React Native.
 
     Args:
@@ -87,13 +89,13 @@ def convert_component(
             ``{"stylingEngine": "nativewind", "navigationLibrary": "react-navigation"}``).
 
     Raises:
-        ConverterError: if the file is missing, the worker fails (including when
+        TransformerError: if the file is missing, the worker fails (including when
             it would emit syntactically invalid TS), or the output is not a valid
-            ConversionResult.
+            TransformResult.
     """
     source = Path(file).expanduser().resolve()
     if not source.is_file():
-        raise ConverterError(f"Not a file: {source}")
+        raise TransformerError(f"Not a file: {source}")
 
     node = _require_node()
     ensure_worker_built()
@@ -102,12 +104,12 @@ def convert_component(
     try:
         proc = _run(args, WORKER_DIR, CONVERT_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as exc:
-        raise ConverterError(
+        raise TransformerError(
             f"codemod-worker timed out after {CONVERT_TIMEOUT_SECONDS}s on {source}."
         ) from exc
 
     if proc.returncode != 0:
-        raise ConverterError(
+        raise TransformerError(
             "codemod-worker exited with a non-zero status "
             f"({proc.returncode}).\nstderr:\n{proc.stderr.strip()}"
         )
@@ -116,17 +118,17 @@ def convert_component(
         raw = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         preview = proc.stdout[:500]
-        raise ConverterError(
+        raise TransformerError(
             "codemod-worker did not emit valid JSON.\n"
             f"JSON error: {exc}\nstdout (first 500 chars):\n{preview}\n"
             f"stderr:\n{proc.stderr.strip()}"
         ) from exc
 
     try:
-        return ConversionResult.model_validate(raw)
+        return TransformResult.model_validate(raw)
     except ValidationError as exc:
-        raise ConverterError(
-            f"codemod-worker output failed ConversionResult validation:\n{exc}"
+        raise TransformerError(
+            f"codemod-worker output failed TransformResult validation:\n{exc}"
         ) from exc
 
 
@@ -148,7 +150,7 @@ def check_syntax(code: str) -> int:
     try:
         proc = _run([node, str(CHECK_ENTRY), str(tmp)], WORKER_DIR, CONVERT_TIMEOUT_SECONDS)
         if proc.returncode != 0:
-            raise ConverterError(f"syntax check failed:\n{proc.stderr.strip()}")
+            raise TransformerError(f"syntax check failed:\n{proc.stderr.strip()}")
         return int(proc.stdout.strip() or "0")
     finally:
         tmp.unlink(missing_ok=True)
