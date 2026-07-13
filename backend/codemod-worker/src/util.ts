@@ -65,6 +65,30 @@ export function containsJsx(node: Node): boolean {
   );
 }
 
+/** Request a named import (injected by the imports transform, de-duplicated). */
+export function requestNamedImport(ctx: Ctx, module: string, name: string): void {
+  let names = ctx.namedImports.get(module);
+  if (!names) {
+    names = new Set();
+    ctx.namedImports.set(module, names);
+  }
+  names.add(name);
+}
+
+/**
+ * The block body of the component function enclosing `node`, so hooks (e.g.
+ * `const navigation = useNavigation()`) can be injected. Returns undefined for
+ * expression-body arrows — those cannot take a statement without a rewrite.
+ */
+export function enclosingComponentBody(node: Node) {
+  const fn =
+    node.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration) ??
+    node.getFirstAncestorByKind(SyntaxKind.FunctionExpression) ??
+    node.getFirstAncestorByKind(SyntaxKind.ArrowFunction);
+  const body = fn?.getBody();
+  return body && Node.isBlock(body) ? body : undefined;
+}
+
 /** Record an unhandled item + a matching TODO line. */
 export function recordUnhandled(
   ctx: Ctx,

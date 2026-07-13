@@ -178,10 +178,10 @@ def _flex_row_issues(comp: Component) -> list[Issue]:
     return [
         Issue(
             code=codes.IMPLICIT_FLEX_ROW,
-            severity="warning",
+            severity="info",  # the transformer appends flex-row deterministically
             message=(
                 f"{len(implicit)} flex container(s) rely on web's default row; RN "
-                "defaults to column, so flexDirection:'row' must be made explicit."
+                "defaults to column (auto-handled: the transformer appends flex-row)."
             ),
             evidence=Evidence(file=comp.file, detail=f"elements: {tags}"),
         )
