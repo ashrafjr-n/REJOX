@@ -224,7 +224,8 @@ backend/app/pipeline/
     ├── components.py      # ELEMENT_MAP / EVENT_MAP → per-component issues
     ├── styling.py         # Tailwind class classifier + styling report
     ├── routing.py         # react-router → proposed React Navigation stack
-    └── scoring.py         # sub-scores + weighted migration score
+    ├── domains.py         # DOMAIN_TABLE → functional-domain risk assessment
+    └── scoring.py         # Coverage contributions + provenance Confidence
 ```
 
 ### Rule groups
@@ -247,30 +248,81 @@ backend/app/pipeline/
   React Navigation stack (screen name + params per route). A worker
   `createBrowserRouter` warning surfaces as an `OBJECT_ROUTER_UNPARSED` blocker.
 
-### Score formula
+### Domain Risk Assessment (`rules/domains.py`)
 
-Each sub-score is a pure function of findings, `0-100` (higher = more
-migratable), combined by fixed weights that sum to `1.0`:
+Classifies **functional domains** — capabilities, a level above libraries and
+components. A declarative `DOMAIN_TABLE` drives it; detection is
+**evidence-based from the KG only**: a domain triggers on a *dependency*
+signal or an *API endpoint / route* signal — component names and web-API usage
+merely corroborate, never trigger. Domains with no signal are simply absent,
+never "unknown".
+
+| Domain          | Risk   | Why                                                        |
+| --------------- | ------ | ---------------------------------------------------------- |
+| authentication  | High   | secure storage, deep-link OAuth, biometrics, no cookies in RN |
+| payments        | High   | platform payment SDKs; app-store IAP rules                 |
+| file-upload     | High   | no `<input type=file>`; expo-image-picker/document-picker  |
+| maps            | Medium | react-native-maps has a different API surface              |
+| realtime        | Medium | WebSockets vs app backgrounding / network switching        |
+| media           | Medium | video/audio playback is a native module (expo-av)          |
+| animations      | Medium | framer-motion → Moti/Reanimated re-authoring               |
+| charts          | Low    | victory-native / react-native-svg equivalents exist        |
+| i18n            | Low    | i18next/react-intl run in RN; locale detection differs     |
+
+**Overall project Risk = the worst detected domain risk; "low" when no domain
+is detected** (documented rule: `overall_risk`).
+
+### Scoring: Coverage · Confidence · Risk
+
+The old single `migrationScore` conflated two independent axes and was
+replaced. The report now carries three:
+
+**Coverage (0-100)** — *how much of the project can be migrated.* Built as an
+explainable list of `ScoreContribution { label, delta, reason, evidence }`
+rows whose **signed deltas sum exactly to the figure** (base 0). Positive rows
+grant fixed area budgets; every deduction is an itemized, evidenced negative
+row:
 
 ```
-migrationScore = 0.40·components + 0.25·libraries + 0.20·styling
-               + 0.10·routing    + 0.05·api
+budgets:    components 40 · libraries 25 · styling 20 · routing 10 · api 5
+components: +40, then per issue code −(attributed shortfall)·40/(100·N),
+            where each component's shortfall (100−score) is attributed to its
+            issues proportionally to severity penalties (info=2, warning=10,
+            blocker=40; a blocker caps the component score at 20 → "blocked")
+libraries:  each library is its own positive row: +25·compatibility/(100·M)
+styling:    +20, then −20·penalty·count/100 per code
+            (grid 3 · hover 2 · responsive 1 · gradient 2 · group 2 ·
+             css-module 4 · dynamic 5)
+routing:    +10 (or "+10 No web router"), −2 router conversion overhead,
+            −2 per unparsed object-config router
+api:        +5, −0.5 per endpoint with an unresolved URL
 ```
 
-- **components** = mean of per-component scores. A component's score is
-  `100 − Σ penalty` where `info=2, warning=10, blocker=40`; any blocker forces
-  difficulty `blocked` (score capped at 20). Buckets: `≥90 trivial · ≥75 easy ·
-  ≥55 medium · <55 hard`.
-- **libraries** = mean `compatibility` across findings.
-- **styling** = `100 −` per-component penalties for grid(3)/hover(2)/responsive(1)
-  /gradient(2)/group(2)/css-module(4)/dynamic(5).
-- **routing** = `100` if no router, else `80 − 20·(object-router blockers)`.
-- **api** = `100 − 10·(endpoints with an unresolved URL)`.
+**Confidence (0-100)** — *how sure we are that what WAS migrated is correct.*
+Computed **from provenance, never estimated**, via the `ConfidenceSource` enum
+(the AI values are reserved so the AI Resolution Engine plugs in without
+schema churn):
 
-On the benchmark `sample-app`, this yields **migrationScore ≈ 81.1**
-(components 85.7, libraries 85.7, styling 62.0, routing 80.0, api 100.0) — the
-component sub-score dropped from ~91.8 once the Converter-Part-1 conversion
-rules (MISSING_TEXT_WRAP, IMPLICIT_FLEX_ROW, UNSIZED_IMAGE) began firing.
+| Provenance                          | Confidence |
+| ----------------------------------- | ---------- |
+| `deterministic` (rule, no warning)  | 100        |
+| `deterministic-warning`             | 80         |
+| `ai-validated` (reserved)           | 65         |
+| `ai-failed` (reserved)              | 0          |
+| `unhandled` (residue)               | excluded — counts against Coverage |
+
+`PROVENANCE_BY_CODE` maps every issue code to what the Deterministic
+Transformer actually does with it today. Each non-blocked component
+contributes one baseline `deterministic` unit (its mechanical conversion) plus
+one unit per issue; blocked components contribute nothing (not migrated at
+all — Coverage's business). Confidence = mean over included units.
+
+**Risk** — the worst detected functional-domain risk (see above).
+
+On the benchmark `sample-app`: **Coverage 82.5 · Confidence 97.7 · Risk low**.
+The two figures are deliberately different — the project is deterministic-
+heavy (high confidence in what converts) while hover/grid/CSS-Module residue
+drags Coverage down. A single conflated score hid exactly that distinction.
 
 ---
 
@@ -336,11 +388,12 @@ split into **5 render-topology waves of [9, 5, 4, 2, 1]** (Button/Rating/Spinner
 
 ---
 
-## Converter stage — Part 1 (deterministic)
+## Migration Engine — Deterministic Transformer
 
-The Converter runs in two parts. **Part 1 (this stage) is fully deterministic —
-no LLM.** It builds every mechanical transform; only what AST rules genuinely
-cannot express is recorded in an `unhandled` list for **Part 2 (LLM-assisted)**.
+The first sub-engine of the Migration Engine. **Fully deterministic — no AI.**
+It resolves everything rules can resolve; only what genuinely requires
+judgment is recorded in `unhandled` — that list is the entire input contract
+of the AI Resolution Engine (next).
 
 ### Two-worker design
 
@@ -349,30 +402,43 @@ orchestrated from Python via subprocess — the same pattern for both:
 
 ```
 backend/
-├── parser-worker/     # React → Knowledge Graph (facts)          → app/pipeline/parser.py
-├── codemod-worker/    # one React file → one React Native file   → app/pipeline/converter.py
-│   └── src/transforms/{links,events,elements,text,imports}.ts    # composable, ordered
+├── parser-worker/     # React → Knowledge Graph (facts)          → app/pipeline/intelligence.py
+├── codemod-worker/    # one React file → one React Native file   → app/pipeline/transformer.py
+│   └── src/transforms/{navigation,events,elements,images,text,styles,propsTypes,imports}.ts
 └── app/pipeline/
     ├── scaffold.py    # Expo(TS) project skeleton from answers (templates/)
-    └── converter.py   # convert_component(file, options) -> ConversionResult
+    └── transformer.py # build_transform_options(kg, report, answers) → options
+                       # transform_component(file, options) -> TransformResult
 ```
 
-The parser-worker feeds the codemod the **conversion facts** it is blind
-without (added to the KG in Part 1): `textNodes` (bare text → the #1 silent RN
-bug), `layoutHints` (web flex = row, RN = column), `images` (explicit size /
-`src` kind), `inlineStyles` (RN-incompatible CSS props). New Analyzer rules —
-`MISSING_TEXT_WRAP`, `IMPLICIT_FLEX_ROW`, `UNSIZED_IMAGE`,
-`RN_INCOMPATIBLE_CSS_PROP` — score off these.
+The Project Intelligence Engine feeds the codemod everything it would
+otherwise be blind to:
 
-### Codemod transform order
+- **conversion facts** in the KG: `textNodes` (bare text → the #1 silent RN
+  bug), `layoutHints` (web flex = row, RN = column), `images` (explicit size /
+  `src` kind), `inlineStyles` (RN-incompatible CSS props), `propsExtends`
+  (DOM-derived props);
+- **graph-derived options** built by `build_transform_options`:
+  - `routes` — the normalized route table (`/products/:id` → screen
+    `ProductDetail`, params `[id]`), which makes `<Link to>` →
+    `navigation.navigate()` a rule for static, param, and template paths;
+  - `componentEvents` — project components whose props the graph PROVES are
+    DOM-derived (`propsExtends` ∋ `*HTMLAttributes`) get `onClick → onPress`
+    renamed at every call site, consistent with the definition side
+    (`extends ButtonHTMLAttributes` → `extends PressableProps`). A component's
+    own `(value) => void` API is never touched.
 
-`links → events → elements → text → imports`. Events run while host tags are
-still lowercase, so custom components are never touched; text-wrapping runs
-after element renames so parent tags are already RN. Each transform is
-idempotent and re-queries the tree after every edit (avoids stale ts-morph
-node refs).
+### Transform order
 
-### Output contract — `unhandled` → LLM (Part 2)
+`navigation → events → elements → images → text → styles → propsTypes →
+imports`. Navigation runs first while `<Link>`/`useParams` are intact; events
+run while host tags are still lowercase (only graph-proven project components
+are touched); images run after elements (`img` is already `<Image>`);
+text-wrapping runs after renames so parent tags are already RN; imports run
+last over the fully-transformed file. Each transform is idempotent and
+re-queries the tree after every edit (avoids stale ts-morph node refs).
+
+### Output contract — `unhandled` → AI Resolution Engine
 
 The codemod-worker prints one JSON document:
 
@@ -384,11 +450,37 @@ The codemod-worker prints one JSON document:
 
 - **`code`** is guaranteed **syntactically valid TS** — the worker re-parses its
   own output and refuses to emit on any syntax error.
-- **`unhandled`** is precisely the Part-2 spec: everything the deterministic
-  pass could not safely resolve (`NAV_LINK`, `NAV_ACTIVE`, `NAV_HOOK`,
-  `CSS_MODULE`, `IMAGE_PROPS`, `PROPS_HTML_TYPE`, `EVENT_ADAPTER`,
-  `WEB_ONLY_ELEMENT`). Each also leaves a `// REJOX-TODO(<CODE>)` comment in the
-  output, so nothing is ever silently dropped.
+- **`unhandled`** is precisely the AI Resolution Engine's spec: ONLY items that
+  genuinely require judgment. Each also leaves a `// REJOX-TODO(<CODE>)`
+  comment in the output, so nothing is ever silently dropped.
+
+### The honest residue (benchmark `sample-app`)
+
+After the deterministic layer is pushed as far as it honestly goes, the full
+residue — per component, per code — is:
+
+| File                  | Residue                                                       |
+| --------------------- | ------------------------------------------------------------- |
+| App                   | `NAV_CONTAINER` ×2 (`Routes`, `Route` — navigator structure)  |
+| Layout                | `NAV_CONTAINER` (`Outlet`)                                    |
+| Navbar                | `NAV_LINK` (`to={link.to}` is a runtime value) · `NAV_ACTIVE` (isActive styling) · `TW_UNSUPPORTED` (backdrop-blur, hover:, sticky, transition) |
+| ProductCard           | `CSS_MODULE` · `TW_UNSUPPORTED` (hover:)                      |
+| Button                | `TW_UNSUPPORTED` (hover: ×2, transition-colors)               |
+| ProductGrid           | `TW_UNSUPPORTED` (grid + responsive grid-cols)                |
+| Hero                  | `TW_UNSUPPORTED` (bg-gradient, from-, to-, hover:)            |
+| Spinner               | `TW_UNSUPPORTED` (animate-spin)                               |
+| CartBadge / CartItem / QuantityStepper | `TW_UNSUPPORTED` (hover:)                    |
+| CartSummary / SettingsPage | `TW_UNSUPPORTED` (divide-y)                              |
+| FeatureCard / SettingToggle | `TW_UNSUPPORTED` (hover:shadow, transitions)            |
+| HomePage / ProductDetailPage | `TW_UNSUPPORTED` (grid, hover:)                        |
+| ErrorMessage · Footer · Rating · ProductsPage | **zero residue**                      |
+
+Everything that used to be residue but was actually a rule is now closed:
+`NAV_LINK` static/param/template paths (was ×7), `NAV_HOOK`/`useParams`,
+`IMAGE_PROPS` (×3), `PROPS_HTML_TYPE`, and the mechanical majority of Tailwind.
+What remains is precisely the work that needs reasoning: navigator structure
+(design), active-state styling (design), one stylesheet re-expression, and the
+web-only utility classes (pressed states, flex reflow, gradients, animations).
 
 ### Scaffold
 
@@ -398,8 +490,3 @@ skeleton from the answered questions, wiring NativeWind (babel `jsxImportSource`
 and the chosen navigation library, carrying over compatible deps (zustand,
 axios). Templates are real files under `app/pipeline/templates/`. No source is
 copied — skeleton only.
-
-On the benchmark `sample-app`, **14 of 21 components convert with zero unhandled
-items**; the remainder concentrate on navigation (`NAV_LINK`×7, `NAV_ACTIVE`,
-`NAV_HOOK`), images (`IMAGE_PROPS`×3), one CSS Module, and one web DOM prop type
-— that list is the Part 2 backlog.
