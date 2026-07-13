@@ -88,6 +88,92 @@ comment so nothing is ever silently dropped:
 | `PROPS_HTML_TYPE` | DOM types with no clean RN equivalent (post-map)               | props API redesign |
 | `WEB_ONLY_ELEMENT` | `table`/`canvas`/`iframe`/…                                   | needs a component redesign |
 
+> **Update — most of this "residue" turned out to be rules.** Each of the codes
+> below now has an AI-Resolution-Engine resolver that handles it deterministically;
+> the LLM is reserved for the one genuine judgment (navigator shape):
+> - `TW_UNSUPPORTED` → **Styling Resolver** (static-map + pattern) — 24/24 sample-app units, **0 LLM**.
+> - `CSS_MODULE` → **CSS Module resolver** (postcss + CSS→RN table + ts-morph rewrite) — **0 LLM**; it is pure parsing.
+> - `NAV_ACTIVE` → focus-state rule (`useIsFocused`) — **0 LLM**.
+> - `NAV_CONTAINER` wiring → navigator generated from the route table — **0 LLM, no TODO survives**.
+> - Navigator **shape** (tabs/stack/drawer) is the *only* genuine reasoning → **1 LLM call**, and even then the LLM returns a spec, not code.
+
+## Automated by the AI Resolution Engine — Styling Resolver (tiers 1–2)
+
+These resolve `TW_UNSUPPORTED` residue **deterministically**, before any LLM is
+consulted (see `ARCHITECTURE.md` → *the three-tier ladder*). Tier 1 = static map
+(`app/ai/styling/known_map.py`); tier 2 = pattern (`patterns.py`). Anything a
+row here handles must **not** go to the LLM — that is the design, enforced by the
+ordering in `resolver.py`.
+
+**Tier 1 — static map** (fixed, well-known RN equivalent):
+
+| Unsupported Tailwind        | React Native equivalent                                   | Tier / status |
+| --------------------------- | --------------------------------------------------------- | ------------- |
+| `divide-y` / `divide-x` (+ `divide-<color>`) | hairline `borderTopWidth`/`borderLeftWidth` (+ `borderColor` hex) on each child after the first | ✅ static-map / automated |
+| `animate-spin`              | documented Reanimated 360° loop (`withRepeat(withTiming(360…))` + `useAnimatedStyle` rotate) | ✅ static-map / automated |
+| `backdrop-blur` / `backdrop-*` | `expo-blur` `<BlurView intensity tint style={StyleSheet.absoluteFill}>` | ✅ static-map / automated |
+| `sticky`                    | `{ position: 'relative' }` + note: use ScrollView `stickyHeaderIndices` | ✅ static-map / automated |
+| `fixed`                     | `{ position: 'absolute', top:0, left:0, right:0 }` (overlay bar) | ✅ static-map / automated |
+| `transition*` / `duration-*` / `ease-*` / `delay-*` | dropped (lossless — RN has no CSS transitions; state changes are instant) | ✅ static-map / automated |
+| `animate-pulse`/`bounce`/`ping`/`none` | dropped with note (decorative; re-add via Reanimated if needed) | ✅ static-map / automated |
+
+**Tier 2 — pattern** (deterministic given the parameters):
+
+| Unsupported Tailwind        | React Native equivalent                                   | Tier / status |
+| --------------------------- | --------------------------------------------------------- | ------------- |
+| `hover:X` (+ responsive prefix) | NativeWind `active:X` — the pressed-state equivalent (element must be `Pressable`-backed) | ✅ pattern / automated |
+| `grid grid-cols-N` (+ `gap-*`) | `flex-row flex-wrap`; each child `width 100/N %` (`w-[…]`); `gap-*` preserved | ✅ pattern / automated |
+| `bg-gradient-to-DIR` + `from-`/`via-`/`to-<color>` | `expo-linear-gradient` `<LinearGradient colors start end>` — colors mapped to hex, direction → start/end points | ✅ pattern / automated |
+
+Falls through to **tier 3 (LLM)** only when no row above matches (e.g.
+`mix-blend-*`, arbitrary `[mask-…]`). Tier-3 output is markdown-stripped,
+re-parsed by the codemod-worker (retry once, else `unresolvable`), and cached.
+
+## Automated by the AI Resolution Engine — CSS Module resolver
+
+`.module.css` → RN is a **parsing** problem, not a reasoning one: postcss (in the
+Node worker) parses the stylesheet, this declarative CSS→RN table maps each
+declaration, and a ts-morph rewrite flips the component's references. `CSS_MODULE`
+is a **rule** — on real input it needs **zero** LLM calls. Anything with no RN
+equivalent is dropped **with a warning**, never guessed.
+
+| CSS declaration                       | React Native                                              | Tier / status |
+| ------------------------------------- | -------------------------------------------------------- | ------------- |
+| `box-shadow: x y blur color`          | `shadowColor` + `shadowOffset {width,height}` + `shadowRadius` + `shadowOpacity` (from rgba alpha) + `elevation` (Android) | ✅ static-map / automated |
+| `:hover { … }`                        | a `<name>Pressed` variant, applied via `Pressable`'s `pressed` render-prop (same pressed-state idea as the Styling Resolver) | ✅ pattern / automated |
+| `transition` / `animation`            | dropped **with warning** (no CSS transitions in RN; animate with Reanimated) | ✅ static-map / automated |
+| `object-fit`                          | dropped **with warning** → use the `<Image resizeMode>` prop | ✅ static-map / automated |
+| `transform: translateY(-2px) …`       | `transform: [{ translateY: -2 }, …]` (function list parsed) | ✅ static-map / automated |
+| `aspect-ratio: 1 / 1`                 | `aspectRatio: 1`                                          | ✅ static-map / automated |
+| `display: flex` / `block`             | dropped (lossless — RN is flex by default)               | ✅ static-map / automated |
+| `background`/`background-color: <color>` | `backgroundColor` (gradients/images → warned drop)    | ✅ static-map / automated |
+| `border-radius`/`width`/`padding`/… `<len>` | camelCase RN prop; `rem`/`em` → px number, `%` kept as string | ✅ static-map / automated |
+| `flex-direction`/`justify-content`/`overflow`/… | camelCase RN prop, value passthrough           | ✅ static-map / automated |
+| unknown property / complex selector   | dropped **with warning** — never guessed                 | ✅ static-map / automated |
+| Component references                  | drop the `.module.css` import, inline `StyleSheet.create({…})` under the same name, flip `className={styles.X}` → `style={styles.X}` (ts-morph) | ✅ automated |
+
+Only a genuinely unparseable value of a *known* RN property (e.g. a **multi-value
+`box-shadow`** — which shadow wins?) is `ambiguous` and may reach the LLM tier;
+without a provider it too degrades to a warned drop.
+
+## Automated by the AI Resolution Engine — Navigation resolver
+
+Two of three navigation residue codes are rules; the third is the one place a
+real design judgment lives.
+
+| Residue         | React Native                                                     | Tier / status |
+| --------------- | ---------------------------------------------------------------- | ------------- |
+| `NAV_ACTIVE` (`isActive`) | React Navigation focus state — `useIsFocused()` drives the active branch (a Tab navigator styles the active tab for free) | ✅ rule (tier 1) / automated |
+| `NAV_CONTAINER` wiring (`<Outlet>`/`<Routes>`) | a **complete navigator generated from the route table**; the shared `<Layout>` shell is subsumed by it (skipped, recorded) — **no NAV_CONTAINER TODO survives** | ✅ rule (tier 2) / automated |
+| Navigator **shape** (stack vs tabs vs drawer) | **genuine reasoning** — the LLM returns a validated `NavigatorSpec` (never code); our generator writes the code; surfaced to the user as a Planner question | 🧠 LLM (tier 3) — *decides shape only* |
+
+**The tier-3 contract (the product's key pattern):** the LLM's output is a
+*spec, not source*. It is parsed into a closed `NavigatorSpec`, validated against
+the route table (a malformed or screen-inventing spec is rejected and retried
+once, then falls back to a deterministic stack), and only the validated spec
+feeds the generator. Raw LLM prose can never reach the emitted navigator. See
+`ARCHITECTURE.md` → *LLM decides shape, rules write code*.
+
 ## Validated end-to-end
 
 The Validator (`tsc --noEmit` + Metro `expo export`) now runs against the emitted

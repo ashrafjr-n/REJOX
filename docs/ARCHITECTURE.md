@@ -96,8 +96,11 @@ Composed of three sub-engines, run in order:
 1. **Deterministic Transformer** — AST codemods driven by
    `docs/CONVERSION-RULES.md` (the Node codemod-worker). Resolves everything
    rules can resolve; records the rest as `unhandled`.
-2. **AI Resolution Engine** *(next session — not yet implemented)* — targeted
-   reasoning over the `unhandled` residue **only**, never the default path.
+2. **AI Resolution Engine** — targeted reasoning over the `unhandled` residue
+   **only**, never the default path. Its first resolver — the **Styling
+   Resolver** — is implemented and runs a *three-tier ladder*
+   (static-map → pattern → LLM) so the LLM is reached only for the residue of
+   the residue. See *AI Resolution Engine — the three-tier ladder* below.
 3. **Validator** — runs `tsc --noEmit` and a Metro build against the generated
    RN project. Failures loop back with actionable diagnostics; success gates
    Download.
@@ -111,10 +114,140 @@ Composed of three sub-engines, run in order:
 | Build the knowledge graph              |         ✅          |     |
 | Navigation links / params (route table)|         ✅          |     |
 | Tailwind → NativeWind (supported set)  |         ✅          |     |
+| Unsupported Tailwind (hover/grid/gradient/divide/…) | ✅ *(tiers 1–2)* | ✅ *(tier 3, novel only)* |
+| CSS Modules (`.module.css` → StyleSheet) | ✅ *(postcss + CSS→RN table)* |     |
+| `isActive` active state (`NAV_ACTIVE`) | ✅ *(focus-state rule)* |     |
+| Navigator wiring from route table (`NAV_CONTAINER`) | ✅ *(generated)* |     |
+| Navigator **shape** (tabs/stack/drawer) |            | ✅ *(spec only; rules write the code)* |
 | Run tsc / Metro validation             |         ✅          |     |
 | Reflow ambiguous responsive layout     |                     |  ✅ |
 | Explain a finding in the report        |                     |  ✅ |
 | Resolve genuinely ambiguous intent     |                     |  ✅ |
+
+## AI Resolution Engine — the three-tier ladder
+
+**This ladder is the product.** Anyone can pipe a code snippet to an LLM and
+call it a converter; Rejox's differentiator is that it *refuses to* until two
+deterministic tiers have failed. Every piece of residue descends the ladder and
+stops at the first rung that can answer:
+
+```
+        residue unit
+             │
+   ┌─────────▼──────────┐   deterministic, fixed RN equivalent — no reasoning
+   │ 1. static map      │   divide-* · animate-spin · backdrop-* · sticky/fixed
+   │   known_map.py     │   · transition-*/animate-* (lossless drop)
+   └─────────┬──────────┘
+             │ (miss)
+   ┌─────────▼──────────┐   deterministic structural transform, parametric
+   │ 2. pattern         │   hover:* → active:* · grid-cols-N → flex-wrap+100/N%
+   │   patterns.py      │   · bg-gradient-* → <LinearGradient> (mapped colors)
+   └─────────┬──────────┘
+             │ (miss)
+   ┌─────────▼──────────┐   genuine reasoning — the residue of the residue
+   │ 3. LLM             │   tight prompt · fence-strip · re-parse gate (retry
+   │   resolver.py      │   once, else unresolvable) · every call cached & logged
+   └────────────────────┘
+```
+
+Design rules enforced *in code*, not just documented:
+
+- **Ordering is mechanical.** `StylingResolver.resolve` calls
+  `known_map.resolve() or patterns.resolve() or self._resolve_llm()` — a tier is
+  reached only when the ones above return `None`. Adding an entry to tier 1 or 2
+  provably removes work from the LLM.
+- **The LLM never emits code that doesn't parse.** Tier-3 output is stripped of
+  markdown, then re-parsed by the *same* codemod-worker check the Transformer
+  uses (`transformer.check_syntax`, injectable for offline tests). On a parse
+  failure it retries exactly once with the error appended, then returns
+  `unresolvable` — never unparseable code.
+- **Every tier-3 call is content-addressed.** The shared `ResolutionCache`
+  means the same novel class across seven files costs at most one call; tiers 1
+  and 2 cost nothing at all.
+- **Provenance is honest.** Each `Resolution` records its `tier`
+  (`static_map | pattern | llm`), which maps to a `ConfidenceSource`
+  (`confidence_source_for`): deterministic tiers → `deterministic-warning`, LLM →
+  `ai-validated` (once the Validator proves it), unresolvable → `unhandled`.
+
+**Benchmark — `sample-app`.** The Transformer leaves unsupported-Tailwind
+residue in 15 files. The Styling Resolver partitions it into **24 units** and
+resolves **all 24 by rule — 14 pattern, 10 static map, 0 LLM**. The lower the
+LLM count, the better the design; on the benchmark it is zero.
+
+> Wiring: `resolve_styling(residue, options)` is callable from the emit pipeline
+> but **not yet wired into it** — that arrives with the Validator repair loop.
+
+### Same ladder, three residues — and where the LLM actually earns its place
+
+The ladder generalizes. Each residue class got its own resolver, and applying
+the core question (*reasoning, or a rule in disguise?*) to each one collapsed
+almost all of it to rules:
+
+| Residue        | Resolver (`app/ai/…`) | Verdict | LLM on `sample-app` |
+| -------------- | --------------------- | ------- | ------------------- |
+| `TW_UNSUPPORTED` | `styling/`          | **rule** — static-map + pattern | 0 |
+| `CSS_MODULE`     | `css/`              | **rule** — parsing, not reasoning | 0 |
+| `NAV_ACTIVE`     | `navigation/active` | **rule** — focus state | 0 |
+| `NAV_CONTAINER` wiring | `navigation/generator` | **rule** — route table → navigator | 0 |
+| Navigator **shape** | `navigation/resolver` | **reasoning** — topology is design | **1** |
+
+#### CSS Module resolver — a parsing pipeline, not a prompt
+
+`.module.css` never touches the LLM, because it is deterministic end to end:
+
+```
+  .module.css
+      │  postcss (Node worker: css.js)         ← a real CSS parser, never regex
+      ▼
+  ParsedCss (simple class rules + declarations)
+      │  declarative CSS→RN table (property_map.py)
+      ▼   box-shadow → shadow*/elevation · transition → warned drop ·
+      │   :hover → <name>Pressed · rem→px · object-fit → resizeMode note
+  RnStyle objects  →  StyleSheet.create({ … })
+      │  ts-morph rewrite (Node worker: cssmodule.js)
+      ▼   drop the CSS import · inline the StyleSheet · className={styles.x} → style={styles.x}
+  rewritten component
+```
+
+Parsing (postcss) and the JSX rewrite (ts-morph) both live in the codemod-worker
+— parsing stays in Node, per the architecture. Python owns only the CSS→RN
+*mapping table*. Anything with no RN equivalent is dropped **with a warning**,
+never guessed. The LLM tier exists for symmetry (a genuinely unparseable value of
+a *known* property, e.g. a multi-value `box-shadow`) but is not reached on real
+input. On `sample-app`'s one CSS Module: 3 rules → StyleSheet, **0 LLM**.
+
+#### Navigation: **LLM decides shape, rules write code**
+
+This is a pattern worth naming, and the template for every future "design"
+residue. Navigator *topology* — a persistent 3-link navbar suggests bottom tabs;
+nested detail routes suggest a stack; a sidebar suggests a drawer — is a genuine
+judgment, so it is the one place the LLM is invoked. But the LLM never writes a
+line of the app:
+
+```
+  route table + nav-UI summary  ──▶  LLM  ──▶  NavigatorSpec (JSON, NOT code)
+                                              { type: "tabs", screens: [...],
+                                                nested: [...], rationale: "…" }
+                                                   │
+                          pydantic validation + route-table check
+                          (malformed / invented screen → reject, retry once,
+                           else fall back to a deterministic stack)
+                                                   │
+                                                   ▼
+                        our generator  ──▶  AppNavigator.tsx  (deterministic)
+                                                   │
+                                                   ▼
+                        Planner question ("Tabs vs Stack", LLM rationale as
+                        context) ──▶ the human confirms the shape
+```
+
+Enforced consequences: the LLM's output is a **closed spec** whose every field
+is constrained (type is an enum; screen names must be route-table names), so raw
+model prose cannot reach the emitted code; a bad spec degrades to a rule, not a
+crash; and the deterministic navigator wiring means **no `NAV_CONTAINER` TODO
+survives** for the standard layout-route case — the shared `<Layout>` shell is
+subsumed by the generated navigator (emit skips it, recording why), and the
+shape choice is a *question*, not code residue.
 
 ---
 
