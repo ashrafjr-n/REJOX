@@ -39,3 +39,9 @@ yarn-error.log*
 # Uploads / working data
 uploads/
 tmp/
+
+# Rejox emission working directory
+.rejox-out/
+
+# AI resolution cache (local SQLite)
+*.sqlite3

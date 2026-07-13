@@ -3,6 +3,11 @@ uvicorn[standard]==0.34.0
 pydantic==2.10.4
 python-multipart==0.0.20
 
+# AI Resolution Engine — Gemini via the official SDK. Imported lazily by
+# GeminiProvider, so it is optional for offline runs / the test suite
+# (FakeProvider needs nothing).
+google-genai==1.15.0
+
 # Dev / test
 pytest==8.3.4
 httpx==0.28.1
