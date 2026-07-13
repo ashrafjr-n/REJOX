@@ -1,5 +1,6 @@
-"""Parser stage.
+"""Project Intelligence Engine.
 
+Parser + dependency scanner + AST builder + metadata extractor + graph builder.
 Orchestrates the deterministic Node parser-worker (ts-morph) from Python. The
 worker is the single source of parsing truth — Python never parses JS/TS itself.
 This module runs the worker over a project path, captures its stdout JSON, and
@@ -26,7 +27,7 @@ PARSE_TIMEOUT_SECONDS = 300
 BUILD_TIMEOUT_SECONDS = 600
 
 
-class ParserError(RuntimeError):
+class IntelligenceError(RuntimeError):
     """Raised when the parser-worker cannot produce a valid Knowledge Graph."""
 
 
@@ -34,7 +35,7 @@ def _require_node() -> str:
     """Return the path to the `node` binary or raise a clear error."""
     node = shutil.which("node")
     if node is None:
-        raise ParserError(
+        raise IntelligenceError(
             "Node.js is required to run the parser-worker but `node` was not "
             "found on PATH. Install Node 18+ and try again."
         )
@@ -63,7 +64,7 @@ def ensure_worker_built(force: bool = False) -> None:
     _require_node()
     npm = shutil.which("npm")
     if npm is None:
-        raise ParserError(
+        raise IntelligenceError(
             "`npm` was not found on PATH; it is required to build the "
             "parser-worker on first run."
         )
@@ -71,23 +72,23 @@ def ensure_worker_built(force: bool = False) -> None:
     if not (WORKER_DIR / "node_modules").exists():
         install = _run([npm, "install"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
         if install.returncode != 0:
-            raise ParserError(
+            raise IntelligenceError(
                 "Failed to install parser-worker dependencies.\n"
                 f"stderr:\n{install.stderr}"
             )
 
     build = _run([npm, "run", "build"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
     if build.returncode != 0:
-        raise ParserError(
+        raise IntelligenceError(
             f"Failed to build parser-worker.\nstderr:\n{build.stderr}"
         )
     if not WORKER_ENTRY.exists():
-        raise ParserError(
+        raise IntelligenceError(
             f"parser-worker build reported success but {WORKER_ENTRY} is missing."
         )
 
 
-def parse_project(path: Path) -> KnowledgeGraph:
+def build_knowledge_graph(path: Path) -> KnowledgeGraph:
     """Parse a React project into a validated Knowledge Graph.
 
     Args:
@@ -95,12 +96,12 @@ def parse_project(path: Path) -> KnowledgeGraph:
             parse; a ``package.json`` is expected but not strictly required).
 
     Raises:
-        ParserError: if the path is invalid, the worker fails, its output is not
+        IntelligenceError: if the path is invalid, the worker fails, its output is not
             valid JSON, or the output does not match the Knowledge Graph schema.
     """
     project_path = Path(path).expanduser().resolve()
     if not project_path.is_dir():
-        raise ParserError(f"Not a directory: {project_path}")
+        raise IntelligenceError(f"Not a directory: {project_path}")
 
     node = _require_node()
     ensure_worker_built()
@@ -112,12 +113,12 @@ def parse_project(path: Path) -> KnowledgeGraph:
             PARSE_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
-        raise ParserError(
+        raise IntelligenceError(
             f"parser-worker timed out after {PARSE_TIMEOUT_SECONDS}s on {project_path}."
         ) from exc
 
     if proc.returncode != 0:
-        raise ParserError(
+        raise IntelligenceError(
             "parser-worker exited with a non-zero status "
             f"({proc.returncode}).\nstderr:\n{proc.stderr.strip()}"
         )
@@ -126,7 +127,7 @@ def parse_project(path: Path) -> KnowledgeGraph:
         raw = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         preview = proc.stdout[:500]
-        raise ParserError(
+        raise IntelligenceError(
             "parser-worker did not emit valid JSON.\n"
             f"JSON error: {exc}\nstdout (first 500 chars):\n{preview}\n"
             f"stderr:\n{proc.stderr.strip()}"
@@ -135,6 +136,6 @@ def parse_project(path: Path) -> KnowledgeGraph:
     try:
         return KnowledgeGraph.model_validate(raw)
     except ValidationError as exc:
-        raise ParserError(
+        raise IntelligenceError(
             f"parser-worker output failed Knowledge Graph validation:\n{exc}"
         ) from exc

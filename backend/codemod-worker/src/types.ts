@@ -14,7 +14,7 @@ export interface Warning {
   line: number;
 }
 
-/** Something the deterministic codemod could not safely resolve — Part 2 (LLM). */
+/** Something rules could not safely resolve — AI Resolution Engine residue. */
 export interface Unhandled {
   code: string;
   snippet: string;

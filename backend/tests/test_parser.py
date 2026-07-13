@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.knowledge_graph import KnowledgeGraph
-from app.pipeline.parser import ParserError, parse_project
+from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_APP = REPO_ROOT / "test-projects" / "sample-app"
@@ -30,7 +30,7 @@ EXPECTED_COMPONENTS = {
 @pytest.fixture(scope="module")
 def kg() -> KnowledgeGraph:
     """Parse the sample-app once for the whole module."""
-    return parse_project(SAMPLE_APP)
+    return build_knowledge_graph(SAMPLE_APP)
 
 
 # --- Project ----------------------------------------------------------------
@@ -161,7 +161,7 @@ def test_edges_cover_all_kinds(kg: KnowledgeGraph) -> None:
 
 
 def test_broken_file_is_warned_not_crashed() -> None:
-    graph = parse_project(BROKEN_PROJECT)
+    graph = build_knowledge_graph(BROKEN_PROJECT)
     # A syntax error becomes a warning, not an exception.
     assert graph.warnings, "expected at least one warning for the broken file"
     assert any("Syntax error" in w for w in graph.warnings)
@@ -187,6 +187,6 @@ def test_parse_endpoint_rejects_bad_path() -> None:
     assert resp.status_code == 400
 
 
-def test_parse_project_raises_on_missing_path() -> None:
-    with pytest.raises(ParserError):
-        parse_project(Path("/definitely/not/here"))
+def test_build_knowledge_graph_raises_on_missing_path() -> None:
+    with pytest.raises(IntelligenceError):
+        build_knowledge_graph(Path("/definitely/not/here"))

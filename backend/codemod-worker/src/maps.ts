@@ -42,7 +42,7 @@ export const WEB_ONLY_EVENTS = new Set([
   'onKeyPress', 'onScroll',
 ]);
 
-/** react-router hooks that need React Navigation equivalents (Part 2). */
+/** react-router hooks that need React Navigation equivalents. */
 export const ROUTER_HOOKS = new Set([
   'useParams', 'useNavigate', 'useLocation', 'useSearchParams', 'useMatch',
   'useRoutes', 'useOutletContext',

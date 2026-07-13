@@ -1,4 +1,4 @@
-"""Acceptance tests for the deterministic codemod (Converter Part 1).
+"""Acceptance tests for the Deterministic Transformer (codemod-worker).
 
 Converts real files from sample-app and asserts the mechanical transforms and
 the unhandled/warning contract. Every converted output is independently
@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from app.models.conversion import ConversionResult
-from app.pipeline.converter import check_syntax, convert_component
+from app.models.transformation import TransformResult
+from app.pipeline.transformer import check_syntax, transform_component
 from app.pipeline.scaffold import generate_scaffold
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,11 +21,11 @@ SRC = REPO_ROOT / "test-projects" / "sample-app" / "src"
 OPTIONS = {"stylingEngine": "nativewind", "navigationLibrary": "react-navigation"}
 
 
-def _convert(rel: str) -> ConversionResult:
-    return convert_component(SRC / rel, OPTIONS)
+def _convert(rel: str) -> TransformResult:
+    return transform_component(SRC / rel, OPTIONS)
 
 
-def _codes(result: ConversionResult) -> set[str]:
+def _codes(result: TransformResult) -> set[str]:
     return {u.code for u in result.unhandled}
 
 
@@ -99,21 +99,21 @@ def test_navbar_navlink_is_unhandled() -> None:
 
 @pytest.mark.parametrize("rel", sorted(p.name for p in (SRC / "components").glob("*.tsx")))
 def test_every_component_output_is_valid_typescript(rel: str) -> None:
-    r = convert_component(SRC / "components" / rel, OPTIONS)
+    r = transform_component(SRC / "components" / rel, OPTIONS)
     assert check_syntax(r.code) == 0, f"{rel} produced invalid TS"
 
 
 @pytest.mark.parametrize("rel", sorted(p.name for p in (SRC / "pages").glob("*.tsx")))
 def test_every_page_output_is_valid_typescript(rel: str) -> None:
-    r = convert_component(SRC / "pages" / rel, OPTIONS)
+    r = transform_component(SRC / "pages" / rel, OPTIONS)
     assert check_syntax(r.code) == 0, f"{rel} produced invalid TS"
 
 
 def test_missing_file_raises() -> None:
-    from app.pipeline.converter import ConverterError
+    from app.pipeline.transformer import TransformerError
 
-    with pytest.raises(ConverterError):
-        convert_component(SRC / "components" / "DoesNotExist.tsx", OPTIONS)
+    with pytest.raises(TransformerError):
+        transform_component(SRC / "components" / "DoesNotExist.tsx", OPTIONS)
 
 
 # --- Scaffold ---------------------------------------------------------------

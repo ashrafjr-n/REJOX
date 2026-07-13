@@ -13,7 +13,7 @@ from app.models.analysis import AnalysisReport
 from app.models.knowledge_graph import KnowledgeGraph
 from app.models.plan import PlanResponse
 from app.pipeline.analyzer import analyze_graph
-from app.pipeline.parser import ParserError, parse_project
+from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
 from app.pipeline.planner import plan_migration
 
 app = FastAPI(
@@ -49,8 +49,8 @@ class ParseRequest(BaseModel):
 def parse(req: ParseRequest) -> KnowledgeGraph:
     """Parse stage: run the Node worker and return the Knowledge Graph JSON."""
     try:
-        return parse_project(Path(req.path))
-    except ParserError as exc:
+        return build_knowledge_graph(Path(req.path))
+    except IntelligenceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -58,8 +58,8 @@ def parse(req: ParseRequest) -> KnowledgeGraph:
 def analyze(req: ParseRequest) -> AnalysisReport:
     """Analysis stage: parse the project, then analyze migratability."""
     try:
-        kg = parse_project(Path(req.path))
-    except ParserError as exc:
+        kg = build_knowledge_graph(Path(req.path))
+    except IntelligenceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return analyze_graph(kg)
 
@@ -68,8 +68,8 @@ def analyze(req: ParseRequest) -> AnalysisReport:
 def plan(req: ParseRequest) -> PlanResponse:
     """Plan stage: parse + analyze + plan; returns the report and plan together."""
     try:
-        kg = parse_project(Path(req.path))
-    except ParserError as exc:
+        kg = build_knowledge_graph(Path(req.path))
+    except IntelligenceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     report = analyze_graph(kg)
     migration_plan = plan_migration(report, kg)

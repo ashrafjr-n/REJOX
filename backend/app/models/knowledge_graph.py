@@ -109,7 +109,7 @@ class Component(KGBase):
     cssModuleImports: list[str] = Field(default_factory=list)
     # Browser globals referenced (localStorage, window, document, ...).
     webApis: list[str] = Field(default_factory=list)
-    # --- Conversion facts (Converter Part 1) ---
+    # --- Conversion facts (feed the Deterministic Transformer) ---
     textNodes: list[TextNodeInfo] = Field(default_factory=list)
     layoutHints: list[LayoutHint] = Field(default_factory=list)
     images: list[ImageInfo] = Field(default_factory=list)
