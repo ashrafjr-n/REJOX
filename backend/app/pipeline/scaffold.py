@@ -23,6 +23,11 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 # Base Expo dependency set (recent, coherent SDK).
 _BASE_DEPS = {
     "expo": "~52.0.0",
+    # expo-asset is a transitive dep of expo, but npm frequently nests it under
+    # expo/node_modules where @expo/metro-config's shallow `require.resolve
+    # ('expo-asset')` cannot find it ("required package expo-asset cannot be
+    # found"). Declaring it directly hoists it so Metro can start.
+    "expo-asset": "~11.0.5",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
     "react-native": "0.76.5",
@@ -44,6 +49,7 @@ class ScaffoldResult:
     files: list[str] = field(default_factory=list)
     dependencies: dict[str, str] = field(default_factory=dict)
     dev_dependencies: dict[str, str] = field(default_factory=dict)
+    overrides: dict[str, str] = field(default_factory=dict)
 
 
 def _slug(name: str) -> str:
@@ -59,13 +65,35 @@ def _render(template_name: str, subs: dict[str, str]) -> str:
 
 def _build_dependencies(
     styling: str, navigation: str | None, source_deps: dict[str, str]
-) -> tuple[dict[str, str], dict[str, str]]:
+) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     deps = dict(_BASE_DEPS)
     dev = dict(_BASE_DEV_DEPS)
+    overrides: dict[str, str] = {}
 
     if styling == "nativewind":
         deps["nativewind"] = "^4.1.23"
         dev["tailwindcss"] = "^3.4.17"
+        # NativeWind pulls react-native-css-interop, whose loose reanimated peer
+        # otherwise resolves to a bleeding-edge version that drags in a SECOND,
+        # incompatible react-native (0.86) nested under nativewind. That nested
+        # copy captures NativeWind's `declare module "react-native"` className
+        # augmentation, so `className` silently disappears from the app's core
+        # components at type-check time. Pin reanimated to the Expo-52-compatible
+        # line and force a single react-native so the augmentation lands.
+        deps["react-native-reanimated"] = "~3.16.2"
+        # react-native-css-interop's babel preset unconditionally references
+        # `react-native-worklets/plugin`, so the package must be present for
+        # Metro to transform any file — otherwise bundling dies with
+        # "Cannot find module 'react-native-worklets/plugin'".
+        deps["react-native-worklets"] = "^0.10.0"
+        overrides["react-native"] = _BASE_DEPS["react-native"]
+        overrides["react-native-reanimated"] = "~3.16.2"
+        # react-native-worklets pulls @react-native/metro-config@0.86 → metro
+        # 0.84, which npm hoists over Expo 52's metro 0.81.5. Expo's CLI is pinned
+        # to 0.81 (`metro/src/lib/TerminalReporter`), so the mismatch breaks
+        # `expo export`. Force worklets' metro-config to the RN-0.76 line so the
+        # whole metro toolchain dedupes to a single 0.81.5.
+        overrides["@react-native/metro-config"] = "0.76.5"
 
     if navigation == "react-navigation":
         deps["@react-navigation/native"] = "^7.0.0"
@@ -83,7 +111,7 @@ def _build_dependencies(
         if lib in source_deps:
             deps[lib] = source_deps[lib]
 
-    return dict(sorted(deps.items())), dict(sorted(dev.items()))
+    return dict(sorted(deps.items())), dict(sorted(dev.items())), dict(sorted(overrides.items()))
 
 
 def generate_scaffold(
@@ -109,7 +137,7 @@ def generate_scaffold(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    deps, dev = _build_dependencies(styling, navigation, source_deps)
+    deps, dev, overrides = _build_dependencies(styling, navigation, source_deps)
     written: list[str] = []
 
     def write(rel: str, content: str) -> None:
@@ -126,6 +154,7 @@ def generate_scaffold(
         "MAIN": main,
         "DEPENDENCIES": json.dumps(deps, indent=2).replace("\n", "\n  "),
         "DEV_DEPENDENCIES": json.dumps(dev, indent=2).replace("\n", "\n  "),
+        "OVERRIDES": json.dumps(overrides, indent=2).replace("\n", "\n  "),
     }))
 
     # app.json
@@ -207,4 +236,5 @@ def generate_scaffold(
         files=sorted(written),
         dependencies=deps,
         dev_dependencies=dev,
+        overrides=overrides,
     )

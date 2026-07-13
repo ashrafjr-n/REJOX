@@ -4,17 +4,27 @@ Exposes the HTTP surface for the migration pipeline. For now this is just a
 health check; pipeline routes will be added as the engine is built out.
 """
 
+import tempfile
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app.models.analysis import AnalysisReport
 from app.models.knowledge_graph import KnowledgeGraph
+from app.models.migrate import MigrateResponse
 from app.models.plan import PlanResponse
 from app.pipeline.analyzer import analyze_graph
+from app.pipeline.emit import emit_project
 from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
 from app.pipeline.planner import plan_migration
+from app.pipeline.validator import (
+    ValidatorError,
+    map_diagnostics,
+    validate_project,
+    validated_scores,
+)
 
 app = FastAPI(
     title="Rejox AI",
@@ -74,3 +84,65 @@ def plan(req: ParseRequest) -> PlanResponse:
     report = analyze_graph(kg)
     migration_plan = plan_migration(report, kg)
     return PlanResponse(report=report, plan=migration_plan)
+
+
+class MigrateRequest(BaseModel):
+    """Request body for the migrate endpoint."""
+
+    path: str = Field(..., description="Local path to a React project root.")
+    answers: dict[str, str] = Field(
+        default_factory=dict,
+        description="Ask-stage answers, e.g. {'styling-engine': 'nativewind'}.",
+    )
+    outDir: Optional[str] = Field(
+        default=None,
+        description="Where to emit the RN project; a temp dir is used if omitted.",
+    )
+    install: bool = Field(True, description="Run npm install (cached across runs).")
+    runBundle: bool = Field(True, description="Run the Metro bundle (slowest stage).")
+
+
+@app.post("/api/migrate", response_model=MigrateResponse)
+def migrate(req: MigrateRequest) -> MigrateResponse:
+    """Migrate stage: emit the RN project, validate it, and map diagnostics.
+
+    Runs the whole back half of the pipeline deterministically (no LLM). The
+    ``mappedDiagnostics`` payload is exactly what the AI Resolution Engine will
+    consume as its repair loop.
+    """
+    source = Path(req.path)
+    try:
+        kg = build_knowledge_graph(source)
+    except IntelligenceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+
+    out_dir = Path(req.outDir) if req.outDir else Path(tempfile.mkdtemp(prefix="rejox-"))
+    emission = emit_project(
+        plan, req.answers, kg, out_dir, report=report, source_root=source
+    )
+
+    try:
+        validation = validate_project(
+            out_dir, install=req.install, run_bundle=req.runBundle
+        )
+    except ValidatorError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    mapped = map_diagnostics(validation, emission, source_root=source)
+    scores = validated_scores(
+        emission,
+        validation,
+        predicted_coverage=report.coverage,
+        predicted_confidence=report.confidence,
+    )
+    return MigrateResponse(
+        report=report,
+        plan=plan,
+        emission=emission,
+        validation=validation,
+        mappedDiagnostics=mapped,
+        validatedScores=scores,
+    )
