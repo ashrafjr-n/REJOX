@@ -84,6 +84,35 @@ function extractProps(fn: FunctionLike, sourceFile: SourceFile): PropInfo[] {
   return props;
 }
 
+/**
+ * Base type names the props interface/alias extends (without type args), e.g.
+ * `interface P extends ButtonHTMLAttributes<HTMLButtonElement>` →
+ * ["ButtonHTMLAttributes"]. Inherited props are NOT expanded (see the known
+ * limitations); this fact lets later stages resolve them from the graph.
+ */
+function extractPropsExtends(fn: FunctionLike, sourceFile: SourceFile): string[] {
+  const param = fn.getParameters()[0];
+  const typeNode = param?.getTypeNode();
+  if (!typeNode || !Node.isTypeReference(typeNode)) return [];
+  const typeName = typeNode.getTypeName().getText();
+
+  const bases = new Set<string>();
+  const baseName = (text: string) => text.replace(/<.*$/s, '').trim();
+
+  const iface = sourceFile.getInterface(typeName);
+  if (iface) {
+    for (const ext of iface.getExtends()) bases.add(baseName(ext.getText()));
+  }
+  const alias = sourceFile.getTypeAlias(typeName);
+  const aliasType = alias?.getTypeNode();
+  if (aliasType && Node.isIntersectionTypeNode(aliasType)) {
+    for (const t of aliasType.getTypeNodes()) {
+      if (Node.isTypeReference(t)) bases.add(baseName(t.getText()));
+    }
+  }
+  return [...bases].sort();
+}
+
 function extractHooksUsed(fn: FunctionLike): string[] {
   const names = new Set<string>();
   for (const call of fn.getDescendantsOfKind(SyntaxKind.CallExpression)) {
@@ -197,6 +226,7 @@ export function extractComponents(
       file: fileRel,
       exportType: isDefaultExport ? 'default' : 'named',
       props: extractProps(fn, sourceFile),
+      propsExtends: extractPropsExtends(fn, sourceFile),
       hooksUsed: extractHooksUsed(fn),
       childComponents: usage.childComponents,
       jsxElements: usage.jsxElements,

@@ -67,6 +67,16 @@ def test_product_card_props_and_jsx(kg: KnowledgeGraph) -> None:
     assert "useCartStore" in pc.hooksUsed
 
 
+def test_button_props_extends_records_dom_interface(kg: KnowledgeGraph) -> None:
+    # Inherited props are not expanded (known limitation), but the heritage is
+    # a graph fact — later stages resolve DOM props (onClick, ...) from it.
+    button = next(c for c in kg.components if c.name == "Button")
+    assert button.propsExtends == ["ButtonHTMLAttributes"]
+    # A component with a plain local interface inherits nothing.
+    stepper = next(c for c in kg.components if c.name == "QuantityStepper")
+    assert stepper.propsExtends == []
+
+
 # --- Hooks ------------------------------------------------------------------
 
 

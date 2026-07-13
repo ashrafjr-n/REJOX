@@ -79,6 +79,12 @@ export interface Component {
   file: string;
   exportType: 'default' | 'named';
   props: PropInfo[];
+  /**
+   * Base type names the props interface/alias extends (e.g.
+   * "ButtonHTMLAttributes"), without type arguments. Lets later stages resolve
+   * inherited DOM props (onClick, className, ...) from the graph.
+   */
+  propsExtends: string[];
   hooksUsed: string[];
   childComponents: string[];
   jsxElements: Record<string, number>;
