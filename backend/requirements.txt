@@ -8,6 +8,10 @@ python-multipart==0.0.20
 # (FakeProvider needs nothing).
 google-genai==1.15.0
 
+# CLI — the terminal face of the pipeline (`rejox migrate …`).
+typer==0.26.8
+rich==13.9.4
+
 # Dev / test
 pytest==8.3.4
 httpx==0.28.1
