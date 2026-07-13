@@ -99,6 +99,9 @@ class Component(KGBase):
     file: str
     exportType: Literal["default", "named"]
     props: list[PropInfo] = Field(default_factory=list)
+    # Base type names the props interface extends (e.g. "ButtonHTMLAttributes"),
+    # without type arguments — inherited props stay resolvable from the graph.
+    propsExtends: list[str] = Field(default_factory=list)
     hooksUsed: list[str] = Field(default_factory=list)
     childComponents: list[str] = Field(default_factory=list)
     # host (lowercase) JSX tags → occurrence count, e.g. {"div": 4, "img": 1}
