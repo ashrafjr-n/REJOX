@@ -490,3 +490,204 @@ skeleton from the answered questions, wiring NativeWind (babel `jsxImportSource`
 and the chosen navigation library, carrying over compatible deps (zustand,
 axios). Templates are real files under `app/pipeline/templates/`. No source is
 copied — skeleton only.
+
+**NativeWind dependency wiring (load-bearing).** Making NativeWind actually
+type-check *and* bundle under a clean `npm install` requires four non-obvious
+pins, each verified by `tsc` + `expo export` (not guessed):
+
+- `overrides.react-native` + `react-native-reanimated ~3.16.2` — NativeWind's
+  `react-native-css-interop` has a loose reanimated peer that otherwise pulls
+  reanimated 4 and a **second** nested `react-native`; the nested copy captures
+  NativeWind's `declare module "react-native"` className augmentation, so
+  `className` silently vanishes from RN core components at type-check.
+- `react-native-worklets` — css-interop's babel preset unconditionally requires
+  `react-native-worklets/plugin`; without it Metro cannot transform any file.
+- `overrides["@react-native/metro-config"] = "0.76.5"` — worklets drags
+  `metro@0.84`, which npm hoists over Expo 52's `metro@0.81.5`; Expo's CLI is
+  pinned to 0.81, so `expo export` breaks until the toolchain dedupes.
+- `expo-asset` (direct dep) — npm nests it under `expo/node_modules` where
+  `@expo/metro-config`'s shallow `require.resolve('expo-asset')` cannot find it.
+
+---
+
+## Migration Engine — Full-project emission
+
+The Deterministic Transformer converts one file at a time; **emission**
+(`app/pipeline/emit.py`) assembles a whole runnable RN project.
+`emit_project(plan, answers, kg, out_dir, *, report=None, source_root=None) →
+EmittedProject`:
+
+1. scaffold the Expo (TS) skeleton;
+2. transform **every** source `.ts`/`.tsx` through the codemod-worker — including
+   zustand stores, the api layer, hooks, and shared types, so nothing bypasses
+   the rules — and write each into the RN tree. Source layout is preserved 1:1
+   so relative imports stay valid; the only remap is `pages/ → screens/` (both
+   one level under `src/`, so `../components/X` is unaffected);
+3. generate the **React Navigation navigator** from the route table
+   (`src/navigation/AppNavigator.tsx`, screen names matching the Analyzer's
+   table so the transformer's `navigation.navigate('Screen')` calls resolve) and
+   an `App.tsx` wiring it. The shared-chrome wrapper (`<Layout>`/`<Outlet>`) is a
+   navigator-shape decision → recorded as `NAV_CONTAINER` residue, not invented;
+4. copy real assets; skip web-only ones (favicon, `index.html`, global CSS,
+   `vite.svg`) with a recorded reason;
+5. write `REJOX-REPORT.md` — per-file provenance, residue, and skips.
+
+`EmittedProject` (`app/models/emission.py`) carries, per file, `{path,
+sourceFile, provenance: ConfidenceSource, warnings, unhandled, todoCodes}` plus
+`skipped[]` and `todoCount`. Provenance is derived from what actually happened:
+`deterministic` (rule, clean) / `deterministic-warning` (flagged or generated) /
+`unhandled` (carries residue → excluded from Confidence).
+
+## Migration Engine — Validator
+
+**The system's judge** (`app/pipeline/validator.py`). It runs BEFORE any AI
+exists: its first job is to prove the *deterministic* output is sound. If our own
+codemods produced TypeScript errors, we learn it now — we never blame a future
+LLM for our bugs. It runs **real tools, never heuristics**:
+
+`validate_project(out_dir, *, install=True, force_install=False, run_bundle=True)
+→ ValidationResult`
+
+- **Install** — `npm install`, cached across runs (skipped when `node_modules`
+  exists unless `force_install`).
+- **Typecheck** — the project's own `tsc --noEmit`, invoked via the **local**
+  `typescript` binary (never `npx tsc` — npx fetches an unrelated `tsc@2.0.4`
+  package if it can't find the local one). Output is parsed into structured
+  `Diagnostic{source, file, line, column, code, message, severity}`.
+- **Bundle** — the Metro bundler headlessly via `expo export --platform ios`.
+  Metro fails fast (first unresolved module), so `bundle` typically carries one
+  diagnostic, parsed the same structured way. (`react-native bundle` was
+  rejected: `expo export` uses the project's own `@expo/metro-config` wiring,
+  which is what a real build uses.)
+
+`ValidationResult` = `{passed, installed, typecheck: StageResult, bundle:
+StageResult, durationSeconds, toolVersions}`, each `StageResult` =
+`{ran, passed, diagnostics[], errorCount, skippedReason, rawTail}`.
+
+### Diagnostic → source mapping (the AI Resolution Engine's contract)
+
+A raw `tsc` error is useless to a repair loop unless we know **which transform**
+produced that line. `map_diagnostics(result, emitted, *, source_root) →
+[MappedDiagnostic]` is that contract, designed now so the AI Engine plugs in
+without schema churn. Each `MappedDiagnostic` carries:
+
+- `diagnostic` + `file` (output-relative) + `sourceComponent` (the React source);
+- `provenance` (the emitted file's `ConfidenceSource`);
+- `nearbyTodo` — the REJOX-TODO code(s) on/near the line (line-proximate markers
+  first, then the file's residue set);
+- `residue` — the specific `unhandled` item (matched by token, e.g. `isActive` →
+  `NAV_ACTIVE`);
+- `sourceSnippet` (offending emitted lines) + `originalSnippet` (the
+  corresponding React source, when resolvable).
+
+`unexplained_diagnostics(mapped)` returns errors that trace to **no** residue —
+i.e. deterministic codemod bugs. The benchmark **gate**: this list is empty.
+
+### Confidence wired to validated reality
+
+Once the Validator exists, `ConfidenceSource` stops being theoretical.
+`validated_scores(emitted, result)` recomputes the scores from the emitted +
+**validated** project:
+
+- deterministic + validator passed → **100**;
+- deterministic-warning + validator passed → **80**;
+- any file with unresolved residue → **excluded** from Confidence, counts against
+  Coverage.
+
+On `sample-app`, this recomputation is the credibility check on the Analyzer:
+
+| Metric      | Analyzer predicted | Validated reality | Δ |
+| ----------- | -----------------: | ----------------: | -: |
+| Confidence  | 97.7 | **97.8** | **+0.1** |
+| Coverage (working: compiles+bundles) | 82.5 | **88.9** | **+6.4** |
+| Coverage (strict: residue-free files) | — | 33.3 | — |
+
+**Confidence is essentially perfectly calibrated** (both sides are
+provenance-driven). The working-Coverage delta shows the Analyzer is *mildly
+conservative* (under-predicts) — the safe direction. The strict residue-free
+fraction (9/27 files with zero TODOs) is a deliberately harsher lens, not a sign
+the Analyzer is wrong. **Zero non-residue failures.**
+
+### The validated residue (benchmark `sample-app`)
+
+After a clean emit + install, the ENTIRE remaining error set — 4 `tsc` + 1 Metro
+— is legitimate residue, each mapping to a REJOX-TODO the AI Resolution Engine
+will own:
+
+| Diagnostic | File | Residue |
+| ---------- | ---- | ------- |
+| `TS2304` Cannot find name `Outlet` | Layout | `NAV_CONTAINER` |
+| `TS2322`/`TS7031` `isActive` styling | Navbar | `NAV_ACTIVE` |
+| `TS2307` Cannot find module `./ProductCard.module.css` | ProductCard | `CSS_MODULE` |
+| Metro: unresolved `./ProductCard.module.css` | ProductCard | `CSS_MODULE` |
+
+The `className`-flood errors that appeared on the first run were **not** codemod
+bugs — they were scaffold dependency-wiring bugs (see *NativeWind dependency
+wiring* above), fixed at the source. No per-component transform logic changed.
+
+---
+
+## Migration Engine — AI Resolution Engine (foundation)
+
+The AI Resolution Engine is a **scalpel for the residue, never the default
+path** (see `CLAUDE.md`). Everything that can be resolved by rules already was;
+the AI layer is invoked only over the honest residue the Validator surfaces
+(`NAV_CONTAINER`, `NAV_ACTIVE`, `CSS_MODULE`, …). This section describes the
+**plumbing** — provider seam, cache, and contract. No resolver logic exists yet;
+those arrive in later sessions.
+
+```
+backend/app/ai/
+├── provider.py   # LLMProvider ABC + LLMResponse; GeminiProvider, FakeProvider
+├── config.py     # env-driven provider/model/cache selection (one-line vendor swap)
+├── cache.py      # content-addressed ResolutionCache over a swappable backend
+└── schemas.py    # ResolutionRequest / ResolutionResponse + the snippet budget guard
+```
+
+### Provider abstraction
+
+The rest of Rejox depends ONLY on `LLMProvider.complete(system, user, *,
+max_tokens) -> LLMResponse` (`{text, tokensIn, tokensOut, model, latencyMs}`).
+
+- **`GeminiProvider`** — Google Gemini via the official `google-genai` SDK. The
+  SDK is imported **lazily** (inside `complete`), so importing the AI layer never
+  requires the SDK and never reaches the network; the model comes from config
+  (default: a Flash-tier model), the key from `GEMINI_API_KEY` — a missing key
+  fails with a clear `ProviderError`.
+- **`FakeProvider`** — deterministic and offline. Canned responses keyed by a
+  hash of the prompt; unknown prompts get a stable synthetic answer. **Tests
+  inject this everywhere and never touch the network.**
+
+`config.py` selects the provider from `REJOX_AI_PROVIDER` (`gemini` | `fake`), so
+swapping vendors is a one-line change in `get_provider` — no resolver edits.
+
+### Resolution cache
+
+The same residue recurs constantly (`hover:bg-indigo-500` across seven files).
+Resolving it once and reusing the answer is the difference between ~100 LLM calls
+and ~8. `ResolutionCache` is content-addressed:
+
+- **Key** = a stable hash of `(issue_code, normalized_snippet, target_options)`.
+  Normalization strips file paths, line numbers, and (given) component names and
+  canonicalizes whitespace, so two *semantically identical* pieces of residue
+  from different files collide onto one key. Distinct issue codes or target
+  options never collide.
+- **Value** = the `ResolutionResponse` plus metadata (model, timestamp, tokens).
+- **Storage** = SQLite behind a `CacheBackend` interface (`get`/`set`/`count`), so
+  moving to Postgres/Redis later is one new backend class — the cache API is
+  unchanged. `:memory:` keeps it fully in-process for tests.
+- **Instrumented** — every hit/miss is counted; `stats()` reports a real
+  `hitRate`, so cache effectiveness is measurable, not assumed.
+
+### The snippet-only contract (enforced, not asserted)
+
+`ResolutionRequest = {issueCode, snippet, context, targetOptions, diagnostics}`
+carries ONE piece of residue and the *minimal* surrounding code — the validator
+`Diagnostic`s ride along when the residue broke the build.
+`ResolutionResponse = {code, explanation, confidence, unresolvable, reason}`.
+
+The core principle — **a request may never contain a whole file** — is enforced
+*mechanically*: a `model_validator` counts `snippet + context` lines and raises
+`SnippetBudgetError` when they exceed the budget (`REJOX_AI_MAX_SNIPPET_LINES`,
+default **60**). Smuggling a file into the prompt fails at construction, in code,
+not in a code-review comment.

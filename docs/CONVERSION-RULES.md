@@ -88,6 +88,19 @@ comment so nothing is ever silently dropped:
 | `PROPS_HTML_TYPE` | DOM types with no clean RN equivalent (post-map)               | props API redesign |
 | `WEB_ONLY_ELEMENT` | `table`/`canvas`/`iframe`/…                                   | needs a component redesign |
 
+## Validated end-to-end
+
+The Validator (`tsc --noEmit` + Metro `expo export`) now runs against the emitted
+project, so these rules are proven, not asserted. On `sample-app` the deterministic
+output type-checks and bundles with **zero** unexplained errors — every remaining
+diagnostic maps to a residue code above (`NAV_CONTAINER`, `NAV_ACTIVE`,
+`CSS_MODULE`). No transform rule changed this session; the only fixes were in the
+**scaffold's NativeWind dependency wiring** (react-native/reanimated/worklets/
+metro-config pins), without which the `className` rule type-checks against a
+duplicate `react-native` and Metro fails to bundle. See `ARCHITECTURE.md` →
+*NativeWind dependency wiring* / *Validator*. When touching the NativeWind path,
+re-run `pytest -m slow` to keep the bundle honest.
+
 ## Legend / conventions
 
 - **Text rule**: any bare string in JSX must be wrapped in `<Text>` in RN.
