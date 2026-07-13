@@ -13,6 +13,7 @@ from app.models.knowledge_graph import KnowledgeGraph
 
 from .rules import scoring
 from .rules.components import analyze_components
+from .rules.domains import detect_domains, overall_risk
 from .rules.libraries import analyze_libraries, library_issues
 from .rules.routing import analyze_routing
 from .rules.styling import analyze_styling
@@ -35,6 +36,7 @@ def analyze_graph(kg: KnowledgeGraph) -> AnalysisReport:
     components = analyze_components(kg)
     routing = analyze_routing(kg)
     styling = analyze_styling(kg)
+    domains = detect_domains(kg)
 
     # Aggregate cross-cutting issues.
     issues: list[Issue] = []
@@ -46,8 +48,13 @@ def analyze_graph(kg: KnowledgeGraph) -> AnalysisReport:
     blockers = [i for i in issues if i.severity == "blocker"]
     warnings = [i for i in issues if i.severity == "warning"]
 
-    breakdown = scoring.build_score_breakdown(components, libraries, routing, kg)
-    migration_score = round(breakdown.weighted_total(), 1)
+    # The three independent axes: Coverage (what migrates), Confidence
+    # (how sure we are about what migrates — provenance-based), Risk
+    # (worst detected functional domain).
+    contributions, coverage = scoring.build_contributions(
+        components, libraries, routing, kg
+    )
+    confidence = scoring.compute_confidence(components)
 
     return AnalysisReport(
         projectName=kg.project.name,
@@ -56,8 +63,11 @@ def analyze_graph(kg: KnowledgeGraph) -> AnalysisReport:
         components=components,
         routing=routing,
         styling=styling,
+        domains=domains,
         blockers=blockers,
         warnings=warnings,
-        migrationScore=migration_score,
-        scoreBreakdown=breakdown,
+        coverage=coverage,
+        confidence=confidence,
+        risk=overall_risk(domains),
+        contributions=contributions,
     )

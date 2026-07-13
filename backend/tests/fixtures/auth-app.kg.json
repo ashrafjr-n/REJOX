@@ -1,0 +1,98 @@
+{
+  "project": {
+    "name": "auth-app",
+    "root": "synthetic",
+    "framework": "react",
+    "language": "ts",
+    "bundler": "vite",
+    "dependencies": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0",
+      "axios": "^1.6.0"
+    }
+  },
+  "files": [
+    {
+      "path": "package.json",
+      "type": "config",
+      "loc": 14
+    },
+    {
+      "path": "src/api/auth.ts",
+      "type": "api",
+      "loc": 20
+    },
+    {
+      "path": "src/components/LoginForm.tsx",
+      "type": "component",
+      "loc": 48
+    }
+  ],
+  "components": [
+    {
+      "id": "src/components/LoginForm.tsx#LoginForm",
+      "name": "LoginForm",
+      "file": "src/components/LoginForm.tsx",
+      "exportType": "default",
+      "props": [],
+      "hooksUsed": [
+        "useState"
+      ],
+      "childComponents": [],
+      "jsxElements": {
+        "div": 2,
+        "form": 1,
+        "input": 2,
+        "button": 1
+      },
+      "eventHandlers": [
+        "onChange",
+        "onSubmit"
+      ],
+      "stylingApproach": [
+        "tailwind"
+      ],
+      "tailwindClasses": [
+        "flex",
+        "flex-col",
+        "gap-4",
+        "p-6"
+      ],
+      "cssModuleImports": [],
+      "webApis": [
+        "localStorage"
+      ]
+    }
+  ],
+  "hooks": [],
+  "routes": [],
+  "stateManagement": {
+    "library": "none",
+    "stores": []
+  },
+  "apiLayer": {
+    "clients": [
+      {
+        "id": "src/api/auth.ts#client",
+        "library": "axios",
+        "file": "src/api/auth.ts",
+        "baseURL": "https://api.example.com"
+      }
+    ],
+    "endpoints": [
+      {
+        "method": "POST",
+        "url": "/auth/login",
+        "file": "src/api/auth.ts"
+      },
+      {
+        "method": "POST",
+        "url": "/auth/logout",
+        "file": "src/api/auth.ts"
+      }
+    ]
+  },
+  "assets": [],
+  "edges": [],
+  "warnings": []
+}
