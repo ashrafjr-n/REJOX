@@ -16,7 +16,7 @@ add a row here **first**, then implement it.
 | `<img>`                           | `<Image>` (from `react-native`)             | High       | `src` → `source={{ uri }}`; requires explicit width/height. |
 | `onClick`                         | `onPress`                                   | High       | On `Pressable` / `TouchableOpacity` / `Button`. |
 | `className` / Tailwind            | NativeWind `className`                      | Medium     | NativeWind maps most utilities; some (hover, grid) have no RN equivalent. |
-| `react-router-dom`                | React Navigation (`@react-navigation/*`)    | Medium     | Routes → stack/tab navigators; `useParams`→route params; `Link`→`navigation.navigate`. |
+| `react-router-dom`                | React Navigation (`@react-navigation/*`)    | Medium     | `Link`→`navigation.navigate` and `useParams`→`useRoute` are **automated** (route table); navigator STRUCTURE (stack/tab) stays a design decision. |
 | CSS `:hover`                      | — (no equivalent)                           | Low        | No hover on touch. Flag; optionally map to press/focus state. |
 | `localStorage`                    | `AsyncStorage` (`@react-native-async-storage`) | Medium  | API is async — call sites must be awaited. |
 | `<a href>`                        | `Linking.openURL` / `<Pressable>`           | Medium     | External links → `Linking`; internal → navigation. |
@@ -39,39 +39,59 @@ add a row here **first**, then implement it.
 | `onSubmit` / `onMouseEnter` / `onKeyDown` | — (no equivalent)                    | Low        | Analyzer code `WEB_ONLY_EVENT`. No mouse/keyboard/submit on touch. |
 | Redux / Three.js / Next.js / Electron | — (unsupported in MVP)                   | Low        | Analyzer code `UNSUPPORTED_LIBRARY` (blocker). See `PRD.md`. |
 
-## Automated by the codemod (Part 1)
+## Automated by the Deterministic Transformer
 
 These rules are implemented as **deterministic** transforms in
-`backend/codemod-worker` (ts-morph) — no LLM. All are Confidence **High**
-(mechanical). The worker self-checks that its output is syntactically valid TS
-before emitting.
+`backend/codemod-worker` (ts-morph) — no AI. All are **Confidence: High /
+automated**; this table is the product's proof of determinism. The worker
+self-checks that its output is syntactically valid TS before emitting.
 
 | Rule (implemented)                              | Transform                                            | Confidence |
 | ----------------------------------------------- | ---------------------------------------------------- | ---------- |
-| `div`/`section`/`header`/`footer`/`nav`/`ul`/`li`/`form` → `View` | tag rename            | ✅ High |
-| `span`/`p`/`h1`-`h6`/`label`/`small`/`strong`/`em` → `Text`       | tag rename            | ✅ High |
-| `img` → `Image`                                 | tag rename (+ `IMAGE_PROPS` unhandled: `src`→`source`) | ✅ High |
-| `button` → `Pressable`                          | tag rename                                           | ✅ High |
-| container/text element with `onPress` → `Pressable` | interactive override                             | ✅ High |
-| Bare text / `{expr}` child of non-`Text` parent → wrap in `<Text>` | text-wrap pass       | ✅ High |
-| `onClick` → `onPress` (host elements only)      | attribute rename                                     | ✅ High |
-| `onChange` on `input`/`textarea`/`select` → `onChangeText` | rename (+ `EVENT_ADAPTER` unhandled)      | ✅ High |
-| `onSubmit` → dropped (+ `FORM_SUBMIT` unhandled) | attribute removal                                   | ✅ High |
-| `onMouseEnter`/`onKeyDown`/… → dropped          | attribute removal (+ warning)                        | ✅ High |
-| Inject `import { … } from 'react-native'`       | for every RN component actually used                 | ✅ High |
-| Drop `react-dom` imports                        | import removal                                       | ✅ High |
-| `className` (any form)                          | **preserved verbatim** (styling is Part 2)           | ✅ High |
+| `div`/`section`/`header`/`footer`/`nav`/`ul`/`li`/`form` → `View` | tag rename            | ✅ High / automated |
+| `span`/`p`/`h1`-`h6`/`label`/`small`/`strong`/`em` → `Text`       | tag rename            | ✅ High / automated |
+| `img` → `Image`                                 | tag rename                                           | ✅ High / automated |
+| `src="…"` → `source={{ uri: '…' }}` · `src={expr}` → `source={{ uri: expr }}` · imported asset → `source={asset}` | attribute reshape | ✅ High / automated |
+| `alt` → `accessibilityLabel`; `width`/`height` attrs → `style` | attribute reshape       | ✅ High / automated |
+| `<img>` with unprovable size → inject placeholder `style` + `IMAGE_SIZE` warning | size injection (the SHAPE is a rule; the number is design → flagged) | ✅ High / automated |
+| `button` → `Pressable`                          | tag rename                                           | ✅ High / automated |
+| container/text element with `onPress` → `Pressable` | interactive override                             | ✅ High / automated |
+| Bare text / `{expr}` child of non-`Text` parent → wrap in `<Text>` | text-wrap pass       | ✅ High / automated |
+| `<Link to>`/`<NavLink to>` (static / param / template path) → `<Pressable onPress={() => navigation.navigate('Screen', { params })}>` | route-table resolution + `useNavigation` hook & import injection | ✅ High / automated |
+| `useParams<T>()` → `(useRoute().params ?? {}) as T` | hook swap + `useRoute` import                   | ✅ High / automated |
+| `onClick` → `onPress` (host elements)           | attribute rename                                     | ✅ High / automated |
+| `onClick` → `onPress` on PROJECT components with graph-proven DOM props (`propsExtends` ∋ `*HTMLAttributes`) | graph-resolved rename, consistent on both sides | ✅ High / automated |
+| `extends ButtonHTMLAttributes<…>` → `extends PressableProps` (+ Anchor→Pressable, Input/Textarea→TextInput, Img→Image, Form/HTML→View props) | declarative DOM-interface → RN-interface map | ✅ High / automated |
+| `onChange` on `input`/`textarea`/`select` → `onChangeText` | rename (+ `EVENT_ADAPTER` unhandled)      | ✅ High / automated |
+| `onSubmit` → dropped (+ `FORM_SUBMIT` unhandled) | attribute removal                                   | ✅ High / automated |
+| `onMouseEnter`/`onKeyDown`/… → dropped          | attribute removal (+ warning)                        | ✅ High / automated |
+| NativeWind-supported Tailwind classes           | **passed through untouched** (the mechanical majority) | ✅ High / automated |
+| `space-x-*`/`space-y-*` → `gap-x-*`/`gap-y-*`   | class rename (child-selector spacing → flex gap)     | ✅ High / automated |
+| `flex` with no direction → append `flex-row`    | web defaults to row, RN to column — direction made explicit | ✅ High / automated |
+| Inject `import { … } from 'react-native'` / `'@react-navigation/native'` | for everything actually used | ✅ High / automated |
+| Drop `react-dom` imports                        | import removal                                       | ✅ High / automated |
 
-**Handed to Part 2 (LLM) via `unhandled`** — the deterministic codemod records
-these but does not resolve them: `NAV_LINK`/`NAV_ACTIVE` (`Link`/`NavLink` →
-navigation), `NAV_HOOK` (`useParams`/`useNavigate`), `CSS_MODULE`,
-`IMAGE_PROPS` (`src`→`source`, sizing), `PROPS_HTML_TYPE` (web DOM prop types),
-`EVENT_ADAPTER`, `WEB_ONLY_ELEMENT`. Every one also leaves a
-`// REJOX-TODO(<CODE>)` comment in the output.
+**The honest residue (`unhandled` → AI Resolution Engine)** — only what
+genuinely requires judgment; every item also leaves a `// REJOX-TODO(<CODE>)`
+comment so nothing is ever silently dropped:
+
+| Residue code    | What it is                                                       | Why it needs reasoning |
+| --------------- | ---------------------------------------------------------------- | ---------------------- |
+| `NAV_LINK`      | `to` is a runtime expression with no static route-table match    | which screen is a runtime value |
+| `NAV_ACTIVE`    | `NavLink` styles by `isActive`                                   | active state is navigation state; tab bar vs highlight is design |
+| `NAV_CONTAINER` | `<Routes>`/`<Route>`/`<Outlet>` structure                        | navigator arrangement (stack/tab/drawer) is design |
+| `NAV_HOOK`      | router hooks other than `useParams` still referenced             | imperative navigation intent |
+| `CSS_MODULE`    | `*.module.css` imports                                           | restyling a stylesheet is design |
+| `TW_UNSUPPORTED`| `hover:`/`group-*`/`grid-*`/gradients/`backdrop-*`/transitions/animations/`sticky`/`fixed`/`divide-*` | no RN equivalent; re-expression (pressed state, flex reflow, expo-linear-gradient, Moti) is design |
+| `EVENT_ADAPTER` | `onChangeText` handler now receives a string                     | handler body may need reshaping |
+| `FORM_SUBMIT`   | `onSubmit` semantics                                             | submission flow must move into state |
+| `PROPS_HTML_TYPE` | DOM types with no clean RN equivalent (post-map)               | props API redesign |
+| `WEB_ONLY_ELEMENT` | `table`/`canvas`/`iframe`/…                                   | needs a component redesign |
 
 ## Legend / conventions
 
 - **Text rule**: any bare string in JSX must be wrapped in `<Text>` in RN.
 - **Flex default**: RN `flexDirection` defaults to `column`; web defaults to `row`.
-  Converters must make direction explicit to preserve layout intent.
+  The transformer makes direction explicit (`flex` → `flex flex-row`) to
+  preserve layout intent — automated.
 - Rows marked **Low** confidence should generate an "Ask" item, not a silent transform.
