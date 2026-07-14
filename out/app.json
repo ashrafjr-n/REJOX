@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Sample App",
+    "slug": "sample-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "sample-app",
+    "ios": { "supportsTablet": true },
+    "android": {},
+    "web": { "bundler": "metro" },
+    "plugins": []
+  }
+}

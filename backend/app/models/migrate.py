@@ -31,3 +31,5 @@ class MigrateResponse(BaseModel):
     validation: ValidationResult
     mappedDiagnostics: list[MappedDiagnostic] = Field(default_factory=list)
     validatedScores: Optional[ValidatedScores] = None
+    # Set when migrating a landed upload; the id to pass to /api/runs/{id}/download.
+    runId: Optional[str] = None

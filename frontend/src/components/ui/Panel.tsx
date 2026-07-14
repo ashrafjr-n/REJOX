@@ -14,6 +14,8 @@ interface PanelProps {
   /** Drop the inner padding — for panels that wrap a full-bleed table. */
   flush?: boolean
   className?: string
+  /** Stable hook for tests. */
+  testId?: string
 }
 
 /**
@@ -28,10 +30,12 @@ export function Panel({
   children,
   flush,
   className,
+  testId,
 }: PanelProps) {
   const hasHeader = eyebrow || title || description || actions
   return (
     <section
+      data-testid={testId}
       className={cn(
         'rounded-xl border border-line bg-surface-1 shadow-[var(--shadow-panel)]',
         className,

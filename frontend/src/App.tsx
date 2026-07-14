@@ -2,7 +2,10 @@ import { AnimatePresence, motion } from 'framer-motion'
 
 import { AppShell } from './components/AppShell'
 import { AnalyzingScreen } from './screens/AnalyzingScreen'
+import { AskScreen } from './screens/AskScreen'
+import { PlanScreen } from './screens/PlanScreen'
 import { ReportScreen } from './screens/ReportScreen'
+import { SubmittedScreen } from './screens/SubmittedScreen'
 import { UploadScreen } from './screens/UploadScreen'
 import { usePipelineStore } from './store/pipelineStore'
 
@@ -22,6 +25,9 @@ export default function App() {
           {stage === 'upload' && <UploadScreen />}
           {stage === 'analyzing' && <AnalyzingScreen />}
           {stage === 'report' && <ReportScreen />}
+          {stage === 'plan' && <PlanScreen />}
+          {stage === 'ask' && <AskScreen />}
+          {stage === 'submitted' && <SubmittedScreen />}
         </motion.div>
       </AnimatePresence>
     </AppShell>

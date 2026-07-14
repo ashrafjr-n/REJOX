@@ -7,15 +7,19 @@ import { usePipelineStore } from '../store/pipelineStore'
 import type { Stage } from '../store/pipelineStore'
 import { CircuitIcon } from './icons'
 
-/** The three stages this slice walks through, in order, for the header stepper. */
+/** The pipeline stages, in order, for the header stepper. */
 const STEPPER: { id: Stage; label: string }[] = [
   { id: 'upload', label: 'Upload' },
   { id: 'analyzing', label: 'Analyze' },
   { id: 'report', label: 'Report' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'ask', label: 'Ask' },
 ]
 
 function Stepper({ stage }: { stage: Stage }) {
-  const activeIndex = STEPPER.findIndex((s) => s.id === stage)
+  // 'submitted' is past the last stage — everything reads as done.
+  const activeIndex =
+    stage === 'submitted' ? STEPPER.length : STEPPER.findIndex((s) => s.id === stage)
   return (
     <nav className="hidden items-center gap-1 md:flex" aria-label="Pipeline progress">
       {STEPPER.map((step, i) => {

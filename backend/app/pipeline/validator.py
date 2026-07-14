@@ -30,7 +30,18 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
+
+# A progress sink for the async job layer: on_progress(stage, phase, payload).
+# ``stage`` ∈ {"install","typecheck","bundle"}, ``phase`` ∈ {"started","completed"}.
+# Optional and defaulted to None everywhere, so sync callers (CLI, tests) are
+# entirely unaffected. The payload carries only observed facts.
+ProgressFn = Callable[[str, str, dict[str, Any]], None]
+
+
+def _emit(on_progress: Optional[ProgressFn], stage: str, phase: str, **payload: Any) -> None:
+    if on_progress is not None:
+        on_progress(stage, phase, payload)
 
 from app.models.analysis import ConfidenceSource
 from app.models.emission import EmittedFile, EmittedProject
@@ -110,23 +121,25 @@ def _tool_versions(out_dir: Path, node: str, npm: str) -> dict[str, str]:
 # --- Install -----------------------------------------------------------------
 
 
-def _install(out_dir: Path, npm: str, force: bool) -> tuple[bool, Optional[str]]:
-    """Return (installed, skipped_reason). Caches node_modules across runs, but
-    invalidates the cache when ``package.json`` changes (e.g. a new dependency)
-    so a stale ``node_modules`` never hides a newly-added package from Metro."""
+def _install(out_dir: Path, npm: str, force: bool) -> tuple[bool, Optional[str], bool]:
+    """Return (installed, skipped_reason, ran_npm). Caches node_modules across
+    runs, but invalidates the cache when ``package.json`` changes (e.g. a new
+    dependency) so a stale ``node_modules`` never hides a newly-added package
+    from Metro. ``ran_npm`` records whether ``npm install`` actually executed
+    (vs a cache hit) — an observed fact, so the event stream never guesses."""
     node_modules = out_dir / "node_modules"
     pkg = out_dir / "package.json"
     want = hashlib.sha256(pkg.read_bytes()).hexdigest() if pkg.is_file() else ""
     stamp = node_modules / ".rejox-deps-hash"
     fresh = stamp.is_file() and stamp.read_text().strip() == want
     if node_modules.is_dir() and fresh and not force:
-        return True, None
+        return True, None, False
     proc = _run([npm, "install", "--no-audit", "--no-fund"], out_dir, INSTALL_TIMEOUT_SECONDS)
     if proc.returncode != 0:
-        return node_modules.is_dir(), f"npm install failed:\n{_tail(proc.stderr or proc.stdout)}"
+        return node_modules.is_dir(), f"npm install failed:\n{_tail(proc.stderr or proc.stdout)}", True
     if node_modules.is_dir():
         stamp.write_text(want)
-    return node_modules.is_dir(), None
+    return node_modules.is_dir(), None, True
 
 
 # --- Typecheck ---------------------------------------------------------------
@@ -269,6 +282,7 @@ def validate_project(
     force_install: bool = False,
     run_bundle: bool = True,
     run_lint: bool = False,
+    on_progress: Optional[ProgressFn] = None,
 ) -> ValidationResult:
     """Run the real toolchain against the emitted project and structure the result.
 
@@ -278,6 +292,9 @@ def validate_project(
         force_install: reinstall even when ``node_modules`` is present.
         run_bundle: run the Metro bundle (slowest stage; skippable for fast loops).
         run_lint: reserved; off by default.
+        on_progress: optional sink fired at each real sub-stage boundary
+            (install → typecheck → bundle), start and completion, with the
+            counts observed there. Defaults to ``None`` (no-op) for sync callers.
     """
     out_dir = Path(out_dir)
     if not (out_dir / "package.json").is_file():
@@ -287,10 +304,15 @@ def validate_project(
     npm = _which("npm")
     started = time.monotonic()
 
+    # --- install ---
+    _emit(on_progress, "install", "started")
     installed = (out_dir / "node_modules").is_dir()
     install_reason: Optional[str] = None
+    ran_npm = False
     if install:
-        installed, install_reason = _install(out_dir, npm, force_install)
+        installed, install_reason, ran_npm = _install(out_dir, npm, force_install)
+    # installSkipped reflects whether npm actually ran (observed), not just the flag.
+    _emit(on_progress, "install", "completed", installed=installed, installSkipped=not ran_npm)
 
     if not installed:
         typecheck = StageResult(
@@ -301,17 +323,32 @@ def validate_project(
             ran=False, passed=False,
             skippedReason=install_reason or "dependencies not installed",
         )
+        for stage, res in (("typecheck", typecheck), ("bundle", bundle)):
+            _emit(on_progress, stage, "started")
+            _emit(on_progress, stage, "completed", ran=False, passed=False,
+                  errorCount=0, diagnosticsFound=0, skippedReason=res.skippedReason)
         return ValidationResult(
             passed=False, installed=False, typecheck=typecheck, bundle=bundle,
             durationSeconds=round(time.monotonic() - started, 2),
             toolVersions=_tool_versions(out_dir, node, npm),
         )
 
+    # --- typecheck ---
+    _emit(on_progress, "typecheck", "started")
     typecheck = _typecheck(out_dir, node)
+    _emit(on_progress, "typecheck", "completed", ran=typecheck.ran, passed=typecheck.passed,
+          errorCount=typecheck.errorCount, diagnosticsFound=len(typecheck.diagnostics),
+          skippedReason=typecheck.skippedReason)
+
+    # --- bundle ---
+    _emit(on_progress, "bundle", "started")
     if run_bundle:
         bundle = _bundle(out_dir, node, npm)
     else:
         bundle = StageResult(ran=False, passed=False, skippedReason="run_bundle=False")
+    _emit(on_progress, "bundle", "completed", ran=bundle.ran, passed=bundle.passed,
+          errorCount=bundle.errorCount, diagnosticsFound=len(bundle.diagnostics),
+          skippedReason=bundle.skippedReason)
 
     passed = typecheck.passed and (bundle.passed or not run_bundle)
     return ValidationResult(

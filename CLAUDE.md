@@ -11,17 +11,7 @@ deterministic AST transforms (plus targeted AI reasoning for the residue),
 validates the output, and hands back a working React Native project and a
 transparent report.
 
-## Monorepo layout
-
-```
-rejox/
-├── CLAUDE.md            # this file
-├── docs/                # product + engineering docs (read these first)
-├── frontend/            # Rejox web app (Vite + React + TS + Tailwind)
-├── backend/             # FastAPI + pipeline engine (Python 3.11+)
-└── test-projects/
-    └── sample-app/      # benchmark React app used to test migrations
-```
+Product and engineering docs live in `docs/` — read those first.
 
 ## The 8-stage pipeline
 

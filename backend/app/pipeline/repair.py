@@ -16,7 +16,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
+
+# Fired after each completed repair round: on_round(round, maxRounds, attempts, passed).
+# Optional so sync callers (CLI, tests) are unaffected.
+RoundFn = Callable[[int, int, int, bool], None]
 
 from app.ai.provider import LLMProvider
 from app.models.analysis import ConfidenceSource
@@ -98,8 +102,14 @@ def repair_project(
     source_root: Optional[Path | str] = None,
     max_rounds: int = MAX_REPAIR_ROUNDS,
     run_bundle: bool = True,
+    on_round: Optional[RoundFn] = None,
 ) -> RepairResult:
-    """Run up to ``max_rounds`` targeted LLM repairs; re-validate after each."""
+    """Run up to ``max_rounds`` targeted LLM repairs; re-validate after each.
+
+    ``on_round`` (optional) is fired once per completed round with the real
+    counts ``(round, maxRounds, attemptsThisRound, passed)`` so the job layer
+    can emit a truthful per-round event.
+    """
     out_dir = Path(out_dir)
     result = RepairResult(validation=validation, passed=validation.passed)
     if validation.passed:
@@ -159,6 +169,9 @@ def repair_project(
         }
         for a in result.attempts:
             a.fixed = a.file not in clean_files
+        if on_round is not None:
+            attempts_this_round = sum(1 for a in result.attempts if a.round == rnd)
+            on_round(rnd, max_rounds, attempts_this_round, current.passed)
         if current.passed:
             result.stoppedReason = "validation passed after repair"
             break

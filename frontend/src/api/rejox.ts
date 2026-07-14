@@ -9,6 +9,8 @@ import { api } from '../lib/api'
 import type {
   AnalysisReport,
   IngestedProject,
+  JobCreated,
+  PlanResponse,
   SourceRequest,
   ValidationError,
 } from '../types/api'
@@ -82,6 +84,36 @@ export async function analyze(
     const { data } = await api.post<AnalysisReport>('/api/analyze', source, {
       signal,
     })
+    return data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+/** Plan stage — parse + analyze + plan; returns the report and the plan (DAG + questions). */
+export async function plan(
+  source: SourceRequest,
+  signal?: AbortSignal,
+): Promise<PlanResponse> {
+  try {
+    const { data } = await api.post<PlanResponse>('/api/plan', source, { signal })
+    return data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+/**
+ * Migrate stage — start the background migration job with the Ask-stage answers.
+ * Returns immediately (202) with the job id; the real endpoint from main.py.
+ */
+export async function startMigration(
+  source: SourceRequest,
+  answers: Record<string, string>,
+): Promise<JobCreated> {
+  const body = { ...source, answers, install: true, runBundle: true }
+  try {
+    const { data } = await api.post<JobCreated>('/api/migrate', body)
     return data
   } catch (err) {
     throw toApiError(err)

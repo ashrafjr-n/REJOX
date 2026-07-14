@@ -4,9 +4,11 @@
  */
 import type {
   Difficulty,
+  Effort,
   LibraryStatus,
   RiskLevel,
   Severity,
+  StepKind,
 } from '../types/api'
 
 /** The semantic tones our Badge/Metric primitives understand. */
@@ -59,6 +61,24 @@ export const DIFFICULTY_TONE: Record<Difficulty, Tone> = {
   medium: 'warn',
   hard: 'warn',
   blocked: 'danger',
+}
+
+export const STEP_KIND_TONE: Record<StepKind, Tone> = {
+  setup: 'neutral',
+  routing: 'info',
+  components: 'signal',
+  styling: 'ai',
+  state: 'info',
+  api: 'info',
+  assets: 'neutral',
+  navigation: 'info',
+  validation: 'pos',
+}
+
+export const EFFORT_TONE: Record<Effort, Tone> = {
+  small: 'pos',
+  medium: 'warn',
+  large: 'danger',
 }
 
 /** Human-readable byte size, e.g. 1536000 → "1.5 MB". */

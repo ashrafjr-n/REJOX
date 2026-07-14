@@ -18,6 +18,11 @@ converter"; every new capability must first be attempted deterministically.
 
 ```
                 ┌──────────────────┐
+  ZIP / repo ──▶│      Upload      │  Ingest untrusted input into an isolated run
+     URL        │    (ingest.py)   │  workspace; detect the React project root.
+                └────────┬─────────┘
+                         ▼
+                ┌──────────────────┐
    React src ──▶│     Project      │  Parser + dependency scanner + AST builder
                 │   Intelligence   │  + metadata extractor + graph builder
                 │      Engine      │  (Node parser-worker, ts-morph).
@@ -56,10 +61,32 @@ converter"; every new capability must first be attempted deterministically.
                                      ▼
                 ┌──────────────────┐
                 │      Report      │  Final migration report + package for
-                └──────────────────┘  Download.
+                └────────┬─────────┘  Download.
+                         ▼
+                ┌──────────────────┐
+   RN project ◀─│     Download     │  Zip the emitted React Native project from
+     (.zip)     │     (main.py)    │  the run workspace and stream it back.
+                └──────────────────┘
 ```
 
 ## Stage detail
+
+### Upload / ingestion
+
+The engine works from a local filesystem path, but the **product starts from a
+user upload**. The Upload stage lands that untrusted input on disk and hands the
+rest of the pipeline a plain directory path — nothing downstream changes.
+
+- Python module: `app/pipeline/ingest.py` (`ingest_zip`, `ingest_github`) +
+  `app/pipeline/workspace.py` (run directories).
+- Two sources: an uploaded **ZIP** (`POST /api/upload`) or a public **GitHub
+  URL** (`POST /api/upload/github`, shallow `--depth 1` clone; private repos are
+  a later feature and fail with a clear message).
+- Output: an `IngestedProject` (`app/models/ingest.py`) —
+  `{ runId, rootPath, source, detectedRoot, candidateRoots, fileCount,
+  sizeBytes, warnings }` — persisted as `ingest.json` in the run so later
+  `runId`-mode calls need no re-derivation.
+- See **[Upload stage — implementation](#upload-stage--implementation)**.
 
 ### Project Intelligence Engine
 - Parser + dependency scanner + AST builder + metadata extractor + graph
@@ -248,6 +275,73 @@ crash; and the deterministic navigator wiring means **no `NAV_CONTAINER` TODO
 survives** for the standard layout-route case — the shared `<Layout>` shell is
 subsumed by the generated navigator (emit skips it, recording why), and the
 shape choice is a *question*, not code residue.
+
+---
+
+## Upload stage — implementation
+
+The Upload stage turns an untrusted upload into files on disk inside an isolated
+**run workspace**, then finds the React project root within them. Every stage
+after Upload accepts either a `runId` (a landed upload) or a local `path`
+(dev/CLI) — the same pipeline functions run underneath.
+
+### Run workspaces (`app/pipeline/workspace.py`)
+
+Every migration is a *run* with a stable `runId`, and all its files live under
+one config-driven root:
+
+```
+{REJOX_WORKSPACE_ROOT}/{runId}/     # default root: backend/.rejox-workspaces (gitignored)
+├── source/        # the ingested React project (upload lands here)
+├── output/        # the emitted React Native project (emit writes here)
+└── ingest.json    # the IngestedProject manifest (root detection, warnings)
+```
+
+This is the **one** place run directories are created, resolved, and reaped —
+the API (uploads) and the CLI (local runs emit into a run's `output/` instead of
+an ad-hoc temp dir) both go through it. `runId` is a hex token
+(`uuid4().hex`) validated on every lookup (`_RUN_ID_RE`), so a value taken from
+an HTTP path can never contain `/` or `..` and escape the root. `cleanup(runId)`
+deletes a run; `sweep(ttl_seconds)` reaps runs older than a TTL (default 24 h).
+
+### Ingestion (`app/pipeline/ingest.py`)
+
+`ingest_zip(data, run)` / `ingest_github(url, run, ref=None)` → `IngestedProject`.
+
+**A ZIP is attacker-controlled, so extraction is defensive, not convenient.**
+The security limits enforced (all overridable by env var), and their defaults:
+
+| Guard | Default | Env var | Behaviour |
+| ----- | ------- | ------- | --------- |
+| Max **compressed** archive | 100 MB | `REJOX_MAX_ARCHIVE_BYTES` | reject the upload before extracting |
+| Max **uncompressed** total (zip-bomb) | 500 MB | `REJOX_MAX_UNCOMPRESSED_BYTES` | stream each entry through a running byte counter; abort the instant the *actual* total crosses the cap (a lying header can't get past it) |
+| Max **file count** | 20 000 | `REJOX_MAX_FILE_COUNT` | reject once exceeded during extraction |
+| **Path traversal** | — | — | an entry that is absolute, contains `..`, or (after joining) resolves outside the extract root is rejected outright |
+| **Symlinks** | — | — | an archived symlink whose target escapes the extract root is rejected; benign in-tree ones are skipped, never materialized |
+| **Vendor dirs** | — | — | `node_modules` / `.git` / `dist` / `build` are skipped (never source, would blow the limits) |
+
+A GitHub URL is validated to be `https://github.com/<owner>/<repo>` (only
+`github.com`; `--depth 1` clone with `GIT_TERMINAL_PROMPT=0` so a private repo
+fails fast instead of blocking on an auth prompt), the `.git` dir stripped, and
+the same file-count / size caps applied to the checkout.
+
+### Root detection
+
+`detect_react_roots(root)` finds every directory whose `package.json` declares a
+`react` dependency, sorted **shallowest-first**, so the top result is the natural
+project root — the wrapping folder of an archive, or the one React app in a
+monorepo of packages. `detectedRoot` is that top result; `candidateRoots` lists
+all of them so the caller can override the choice (via `root` on the request).
+No React project anywhere → a clean `IngestError` ("No React project found").
+
+## Download stage — implementation
+
+The final stage. `GET /api/runs/{runId}/download` zips the run's `output/`
+directory — minus `node_modules` / `.rejox-bundle` / `.expo` / `.git` so only
+the real project ships — to a temp file and streams it back as
+`application/zip` (a background task unlinks the temp file after the response).
+A run with no emitted output yet returns 404. This closes the 8-stage pipeline:
+Upload → … → Migrate → Review → **Download**.
 
 ---
 

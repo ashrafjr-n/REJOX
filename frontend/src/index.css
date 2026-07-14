@@ -124,3 +124,39 @@
     color: var(--color-ink-3);
   }
 }
+
+/*
+ * React Flow (Plan DAG) — the base stylesheet is light; re-skin its chrome for
+ * the dark instrument aesthetic. Nodes are custom-styled in PlanNode.
+ */
+.react-flow__controls {
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: none;
+}
+.react-flow__controls-button {
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-ink-2);
+}
+.react-flow__controls-button:hover {
+  background: var(--color-surface-2);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+.react-flow__minimap {
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+}
+.react-flow__edge-path {
+  stroke: var(--color-line-strong);
+}
+.react-flow__handle {
+  border: none;
+}
+.react-flow__attribution {
+  display: none;
+}
+
