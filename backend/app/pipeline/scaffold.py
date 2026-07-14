@@ -98,6 +98,9 @@ def _build_dependencies(
     if navigation == "react-navigation":
         deps["@react-navigation/native"] = "^7.0.0"
         deps["@react-navigation/native-stack"] = "^7.1.0"
+        # Bottom-tabs ships so the chosen navigator SHAPE (stack or tabs) always
+        # resolves; it is pure JS on the same v7 line and needs no native setup.
+        deps["@react-navigation/bottom-tabs"] = "^7.2.0"
         deps["react-native-screens"] = "~4.4.0"
         deps["react-native-safe-area-context"] = "~4.12.0"
     elif navigation == "expo-router":

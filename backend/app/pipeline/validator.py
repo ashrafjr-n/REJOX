@@ -24,6 +24,7 @@ Failures loop back to the AI Resolution Engine as :class:`MappedDiagnostic`
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import subprocess
@@ -110,13 +111,21 @@ def _tool_versions(out_dir: Path, node: str, npm: str) -> dict[str, str]:
 
 
 def _install(out_dir: Path, npm: str, force: bool) -> tuple[bool, Optional[str]]:
-    """Return (installed, skipped_reason). Caches node_modules across runs."""
+    """Return (installed, skipped_reason). Caches node_modules across runs, but
+    invalidates the cache when ``package.json`` changes (e.g. a new dependency)
+    so a stale ``node_modules`` never hides a newly-added package from Metro."""
     node_modules = out_dir / "node_modules"
-    if node_modules.is_dir() and not force:
+    pkg = out_dir / "package.json"
+    want = hashlib.sha256(pkg.read_bytes()).hexdigest() if pkg.is_file() else ""
+    stamp = node_modules / ".rejox-deps-hash"
+    fresh = stamp.is_file() and stamp.read_text().strip() == want
+    if node_modules.is_dir() and fresh and not force:
         return True, None
     proc = _run([npm, "install", "--no-audit", "--no-fund"], out_dir, INSTALL_TIMEOUT_SECONDS)
     if proc.returncode != 0:
         return node_modules.is_dir(), f"npm install failed:\n{_tail(proc.stderr or proc.stdout)}"
+    if node_modules.is_dir():
+        stamp.write_text(want)
     return node_modules.is_dir(), None
 
 

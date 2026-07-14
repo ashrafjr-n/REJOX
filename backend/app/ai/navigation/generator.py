@@ -33,6 +33,54 @@ def stack_spec_from_routes(routes: list[RouteMapping]) -> NavigatorSpec:
     )
 
 
+def build_navigator_spec(nav_type: str, routes: list[RouteMapping]) -> NavigatorSpec:
+    """A concrete :class:`NavigatorSpec` for a chosen navigator *type*, derived
+    deterministically from the route table.
+
+    The LLM (or the user) chooses only the topology *type* (``stack``/``tabs``/
+    ``drawer``); the actual screen/nesting layout is mechanical:
+
+    - ``stack`` → a flat stack (:func:`stack_spec_from_routes`).
+    - ``tabs``/``drawer`` → top-level screens are the parameter-less routes; a
+      parameterized detail route (``products/:id``) nests in a stack under its
+      parent list route (``products``), so deep links still push a screen.
+    """
+    try:
+        ntype = NavigatorType(nav_type)
+    except ValueError:
+        ntype = NavigatorType.STACK
+    if ntype is NavigatorType.STACK:
+        return stack_spec_from_routes(routes)
+
+    top: list[str] = []
+    for r in routes:
+        if r.componentName and ":" not in (r.path or "") and r.screenName not in top:
+            top.append(r.screenName)
+
+    nested: list[NestedNavigator] = []
+    for r in routes:
+        if not (r.componentName and r.params and r.path and "/" in r.path):
+            continue
+        parent_path = r.path.rsplit("/", 1)[0].strip("/")
+        parent = next(
+            (x.screenName for x in routes
+             if (x.path or "").strip("/") == parent_path and x.componentName),
+            None,
+        )
+        if parent:
+            nested.append(NestedNavigator(
+                type=NavigatorType.STACK, parent=parent,
+                screens=[parent, r.screenName],
+            ))
+
+    if not top:  # no parameter-less routes → fall back to a flat stack
+        return stack_spec_from_routes(routes)
+    return NavigatorSpec(
+        type=ntype, screens=top, nested=nested,
+        rationale=f"Chosen {ntype.value} navigator; detail routes nest in a stack.",
+    )
+
+
 def _component_for(screen: str, routes: list[RouteMapping]) -> str | None:
     for r in routes:
         if r.screenName == screen and r.componentName:

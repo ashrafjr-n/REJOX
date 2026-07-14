@@ -72,7 +72,9 @@ function main(): void {
     });
   }
 
-  // 4. flip className={<stylesName>.X} → style={...}.
+  // 4. flip className={<stylesName>.X} → style={...}. If the element ALREADY has
+  //    a `style` prop (e.g. an injected image size), MERGE into a style array —
+  //    two `style`/duplicate attributes are a TS error.
   for (const attr of sf.getDescendantsOfKind(SyntaxKind.JsxAttribute)) {
     if (attr.getNameNode().getText() !== 'className') continue;
     const init = attr.getInitializer();
@@ -81,9 +83,27 @@ function main(): void {
     if (!expr) continue;
     // Match `styles.card` (property access whose object is the styles identifier).
     if (
-      Node.isPropertyAccessExpression(expr) &&
-      expr.getExpression().getText() === stylesName
+      !Node.isPropertyAccessExpression(expr) ||
+      expr.getExpression().getText() !== stylesName
     ) {
+      continue;
+    }
+    const styleRef = expr.getText();
+    const opening = attr.getFirstAncestorByKind(SyntaxKind.JsxOpeningElement)
+      ?? attr.getFirstAncestorByKind(SyntaxKind.JsxSelfClosingElement);
+    const existingStyle = opening
+      ?.getAttributes()
+      .find((a) => Node.isJsxAttribute(a) && a.getNameNode().getText() === 'style');
+    if (existingStyle && Node.isJsxAttribute(existingStyle)) {
+      const styleInit = existingStyle.getInitializer();
+      const prev =
+        styleInit && Node.isJsxExpression(styleInit)
+          ? styleInit.getExpression()?.getText() ?? ''
+          : '';
+      // RN merges via an array; the CSS-module style wins by coming first.
+      existingStyle.setInitializer(`{[${styleRef}, ${prev}]}`);
+      attr.remove();
+    } else {
       attr.getNameNode().replaceWithText('style');
     }
   }
