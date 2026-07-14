@@ -8,7 +8,11 @@ confirms via a Planner question. LLM decides shape; rules write code.
 """
 
 from app.ai.navigation.active import resolve_nav_active
-from app.ai.navigation.generator import generate_navigator, stack_spec_from_routes
+from app.ai.navigation.generator import (
+    build_navigator_spec,
+    generate_navigator,
+    stack_spec_from_routes,
+)
 from app.ai.navigation.models import (
     NavigatorSpec,
     NavigatorType,
@@ -35,6 +39,7 @@ __all__ = [
     "NavigatorSpec",
     "NavigatorType",
     "NestedNavigator",
+    "build_navigator_spec",
     "build_shape_question",
     "generate_navigator",
     "infer_navigator_shape",

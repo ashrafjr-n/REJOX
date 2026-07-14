@@ -27,16 +27,20 @@ from __future__ import annotations
 
 import re
 import shutil
+from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
+from app.ai.cache import ResolutionCache
+from app.ai.provider import LLMProvider
 from app.models.analysis import AnalysisReport, ConfidenceSource, RouteMapping
 from app.models.emission import EmittedFile, EmittedProject, SkippedFile
 from app.models.knowledge_graph import KnowledgeGraph
 from app.models.plan import MigrationPlan
 from app.models.transformation import TransformResult
-from app.ai.navigation import generate_navigator, stack_spec_from_routes
+from app.ai.navigation import build_navigator_spec, generate_navigator
 from app.pipeline.analyzer import analyze_graph
+from app.pipeline.resolve_apply import apply_resolutions
 from app.pipeline.scaffold import generate_scaffold
 from app.pipeline.transformer import build_transform_options, transform_component
 
@@ -90,18 +94,18 @@ def _todo_codes(code: str) -> list[str]:
 # --- Navigator generation (deterministic, from the route table) --------------
 
 
-def _navigator_source(routes: list[RouteMapping], nativewind: bool) -> tuple[str, list[str]]:
-    """Generate ``src/navigation/AppNavigator.tsx`` from the route table.
+def _navigator_source(
+    routes: list[RouteMapping], nav_shape: str
+) -> tuple[str, list[str]]:
+    """Generate ``src/navigation/AppNavigator.tsx`` for the CHOSEN shape.
 
-    Navigator wiring is a **rule**, not a judgment call (NAV_CONTAINER tier 2):
-    given the route table, the AI Resolution Engine's navigation generator emits
-    a complete native-stack — screen names match the Analyzer's route table
-    exactly, so the transformer's ``navigation.navigate('Screen', …)`` calls
-    resolve. No NAV_CONTAINER TODO survives; the navigator SHAPE (stack vs tabs
-    vs drawer) is a separate design decision surfaced as a Planner question
-    (``navigation.resolver.infer_navigator_shape``), not code residue.
+    Navigator wiring is a **rule** (NAV_CONTAINER tier 2): the route table makes
+    screen wiring mechanical. The SHAPE (``stack``/``tabs``/``drawer``) is the
+    one decision — chosen by the user / the tier-3 LLM proposal and passed in via
+    ``answers['navigator-shape']`` — and the generator writes the code for it.
+    No NAV_CONTAINER TODO survives.
     """
-    spec = stack_spec_from_routes(routes)
+    spec = build_navigator_spec(nav_shape, routes)
     return generate_navigator(spec, routes), []
 
 
@@ -136,6 +140,8 @@ def emit_project(
     *,
     report: Optional[AnalysisReport] = None,
     source_root: Optional[Path | str] = None,
+    provider: Optional[LLMProvider] = None,
+    cache: Optional[ResolutionCache] = None,
 ) -> EmittedProject:
     """Assemble the migrated React Native project into ``out_dir``.
 
@@ -149,11 +155,17 @@ def emit_project(
         report: the Analysis Report; derived from ``kg`` if not supplied.
         source_root: root of the source project on disk; defaults to
             ``kg.project.root``.
+        provider: LLM provider for the AI Resolution Engine's rare LLM tier
+            (styling novel classes). ``None`` → constructed lazily only if reached.
+        cache: shared resolution cache across the batch.
     """
     report = report or analyze_graph(kg)
     src_root = Path(source_root or kg.project.root)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    cache = cache or ResolutionCache()
+    resolution_tiers: Counter = Counter()
+    styling_options = {"stylingEngine": answers.get("styling-engine", "nativewind")}
 
     styling = answers.get("styling-engine", "stylesheet")
     nativewind = styling == "nativewind"
@@ -216,21 +228,51 @@ def emit_project(
         target = out_dir / target_rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(result.code)
+
+        # AI Resolution Engine: resolve + APPLY this file's residue (CSS Module →
+        # StyleSheet, hover/grid/… → NativeWind, isActive → static). Only what is
+        # genuinely unresolvable keeps a REJOX-TODO; provenance follows the tier.
+        provenance = _provenance(result)
+        remaining_unhandled = list(result.unhandled)
+        if result.unhandled:
+            outcome = apply_resolutions(
+                target, abs_src,
+                unhandled=result.unhandled,
+                component=Path(target_rel).stem,
+                source_file=src_rel,
+                options=styling_options,
+                provider=provider,
+                cache=cache,
+            )
+            resolution_tiers.update(outcome.tiers)
+            remaining_unhandled = [u for u in result.unhandled if u.code in outcome.remainingCodes]
+            if remaining_unhandled:
+                provenance = ConfidenceSource.UNHANDLED
+            elif result.warnings:
+                # Residue resolved by rule, but the file still carries a
+                # deterministic warning (flex-row/image-size) → worth review.
+                provenance = ConfidenceSource.DETERMINISTIC_WARNING
+            else:
+                # Every residue re-expressed by rule, no warnings → as clean as
+                # the transformer's own deterministic output.
+                provenance = ConfidenceSource.DETERMINISTIC
+
         files.append(
             EmittedFile(
                 path=target_rel,
                 sourceFile=src_rel,
-                provenance=_provenance(result),
+                provenance=provenance,
                 warnings=result.warnings,
-                unhandled=result.unhandled,
-                todoCodes=_todo_codes(result.code),
+                unhandled=remaining_unhandled,
+                todoCodes=_todo_codes(target.read_text()),
             )
         )
 
     # 3. navigator + App.tsx.
     has_navigator = bool(report.routing.library and report.routing.routes)
     if has_navigator:
-        nav_src, nav_todos = _navigator_source(report.routing.routes, nativewind)
+        nav_shape = answers.get("navigator-shape", "stack")
+        nav_src, nav_todos = _navigator_source(report.routing.routes, nav_shape)
         nav_rel = "src/navigation/AppNavigator.tsx"
         nav_path = out_dir / nav_rel
         nav_path.parent.mkdir(parents=True, exist_ok=True)
