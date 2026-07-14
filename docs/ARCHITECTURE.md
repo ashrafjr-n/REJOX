@@ -174,8 +174,8 @@ residue in 15 files. The Styling Resolver partitions it into **24 units** and
 resolves **all 24 by rule — 14 pattern, 10 static map, 0 LLM**. The lower the
 LLM count, the better the design; on the benchmark it is zero.
 
-> Wiring: `resolve_styling(residue, options)` is callable from the emit pipeline
-> but **not yet wired into it** — that arrives with the Validator repair loop.
+> Wiring: `resolve_styling(residue, options)` is **now called by emit** — see
+> *Emit → resolve → validate → repair* below.
 
 ### Same ladder, three residues — and where the LLM actually earns its place
 
@@ -670,6 +670,51 @@ sourceFile, provenance: ConfidenceSource, warnings, unhandled, todoCodes}` plus
 `skipped[]` and `todoCount`. Provenance is derived from what actually happened:
 `deterministic` (rule, clean) / `deterministic-warning` (flagged or generated) /
 `unhandled` (carries residue → excluded from Confidence).
+
+### Emit → resolve → validate → repair (the closed loop)
+
+Emission no longer stops at "transform + leave a TODO". For **every** file that
+carries residue, emit now runs the AI Resolution Engine and **applies** the
+result to the file, in tier order (`app/pipeline/resolve_apply.py`):
+
+- **CSS_MODULE** → `resolve_css_module` inlines a `StyleSheet.create({…})` and
+  the `cssmodule.js` codemod drops the `.module.css` import and flips
+  `className={styles.x}` → `style={styles.x}` (merging into a `style` array when
+  an image-size style already exists). **The `.module.css` file is never copied**
+  — that missing-module import is what broke Metro.
+- **TW_UNSUPPORTED** → `resolve_styling` yields a `token → replacement` map; the
+  `apply.js` codemod rewrites the residue tokens inside every *class-shaped*
+  string (className attrs and the class strings held in variables), leaving
+  supported classes untouched. `hover:`→`active:`, `grid`→`flex-row flex-wrap`;
+  structural cases (gradient/backdrop/spin) are reduced to a clean className with
+  a `REJOX-NOTE` for the manual RN component (adding `expo-linear-gradient` etc.
+  would perturb the deliberately-pinned Expo/NativeWind dependency graph the gate
+  depends on — a cost not worth cosmetic fidelity).
+- **NAV_ACTIVE** → the `({ isActive }) => …` render-prop className (invalid on an
+  RN `Pressable`) is static-ized to the inactive branch; the navigator owns
+  active state.
+- The **navigator SHAPE** the user/LLM chose (`answers['navigator-shape']`) now
+  reaches the generator: `build_navigator_spec(type, routes)` derives the
+  concrete spec (tabs/drawer nest detail routes in a stack), and the scaffold
+  ships `@react-navigation/bottom-tabs` so any shape resolves.
+
+Each file's `ConfidenceSource` is stamped from the tier that resolved it; only
+**genuinely unresolvable** residue (a runtime `<Link to>` → `NAV_LINK`, an LLM
+`unresolvable`) keeps its REJOX-TODO.
+
+**The repair loop** (`app/pipeline/repair.py`) closes the loop. After
+emit → validate, if `tsc`/Metro still report errors, each error that maps to a
+*resolvable* residue code (via `map_diagnostics`) gets **one targeted LLM
+repair** — only the offending line + the diagnostic is sent, never the file. The
+returned line is applied and the project re-validated; **at most two rounds**,
+then it stops and reports honestly. An *unexplained* error (a clean deterministic
+file → a codemod bug) is never sent to the LLM. A repaired file that then passes
+is `ai-validated` (65); one that still fails is `ai-failed` (0). Every attempt is
+logged (error, sent, received, fixed?).
+
+**Benchmark — `sample-app` (the gate).** After emit's deterministic resolution,
+`tsc` **passes** and `expo export` (Metro) **bundles** — with **zero repair
+rounds**. The migration produces a project that runs under Expo.
 
 ## Migration Engine — Validator
 
