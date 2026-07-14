@@ -1,0 +1,181 @@
+"""Job layer + SSE mechanics — fast, offline (emit only; no install/tsc/Metro).
+
+These prove the async contract without the slow toolchain: POST returns 202 in
+well under a second, the job runs in the background, the event log is ordered
+and complete, and the SSE stream can be joined late and reconnected without
+losing anything. The full real-toolchain assertion (tsc/Metro/LLM counts) lives
+in the ``slow``-marked ``test_migrate_stream.py``.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import time
+import zipfile
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SAMPLE = REPO_ROOT / "test-projects" / "sample-app"
+_SKIP = {"node_modules", ".git", "dist", "build"}
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    return TestClient(app)
+
+
+def _sample_zip() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(SAMPLE.rglob("*")):
+            rel = path.relative_to(SAMPLE)
+            if set(rel.parts) & _SKIP or not path.is_file():
+                continue
+            zf.writestr(f"sample-app/{rel.as_posix()}", path.read_bytes())
+    return buf.getvalue()
+
+
+def _upload(client) -> str:
+    up = client.post(
+        "/api/upload",
+        files={"file": ("sample-app.zip", _sample_zip(), "application/zip")},
+    )
+    assert up.status_code == 200, up.text
+    return up.json()["runId"]
+
+
+def _start_emit_only(client, run_id: str) -> str:
+    resp = client.post(
+        "/api/migrate",
+        json={"runId": run_id, "install": False, "runBundle": False},
+    )
+    assert resp.status_code == 202, resp.text
+    return resp.json()["jobId"]
+
+
+def _await(client, job_id: str, timeout: float = 60.0) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        state = client.get(f"/api/jobs/{job_id}").json()
+        if state["status"] in ("succeeded", "failed"):
+            return state
+        time.sleep(0.05)
+    raise AssertionError(f"job {job_id} did not finish in {timeout}s")
+
+
+def _read_sse(client, url: str, headers=None, timeout: float = 60.0):
+    """Read an SSE stream to its terminal event; return [(event_type, data)]."""
+    events: list[tuple[str, dict]] = []
+    with client.stream("GET", url, headers=headers or {}, timeout=timeout) as resp:
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/event-stream")
+        cur: dict[str, str] = {}
+        for line in resp.iter_lines():
+            if line == "":
+                if "data" in cur:
+                    events.append((cur.get("event", ""), json.loads(cur["data"])))
+                    if cur.get("event") in ("succeeded", "failed"):
+                        break
+                cur = {}
+                continue
+            key, _, val = line.partition(":")
+            cur[key.strip()] = val.strip()
+    return events
+
+
+# The true, ordered boundaries for an emit-only run (install/tsc/Metro skipped
+# but still stepped through and reported honestly as ran=False).
+_EXPECTED_ORDER = [
+    ("stage_started", "emit"),
+    ("stage_completed", "emit"),
+    ("stage_started", "install"),
+    ("stage_completed", "install"),
+    ("stage_started", "typecheck"),
+    ("stage_completed", "typecheck"),
+    ("stage_started", "bundle"),
+    ("stage_completed", "bundle"),
+    ("succeeded", "done"),
+]
+
+
+def test_migrate_returns_202_under_a_second(client) -> None:
+    run_id = _upload(client)
+    start = time.monotonic()
+    resp = client.post(
+        "/api/migrate", json={"runId": run_id, "install": False, "runBundle": False}
+    )
+    elapsed = time.monotonic() - start
+    assert resp.status_code == 202, resp.text
+    assert resp.json()["status"] in ("queued", "running")
+    assert resp.json()["jobId"]
+    assert elapsed < 1.0, f"POST /api/migrate took {elapsed:.3f}s — must be well under 1s"
+
+
+def test_job_events_ordered_and_late_joiner_sees_everything(client) -> None:
+    run_id = _upload(client)
+    job_id = _start_emit_only(client, run_id)
+    state = _await(client, job_id)
+    assert state["status"] == "succeeded", state.get("error")
+
+    # Late joiner: GET reconstructs the full picture from job state alone.
+    order = [(e["type"], e["stage"]) for e in state["events"]]
+    assert order == _EXPECTED_ORDER
+    # seq is strictly increasing from 1.
+    assert [e["seq"] for e in state["events"]] == list(range(1, len(state["events"]) + 1))
+    # Real emit counts (not estimated).
+    emit_done = next(e for e in state["events"] if e["type"] == "stage_completed" and e["stage"] == "emit")
+    assert emit_done["data"]["filesConverted"] > 0
+    assert emit_done["data"]["filesEmitted"] >= emit_done["data"]["filesConverted"]
+    # Terminal result present and self-consistent.
+    result = state["result"]
+    assert result["runId"] == run_id
+    assert result["filesConverted"] == emit_done["data"]["filesConverted"]
+    assert result["repairRounds"] == 0
+
+
+def test_sse_stream_matches_job_state_and_closes(client) -> None:
+    run_id = _upload(client)
+    job_id = _start_emit_only(client, run_id)
+
+    events = _read_sse(client, f"/api/jobs/{job_id}/events")
+    order = [(t, d["stage"]) for t, d in events]
+    assert order == _EXPECTED_ORDER
+    assert events[-1][0] == "succeeded"  # stream closed right after the terminal
+
+    # The stream is a convenience: GET returns the identical picture.
+    state = client.get(f"/api/jobs/{job_id}").json()
+    assert [(e["type"], e["stage"]) for e in state["events"]] == order
+    assert state["result"] is not None
+
+
+def test_sse_reconnect_with_last_event_id_loses_nothing(client) -> None:
+    run_id = _upload(client)
+    job_id = _start_emit_only(client, run_id)
+    _await(client, job_id)
+
+    full = _read_sse(client, f"/api/jobs/{job_id}/events")
+    assert full[-1][0] == "succeeded"
+    total = full[-1][1]["seq"]
+
+    # Reconnect from the middle: Last-Event-ID = 4 → we must receive 5..terminal,
+    # contiguous, with nothing skipped or duplicated.
+    resumed = _read_sse(
+        client, f"/api/jobs/{job_id}/events", headers={"Last-Event-ID": "4"}
+    )
+    seqs = [d["seq"] for _, d in resumed]
+    assert seqs == list(range(5, total + 1))
+    assert resumed[-1][0] == "succeeded"
+
+
+def test_unknown_job_is_404(client) -> None:
+    assert client.get("/api/jobs/deadbeefdeadbeef").status_code == 404
+    assert client.get("/api/jobs/deadbeefdeadbeef/events").status_code == 404

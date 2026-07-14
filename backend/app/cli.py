@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import re
-import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Optional
@@ -533,7 +532,14 @@ def migrate(
 
     # 4. Migrate.
     _stage("Migrate — emitting the React Native project")
-    out_dir = out.expanduser().resolve() if out else Path(tempfile.mkdtemp(prefix="rejox-"))
+    # One workspace code path: an explicit --out wins; otherwise emit into a
+    # run's output/ dir (same layout uploads use), not an ad-hoc temp dir.
+    if out:
+        out_dir = out.expanduser().resolve()
+    else:
+        from app.pipeline import workspace
+
+        out_dir = workspace.new_run().output_dir
     with console.status("[cyan]Transforming files…[/]", spinner="dots"):
         emission = emit_project(plan, answers, kg, out_dir, report=report, source_root=src)
     console.print(f"Emitted [bold]{len([f for f in emission.files if f.sourceFile])}[/] files → [dim]{out_dir}[/]")

@@ -30,6 +30,28 @@ interface AnalyzeResponse {
   contributions: ScoreContribution[]
 }
 
+interface PlanStepLite {
+  id: string
+  dependsOn?: string[]
+}
+
+/** Same longest-path layering the app uses — the expected wave count. */
+function waveCount(steps: PlanStepLite[]): number {
+  const byId = new Map(steps.map((s) => [s.id, s]))
+  const memo = new Map<string, number>()
+  const depth = (id: string): number => {
+    const cached = memo.get(id)
+    if (cached !== undefined) return cached
+    const s = byId.get(id)
+    const deps = (s?.dependsOn ?? []).filter((d) => byId.has(d))
+    const w = !s || deps.length === 0 ? 0 : 1 + Math.max(...deps.map(depth))
+    memo.set(id, w)
+    return w
+  }
+  const maxW = steps.length ? Math.max(...steps.map((s) => depth(s.id))) : -1
+  return maxW + 1
+}
+
 test('Upload → Analyze → Report against the real backend', async ({ page }) => {
   fs.mkdirSync(SHOTS, { recursive: true })
 
@@ -87,5 +109,52 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
   console.log(
     `[e2e] asserted on-screen == live: coverage=${report.coverage} ` +
       `confidence=${report.confidence} risk=${report.risk} Σcontrib=${sum.toFixed(2)}`,
+  )
+
+  // --- 4 · Plan screen — the real DAG from /api/plan -----------------------
+  const planResponse = page.waitForResponse(
+    (r) => r.url().includes('/api/plan') && r.request().method() === 'POST',
+  )
+  await page.getByRole('button', { name: /Plan the migration/i }).click()
+  const planJson = (await (await planResponse).json()) as {
+    plan: { steps: PlanStepLite[]; questions: { id: string }[] }
+  }
+  const steps = planJson.plan.steps
+  const questions = planJson.plan.questions
+  const expectedWaves = waveCount(steps)
+
+  // Wait for the DAG to render every step as a node.
+  await expect(page.getByTestId('plan-node')).toHaveCount(steps.length, {
+    timeout: 30_000,
+  })
+  // Node count and wave count must equal what /api/plan actually returned.
+  expect(await page.getByTestId('plan-node').count()).toBe(steps.length)
+  expect(await page.getByTestId('plan-wave').count()).toBe(expectedWaves)
+
+  // A node with a real finding must render distinctly (flagged).
+  expect(await page.locator('[data-testid="plan-node"][data-flagged="true"]').count())
+    .toBeGreaterThan(0)
+
+  await page.screenshot({ path: path.join(SHOTS, '05-plan.png'), fullPage: true })
+
+  // --- 5 · Ask screen — the real questions ---------------------------------
+  await page.getByRole('button', { name: /Continue to decisions|Continue/i }).click()
+  await expect(page.getByTestId('ask-question')).toHaveCount(questions.length)
+  await page.screenshot({ path: path.join(SHOTS, '06-ask.png'), fullPage: true })
+
+  // --- 6 · Submit answers to the real /api/migrate -------------------------
+  const migrateResponse = page.waitForResponse(
+    (r) => r.url().includes('/api/migrate') && r.request().method() === 'POST',
+  )
+  await page.getByRole('button', { name: /Start migration/i }).click()
+  const migrate = await migrateResponse
+  expect(migrate.status(), 'migrate accepted the answers (202)').toBe(202)
+  expect((await migrate.json()).jobId, 'migrate returned a jobId').toBeTruthy()
+  await expect(page.getByTestId('submitted')).toBeVisible()
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[e2e] plan: ${steps.length} nodes, ${expectedWaves} waves; ` +
+      `ask: ${questions.length} questions; migration started`,
   )
 })

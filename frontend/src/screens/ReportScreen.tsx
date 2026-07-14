@@ -9,6 +9,7 @@ import { ScoreBreakdown } from '../components/report/ScoreBreakdown'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Stat } from '../components/ui/Metric'
+import { ArrowRightIcon } from '../components/icons'
 import { usePipelineStore } from '../store/pipelineStore'
 import type { AnalysisReport } from '../types/api'
 
@@ -28,12 +29,13 @@ function Section({ children, delay = 0 }: { children: ReactNode; delay?: number 
 export function ReportScreen() {
   const report = usePipelineStore((s) => s.report)
   const reset = usePipelineStore((s) => s.reset)
+  const goToPlan = usePipelineStore((s) => s.goToPlan)
 
   if (!report) return null
 
   return (
     <div className="space-y-6" data-testid="report-screen">
-      <ReportHeader report={report} onReset={reset} />
+      <ReportHeader report={report} onReset={reset} onPlan={goToPlan} />
 
       <Section delay={0.05}>
         <MetricsHeader report={report} />
@@ -72,9 +74,11 @@ export function ReportScreen() {
 function ReportHeader({
   report,
   onReset,
+  onPlan,
 }: {
   report: AnalysisReport
   onReset: () => void
+  onPlan: () => void
 }) {
   return (
     <div className="flex items-end justify-between gap-4">
@@ -92,9 +96,15 @@ function ReportHeader({
           A deterministic read of the project. Nothing has been migrated yet.
         </p>
       </div>
-      <Button variant="secondary" onClick={onReset}>
-        New analysis
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="ghost" onClick={onReset}>
+          New analysis
+        </Button>
+        <Button variant="primary" onClick={onPlan}>
+          Plan the migration
+          <ArrowRightIcon className="text-[16px]" />
+        </Button>
+      </div>
     </div>
   )
 }

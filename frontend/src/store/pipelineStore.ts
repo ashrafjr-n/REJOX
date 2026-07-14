@@ -1,12 +1,22 @@
 import { create } from 'zustand'
 
-import type { AnalysisReport, IngestedProject } from '../types/api'
+import type {
+  AnalysisReport,
+  IngestedProject,
+  MigrationPlan,
+} from '../types/api'
 
 /**
- * The stages this slice renders. The full 8-stage pipeline lives in CLAUDE.md;
- * Upload → Report is the first vertical slice, so we drive these three.
+ * The stages this app renders. Upload → Analyze → Report → Plan → Ask, then a
+ * terminal `submitted` once the migration job is started.
  */
-export type Stage = 'upload' | 'analyzing' | 'report'
+export type Stage =
+  | 'upload'
+  | 'analyzing'
+  | 'report'
+  | 'plan'
+  | 'ask'
+  | 'submitted'
 
 interface PipelineState {
   stage: Stage
@@ -22,11 +32,23 @@ interface PipelineState {
   /** The analysis result — the Migration Report the centerpiece renders. */
   report: AnalysisReport | null
 
+  /** The migration plan — the step DAG + the Ask-stage questions. */
+  plan: MigrationPlan | null
+  /** Ask-stage answers, keyed by questionId → chosen optionId. */
+  answers: Record<string, string>
+  /** The job id returned by POST /api/migrate once answers are submitted. */
+  jobId: string | null
+
   // --- transitions ---
   landUpload: (ingest: IngestedProject) => void
   setSelectedRoot: (root: string | null) => void
   beginAnalysis: () => void
   completeAnalysis: (report: AnalysisReport) => void
+  goToPlan: () => void
+  setPlan: (plan: MigrationPlan) => void
+  goToAsk: () => void
+  setAnswer: (questionId: string, optionId: string) => void
+  markSubmitted: (jobId: string) => void
   reset: () => void
 }
 
@@ -35,11 +57,28 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   ingest: null,
   selectedRoot: null,
   report: null,
+  plan: null,
+  answers: {},
+  jobId: null,
 
   landUpload: (ingest) => set({ ingest, selectedRoot: null }),
   setSelectedRoot: (selectedRoot) => set({ selectedRoot }),
   beginAnalysis: () => set({ stage: 'analyzing', report: null }),
   completeAnalysis: (report) => set({ report, stage: 'report' }),
+  goToPlan: () => set({ stage: 'plan' }),
+  setPlan: (plan) => set({ plan }),
+  goToAsk: () => set({ stage: 'ask' }),
+  setAnswer: (questionId, optionId) =>
+    set((s) => ({ answers: { ...s.answers, [questionId]: optionId } })),
+  markSubmitted: (jobId) => set({ jobId, stage: 'submitted' }),
   reset: () =>
-    set({ stage: 'upload', ingest: null, selectedRoot: null, report: null }),
+    set({
+      stage: 'upload',
+      ingest: null,
+      selectedRoot: null,
+      report: null,
+      plan: null,
+      answers: {},
+      jobId: null,
+    }),
 }))

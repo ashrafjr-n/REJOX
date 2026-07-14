@@ -135,12 +135,58 @@ export interface paths {
         put?: never;
         /**
          * Migrate
-         * @description Migrate stage: emit the RN project, validate it, and map diagnostics.
+         * @description Migrate stage: start a background job and return immediately (``202``).
          *
-         *     For a ``runId`` the RN project is emitted into that run's ``output/`` dir, so
-         *     ``GET /api/runs/{runId}/download`` can package it afterwards.
+         *     The migration (emit → npm install → tsc → Metro → repair → done) runs in the
+         *     background; follow it live via ``GET /api/jobs/{jobId}/events`` (SSE) or poll
+         *     ``GET /api/jobs/{jobId}``. The RN project is emitted into the run's
+         *     ``output/`` dir, so ``GET /api/runs/{runId}/download`` can package it after.
          */
         post: operations["migrate_api_migrate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job State
+         * @description The full, reconstructable job state — a late joiner rebuilds the whole
+         *     picture (events so far + final result/error) from this alone.
+         */
+        get: operations["job_state_api_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Events
+         * @description SSE stream of the job's events, in order. Replays everything after the
+         *     client's ``Last-Event-ID`` (or from the start), then streams live until the
+         *     terminal event, then closes. The stream is a convenience over
+         *     ``GET /api/jobs/{id}`` — never the source of truth.
+         */
+        get: operations["job_events_api_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -566,6 +612,45 @@ export interface components {
             message: string;
             evidence: components["schemas"]["Evidence"];
         };
+        /**
+         * JobCreated
+         * @description The immediate ``202`` body from ``POST /api/migrate``.
+         */
+        JobCreated: {
+            /** Jobid */
+            jobId: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "succeeded" | "failed";
+        };
+        /**
+         * JobState
+         * @description The full state of a migration job — the source of truth.
+         *
+         *     Returned verbatim by ``GET /api/jobs/{id}``: a late joiner or a reconnecting
+         *     client reconstructs the entire run from this alone.
+         */
+        JobState: {
+            /** Jobid */
+            jobId: string;
+            /** Runid */
+            runId?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "succeeded" | "failed";
+            /** Createdat */
+            createdAt: number;
+            /** Updatedat */
+            updatedAt: number;
+            /** Events */
+            events?: components["schemas"]["MigrationEvent"][];
+            result?: components["schemas"]["MigrationResult"] | null;
+            error?: components["schemas"]["MigrationError"] | null;
+        };
         /** KnowledgeGraph */
         KnowledgeGraph: {
             project: components["schemas"]["Project"];
@@ -681,11 +766,6 @@ export interface components {
                 [key: string]: string;
             };
             /**
-             * Outdir
-             * @description Where to emit (local-path mode only); the run's output/ dir for a runId.
-             */
-            outDir?: string | null;
-            /**
              * Install
              * @description Run npm install (cached across runs).
              * @default true
@@ -698,17 +778,88 @@ export interface components {
              */
             runBundle: boolean;
         };
-        /** MigrateResponse */
-        MigrateResponse: {
-            report: components["schemas"]["AnalysisReport"];
-            plan: components["schemas"]["MigrationPlan"];
-            emission: components["schemas"]["EmittedProject"];
-            validation: components["schemas"]["ValidationResult"];
-            /** Mappeddiagnostics */
-            mappedDiagnostics?: components["schemas"]["MappedDiagnostic"][];
-            validatedScores?: components["schemas"]["ValidatedScores"] | null;
-            /** Runid */
-            runId?: string | null;
+        /**
+         * MigrationError
+         * @description A structured failure — what broke, and where.
+         */
+        MigrationError: {
+            /** Type */
+            type: string;
+            /** Message */
+            message: string;
+            /** Stage */
+            stage?: ("emit" | "install" | "typecheck" | "bundle" | "repair" | "done") | null;
+        };
+        /**
+         * MigrationEvent
+         * @description One entry in the job's event log / SSE stream.
+         *
+         *     ``seq`` is a strictly increasing id (1-based) — also the SSE event id, so a
+         *     reconnect with ``Last-Event-ID`` resumes with nothing lost. ``ts`` is the
+         *     real wall-clock epoch-seconds when the event was emitted.
+         */
+        MigrationEvent: {
+            /** Seq */
+            seq: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "stage_started" | "stage_completed" | "succeeded" | "failed";
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "emit" | "install" | "typecheck" | "bundle" | "repair" | "done";
+            /** Ts */
+            ts: number;
+            /** Message */
+            message: string;
+            data?: components["schemas"]["MigrationEventData"] | null;
+            result?: components["schemas"]["MigrationResult"] | null;
+            error?: components["schemas"]["MigrationError"] | null;
+        };
+        /**
+         * MigrationEventData
+         * @description Observed counts for one event. Every field is OPTIONAL: only the numbers
+         *     the engine actually measured at this boundary are populated; an unset field
+         *     means "not applicable to this event", never a guess.
+         */
+        MigrationEventData: {
+            /** Filesemitted */
+            filesEmitted?: number | null;
+            /** Filesconverted */
+            filesConverted?: number | null;
+            /** Filesskipped */
+            filesSkipped?: number | null;
+            /** Todocount */
+            todoCount?: number | null;
+            /** Navigatorshape */
+            navigatorShape?: string | null;
+            /** Installed */
+            installed?: boolean | null;
+            /** Installskipped */
+            installSkipped?: boolean | null;
+            /** Ran */
+            ran?: boolean | null;
+            /** Passed */
+            passed?: boolean | null;
+            /** Errorcount */
+            errorCount?: number | null;
+            /** Diagnosticsfound */
+            diagnosticsFound?: number | null;
+            /** Skippedreason */
+            skippedReason?: string | null;
+            /** Repairround */
+            repairRound?: number | null;
+            /** Maxrepairrounds */
+            maxRepairRounds?: number | null;
+            /** Repairattempts */
+            repairAttempts?: number | null;
+            /** Llmcalls */
+            llmCalls?: number | null;
+            /** Durationseconds */
+            durationSeconds?: number | null;
         };
         /** MigrationPlan */
         MigrationPlan: {
@@ -722,6 +873,45 @@ export interface components {
             manualReviewCandidates?: components["schemas"]["ManualReviewCandidate"][];
             /** Unsupporteditems */
             unsupportedItems?: components["schemas"]["UnsupportedItem"][];
+        };
+        /**
+         * MigrationResult
+         * @description The terminal success payload — the full, reconstructable picture.
+         *
+         *     Carries the validated scores and tool verdicts (the numbers the instrument
+         *     reports) plus the complete emission/validation/diagnostics so a late joiner
+         *     reconstructs everything from ``GET /api/jobs/{id}`` alone.
+         */
+        MigrationResult: {
+            /** Runid */
+            runId?: string | null;
+            /** Validationpassed */
+            validationPassed: boolean;
+            /** Typecheckpassed */
+            typecheckPassed: boolean;
+            /** Bundlepassed */
+            bundlePassed: boolean;
+            /** Bundleran */
+            bundleRan: boolean;
+            /** Llmcalls */
+            llmCalls: number;
+            /** Repairrounds */
+            repairRounds: number;
+            /** Filesconverted */
+            filesConverted: number;
+            /** Todocount */
+            todoCount: number;
+            /** Navigatorshape */
+            navigatorShape?: string | null;
+            /** Durationseconds */
+            durationSeconds: number;
+            validatedScores?: components["schemas"]["ValidatedScores"] | null;
+            report: components["schemas"]["AnalysisReport"];
+            plan: components["schemas"]["MigrationPlan"];
+            emission: components["schemas"]["EmittedProject"];
+            validation: components["schemas"]["ValidationResult"];
+            /** Mappeddiagnostics */
+            mappedDiagnostics?: components["schemas"]["MappedDiagnostic"][];
         };
         /**
          * PlanResponse
@@ -1362,12 +1552,74 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_state_api_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MigrateResponse"];
+                    "application/json": components["schemas"]["JobState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_events_api_jobs__job_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

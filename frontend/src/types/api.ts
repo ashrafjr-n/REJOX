@@ -37,7 +37,21 @@ export type Summary = Schemas['Summary']
 export type ScoreContribution = Schemas['ScoreContribution']
 export type AnalysisReport = Schemas['AnalysisReport']
 
+// --- Plan / Ask stage -------------------------------------------------------
+export type PlanResponse = Schemas['PlanResponse']
+export type MigrationPlan = Schemas['MigrationPlan']
+export type PlanStep = Schemas['PlanStep']
+export type StepKind = PlanStep['kind']
+export type Effort = PlanStep['estimatedEffort']
+export type Question = Schemas['Question']
+export type QuestionOption = Schemas['QuestionOption']
+export type QuestionDependency = Schemas['QuestionDependency']
+export type ManualReviewCandidate = Schemas['ManualReviewCandidate']
+export type UnsupportedItem = Schemas['UnsupportedItem']
+
 // --- Request / misc shapes --------------------------------------------------
 export type SourceRequest = Schemas['SourceRequest']
+export type MigrateRequest = Schemas['MigrateRequest']
+export type JobCreated = Schemas['JobCreated']
 export type HealthResponse = Schemas['HealthResponse']
 export type ValidationError = Schemas['ValidationError']
