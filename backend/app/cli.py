@@ -327,7 +327,7 @@ def _render_tier_breakdown(tiers: Counter, counter) -> None:
 # --- 5/6. validate + final ---------------------------------------------------
 
 
-def _render_validation(validation, scores) -> None:
+def _render_validation(validation, scores, repair=None) -> None:
     _stage("Review — validation (tsc + Metro)")
     tc, bd = validation.typecheck, validation.bundle
     ok = lambda passed: Text("PASS", style="bold green") if passed else Text("FAIL", style="bold red")
@@ -341,7 +341,15 @@ def _render_validation(validation, scores) -> None:
               bd.skippedReason or "")
     console.print(t)
 
-    # Every remaining diagnostic is expected residue (mapped to a REJOX-TODO).
+    if repair is not None and repair.rounds > 0:
+        console.print(
+            f"[dim]Repair loop:[/] {repair.rounds} round(s), "
+            f"{len(repair.attempts)} LLM attempt(s) — {repair.stoppedReason}"
+        )
+        for a in repair.attempts[:6]:
+            mark = "[green]fixed[/]" if a.fixed else "[yellow]no change[/]"
+            console.print(f"  [dim]{a.file}:{a.line}[/] {a.residueCode} → {mark}")
+
     diags = [d for d in tc.diagnostics if d.severity == "error"][:8]
     if diags:
         console.print("[dim]Remaining diagnostics (all map to known residue):[/]")
@@ -356,7 +364,7 @@ def _render_validation(validation, scores) -> None:
         )
 
 
-def _render_final(emission, validation, scores, out_dir, counter, cache, proposal) -> None:
+def _render_final(emission, validation, scores, out_dir, counter, cache, proposal, nav_shape) -> None:
     _stage("Done — migration summary")
     converted = [f for f in emission.files if f.sourceFile]
     todos = [
@@ -376,9 +384,9 @@ def _render_final(emission, validation, scores, out_dir, counter, cache, proposa
     stats = cache.stats()
     t.add_row("LLM calls", f"[bold magenta]{counter.calls}[/] [dim](tokens {counter.tokensIn}→{counter.tokensOut})[/]")
     t.add_row("Cache", f"{stats.hits} hit / {stats.lookups} lookup ({_pct(stats.hitRate * 100)})")
-    if proposal is not None:
-        shape = proposal.resolution.spec.type.value
-        t.add_row("Navigator shape", f"proposed [cyan]{shape}[/] · emitted [cyan]stack[/] [dim](validated default)[/]")
+    if nav_shape:
+        proposed = proposal.resolution.spec.type.value if proposal is not None else nav_shape
+        t.add_row("Navigator shape", f"proposed [cyan]{proposed}[/] · emitted [cyan]{nav_shape}[/]")
     console.print(t)
 
     if todos:
@@ -535,12 +543,22 @@ def migrate(
         tiers = _resolve_residue(emission, report, kg, src, counter, cache, proposal)
     _render_tier_breakdown(tiers, counter)
 
-    # 5. Validate.
+    # 5. Validate (+ repair loop if needed).
     validation = scores = None
+    repair = None
     if not no_validate:
         try:
             with console.status("[cyan]Validating (npm install · tsc · Metro)…[/]", spinner="dots"):
                 validation = validate_project(out_dir, install=True, run_bundle=True)
+            if not validation.passed and inner is not None:
+                from app.pipeline.repair import repair_project
+
+                with console.status("[cyan]Repairing residue errors with the LLM…[/]", spinner="dots"):
+                    repair = repair_project(
+                        out_dir, emission, validation,
+                        provider=counter, source_root=src,
+                    )
+                validation = repair.validation or validation
             scores = validated_scores(
                 emission, validation,
                 predicted_coverage=report.coverage, predicted_confidence=report.confidence,
@@ -548,10 +566,13 @@ def migrate(
         except ValidatorError as exc:
             console.print(f"[yellow]Validation could not run:[/] {exc}")
         if validation is not None:
-            _render_validation(validation, scores)
+            _render_validation(validation, scores, repair)
 
     # 6. Final report.
-    _render_final(emission, validation, scores, out_dir, counter, cache, proposal)
+    _render_final(
+        emission, validation, scores, out_dir, counter, cache, proposal,
+        answers.get("navigator-shape"),
+    )
 
 
 class _NullProvider:

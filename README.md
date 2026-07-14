@@ -80,16 +80,18 @@ Emitted 27 files → /tmp/rejox-cli-demo
 
 ─────────────────────── Review — validation (tsc + Metro) ────────────────────────
  Install          PASS
- Typecheck (tsc)  FAIL    3 error(s)     ← all map to known residue (NAV_ACTIVE, CSS_MODULE)
-Validated  Coverage 92%  (strict 38%)   Confidence 96%
+ Typecheck (tsc)  PASS    0 error(s)
+ Bundle (Metro)   PASS
+Validated  Coverage 100%  (strict 58%)   Confidence 97%
 
 ────────────────────────────── Done — migration summary ──────────────────────────
 Files converted        27
-Residue TODOs          30
-Validated coverage     92%
-Validated confidence   96%
+Residue TODOs          13
+Validated coverage     100%
+Validated confidence   97%
+Validation             PASS
 LLM calls              1 (tokens 132→30)
-Navigator shape        proposed tabs · emitted stack (validated default)
+Navigator shape        proposed tabs · emitted tabs
 
 ╭────────────────── React Native project ───────────────────╮
 │ /tmp/rejox-cli-demo                                        │
@@ -97,12 +99,19 @@ Navigator shape        proposed tabs · emitted stack (validated default)
 ╰────────────────────────────────────────────────────────────╯
 ```
 
-**One LLM call.** That number is the whole thesis: 29 of 30 residue units are
-resolved by rules (static map, pattern, direct rule); the AI is a scalpel used
-once, for the one decision that is genuinely design. The remaining `tsc`
-diagnostics are all expected residue (the deterministic emit leaves
-`REJOX-TODO`s that the AI Resolution Engine's resolvers target); wiring those
-resolvers into emit is the repair loop.
+**It runs.** `tsc` passes and `expo export` (Metro) bundles cleanly — the
+migration produces a React Native app you can `npx expo start`. The AI Resolution
+Engine runs *inside* emit: CSS Modules become inline `StyleSheet`s (the
+`.module.css` is never emitted), `isActive` classNames are static-ized, and the
+unsupported-Tailwind residue is rewritten — all before validation. The only
+residue that survives is genuinely unresolvable (a runtime `<Link to>`), and it
+does not break the build.
+
+**One LLM call.** That number is the whole thesis: the AI is a scalpel used once,
+for the one decision that is genuinely design (the navigator shape). Everything
+else is resolved by rules. If the build ever did fail, the **repair loop** sends
+only the offending line + its diagnostic to the LLM, re-validates, and caps at
+two rounds — on `sample-app` it is never needed (zero repair rounds).
 
 ## Under the hood
 
