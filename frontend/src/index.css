@@ -1,1 +1,126 @@
 @import "tailwindcss";
+
+/*
+ * Rejox design system — an engineering instrument, not a landing page.
+ * Dark, precise, cinematic. Restrained palette; typography does the work.
+ * Tokens below become Tailwind utilities (bg-surface-1, text-ink-2, font-mono…).
+ */
+@theme {
+  /* --- Surfaces: a deliberate depth ladder, near-black with a cool cast --- */
+  --color-void: #06070a;
+  --color-surface-0: #0a0c11;
+  --color-surface-1: #0f1218;
+  --color-surface-2: #151922;
+  --color-surface-3: #1c212c;
+  --color-line: #232a36;
+  --color-line-strong: #303948;
+
+  /* --- Ink: four steps of legible contrast --- */
+  --color-ink: #e8ebf0;
+  --color-ink-2: #a6afbd;
+  --color-ink-3: #6f7a8a;
+  --color-ink-4: #49525f;
+
+  /* --- Signal accent: a single cool cyan. Used sparingly, on purpose. --- */
+  --color-signal: #4cc9e6;
+  --color-signal-deep: #2ba3c4;
+
+  /* --- Semantic status. Muted, never neon — instrument readouts. --- */
+  --color-pos: #46c98a;
+  --color-warn: #e0a24e;
+  --color-danger: #e5595f;
+  --color-info: #5b9bf0;
+  --color-ai: #b48ce6; /* AI-resolved provenance / Confidence axis */
+
+  /* --- Type --- */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", "Menlo",
+    "Cascadia Code", monospace;
+
+  --shadow-panel: 0 1px 0 0 rgb(255 255 255 / 0.03) inset,
+    0 8px 30px -12px rgb(0 0 0 / 0.6);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Tabular figures everywhere numbers matter (metrics, scores, tables). */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-signal) 30%, transparent);
+    color: var(--color-ink);
+  }
+
+  /* Instrument scrollbars — thin, quiet. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@layer utilities {
+  /* The ambient backdrop: a cool vignette bleeding from the top, over void. */
+  .app-bg {
+    background:
+      radial-gradient(
+        1200px 620px at 50% -12%,
+        color-mix(in oklab, var(--color-signal) 8%, transparent),
+        transparent 62%
+      ),
+      var(--color-void);
+  }
+
+  /* A faint engineering grid, masked so it fades toward the edges. */
+  .grid-veil {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.02) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(
+      70% 60% at 50% 0%,
+      #000 0%,
+      transparent 75%
+    );
+    mask-image: radial-gradient(70% 60% at 50% 0%, #000 0%, transparent 75%);
+  }
+
+  /* Eyebrow label — the small-caps monospace tag above section titles. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-ink-3);
+  }
+}

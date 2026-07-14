@@ -7,7 +7,76 @@ migratability, plans the work, performs the migration with deterministic AST
 transforms (plus a scalpel of AI for the residue), validates the output with the
 real toolchain (`tsc` + Metro), and hands back a working React Native project.
 
-## Quick start
+## Run the web app locally (Upload → Analyze → Report)
+
+The browser UI drives the same pipeline. It runs two services: the FastAPI
+backend (:8000) and the Vite dev server (:5173).
+
+**Prerequisites**
+
+- **Python 3.11+**
+- **Node 18+** (the deterministic parser/codemod workers run in Node)
+- **No `GEMINI_API_KEY` needed** — the Upload → Analyze → Report path is fully
+  deterministic and makes zero LLM calls. (A key is only used for the one AI
+  step in the full *migrate* flow; see “AI is optional” below.)
+
+**Install** (once)
+
+```bash
+# backend
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -e ".[dev]"
+
+# frontend
+cd ../frontend
+npm install
+cp .env.example .env             # sets VITE_API_URL=http://localhost:8000
+```
+
+**Run both services** (one command, from the repo root)
+
+```bash
+./dev.sh
+```
+
+Then open **http://localhost:5173** and upload a React project (try
+`test-projects/sample-app` zipped, or paste a public GitHub URL). `dev.sh`
+starts uvicorn and Vite together and stops both on Ctrl+C. CORS origins are
+controlled by `REJOX_CORS_ORIGINS` (default `http://localhost:5173,http://127.0.0.1:5173`).
+
+**End-to-end browser test** (real stack, real backend numbers)
+
+```bash
+cd frontend
+npx playwright install chromium   # once
+npm run test:e2e                  # boots both servers, drives a full run
+```
+
+The test uploads `test-projects/sample-app`, runs the analysis, and asserts the
+Coverage / Confidence / Risk shown on screen equal the live `/api/analyze`
+response (and that the score contributions sum to Coverage). Screenshots of all
+three screens are written to `docs/screenshots/`.
+
+**Regenerating the API types**
+
+The frontend's TypeScript shapes are **generated** from the backend's OpenAPI
+schema — never hand-written — so they cannot silently drift. The generated file
+(`frontend/src/types/api.generated.ts`) is committed, so a fresh clone builds
+without the backend running. To regenerate after changing a pydantic model:
+
+```bash
+# 1. start the backend (so /openapi.json is served)
+cd backend && source venv/bin/activate && uvicorn app.main:app --port 8000
+# 2. in another shell:
+cd frontend && npm run types:gen
+```
+
+`npm run types:gen` reads `http://localhost:8000/openapi.json` and rewrites
+`src/types/api.generated.ts`. **The backend must be running.** The thin
+`src/types/api.ts` only re-exports readable aliases over that generated schema.
+
+## CLI quick start
 
 ```bash
 cd backend
