@@ -176,16 +176,21 @@ feeds the generator. Raw LLM prose can never reach the emitted navigator. See
 
 ## Validated end-to-end
 
-The Validator (`tsc --noEmit` + Metro `expo export`) now runs against the emitted
-project, so these rules are proven, not asserted. On `sample-app` the deterministic
-output type-checks and bundles with **zero** unexplained errors — every remaining
-diagnostic maps to a residue code above (`NAV_CONTAINER`, `NAV_ACTIVE`,
-`CSS_MODULE`). No transform rule changed this session; the only fixes were in the
-**scaffold's NativeWind dependency wiring** (react-native/reanimated/worklets/
-metro-config pins), without which the `className` rule type-checks against a
-duplicate `react-native` and Metro fails to bundle. See `ARCHITECTURE.md` →
-*NativeWind dependency wiring* / *Validator*. When touching the NativeWind path,
-re-run `pytest -m slow` to keep the bundle honest.
+The Validator (`tsc --noEmit` + Metro `expo export`) runs against the emitted
+project, so these rules are proven, not asserted. **The AI Resolution Engine now
+runs inside emit** (see `ARCHITECTURE.md` → *Emit → resolve → validate →
+repair*): CSS Modules become inline `StyleSheet`s (the `.module.css` file is
+never emitted), `isActive` classNames are static-ized, and the unsupported
+Tailwind residue is rewritten/cleaned — all before validation. On `sample-app`
+the migrated project **type-checks (0 errors) AND Metro-bundles (`expo export`)
+— a running app — with zero repair rounds**. The only residue that survives is
+genuinely unresolvable (a runtime `<Link to>` → `NAV_LINK`), and it does not
+break the build.
+
+Anything the deterministic pass cannot fix goes to the **repair loop**
+(`app/pipeline/repair.py`): a single targeted LLM edit per remaining error,
+re-validated, at most two rounds. When touching the NativeWind / navigation
+paths, re-run `pytest -m slow` to keep the gate honest.
 
 ## Legend / conventions
 

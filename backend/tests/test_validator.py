@@ -89,20 +89,36 @@ def test_typecheck_ran_and_installed(validated) -> None:
     assert "typescript" in result.toolVersions
 
 
-def test_diagnostics_parse_into_structured_form(validated) -> None:
+def test_validation_passes_the_migration_produces_a_running_app(validated) -> None:
+    """THE GATE: the emitted project type-checks AND Metro-bundles — clean.
+
+    The AI Resolution Engine now runs inside emit, so the residue that used to
+    break the build (CSS Module import, isActive className) is resolved before
+    validation. `expo export` (the bundle stage) passing is the proof it runs.
+    """
     _, _, result, _, _ = validated
-    # There ARE residue errors on the benchmark; each must be structured, not a
-    # raw text blob.
-    assert result.typecheck.errorCount > 0
-    for d in result.typecheck.diagnostics:
-        assert d.file and d.file.endswith((".ts", ".tsx"))
-        assert d.line and d.line > 0
-        assert d.code and d.code.startswith("TS")
-        assert d.message
+    assert result.typecheck.passed, (
+        "tsc failed:\n"
+        + "\n".join(f"  {d.file}:{d.line} {d.code} {d.message}" for d in result.typecheck.diagnostics)
+    )
+    assert result.typecheck.errorCount == 0
+    assert result.bundle.passed, f"Metro bundle failed:\n{result.bundle.rawTail or ''}"
+    assert result.passed is True
+
+
+def test_no_css_module_files_and_no_build_breaking_residue(validated) -> None:
+    _, emitted, _, _, _ = validated
+    out = Path(emitted.outDir)
+    # The .module.css files are gone — inlined as StyleSheet (that is what broke Metro).
+    assert list(out.rglob("*.module.css")) == []
+    # No CSS_MODULE / NAV_ACTIVE / TW_UNSUPPORTED residue survives in any emitted file.
+    build_breakers = {"CSS_MODULE", "NAV_ACTIVE", "TW_UNSUPPORTED"}
+    for f in emitted.files:
+        assert not (set(f.todoCodes) & build_breakers), f"{f.path}: {f.todoCodes}"
 
 
 def test_every_remaining_diagnostic_maps_to_known_residue(validated) -> None:
-    """THE GATE: zero unexplained errors."""
+    """No unexplained errors: any diagnostic (there should be none) maps to residue."""
     _, _, _, mapped, _ = validated
     unexplained = unexplained_diagnostics(mapped)
     assert unexplained == [], (
@@ -112,14 +128,6 @@ def test_every_remaining_diagnostic_maps_to_known_residue(validated) -> None:
             for m in unexplained
         )
     )
-    # And every mapped error's residue codes are from the known residue set.
-    for m in mapped:
-        if m.diagnostic.severity != "error":
-            continue
-        assert m.nearbyTodo, f"{m.file}:{m.diagnostic.line} has no residue attribution"
-        assert set(m.nearbyTodo) & KNOWN_RESIDUE, (
-            f"{m.file}:{m.diagnostic.line} residue {m.nearbyTodo} not in KNOWN_RESIDUE"
-        )
 
 
 def test_mapped_diagnostics_carry_the_ai_contract(validated) -> None:

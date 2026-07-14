@@ -86,6 +86,21 @@ def test_navigator_generated_from_route_table(emitted: EmittedProject) -> None:
     assert "REJOX-TODO" not in text
 
 
+def test_navigator_matches_the_chosen_shape(tmp_path_factory) -> None:
+    # When the user (or the tier-3 LLM) chooses `tabs`, the generator emits a
+    # bottom-tab navigator — the chosen shape reaches the code.
+    kg = KnowledgeGraph.model_validate(json.loads((FIXTURES / "sample-app.kg.json").read_text()))
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-tabs")
+    answers = dict(ANSWERS, **{"navigator-shape": "tabs"})
+    emit_project(plan, answers, kg, out, report=report, source_root=SRC_ROOT)
+    nav = (out / "src" / "navigation" / "AppNavigator.tsx").read_text()
+    assert "createBottomTabNavigator" in nav
+    assert "createNativeStackNavigator" in nav  # the nested detail stack
+    assert "ProductsNavigator" in nav           # ProductDetail nests under Products
+
+
 def test_layout_shell_subsumed_by_navigator(emitted: EmittedProject) -> None:
     # The shared <Layout> (Outlet/Routes) is router structure → skipped, not
     # emitted as a dead <Outlet/> + TODO.
@@ -122,12 +137,32 @@ def test_every_file_has_provenance(emitted: EmittedProject) -> None:
         assert isinstance(f.provenance, ConfidenceSource)
 
 
-def test_residue_files_carry_unhandled(emitted: EmittedProject) -> None:
+def test_resolvers_run_in_emit_and_clear_resolvable_residue(emitted: EmittedProject) -> None:
     by_path = {f.path: f for f in emitted.files}
-    # ProductCard has a CSS Module + hover → residue provenance + codes.
+    out = _out(emitted)
+
+    # ProductCard's CSS Module + hover are now RESOLVED by the AI Resolution
+    # Engine in emit: no CSS_MODULE/TW_UNSUPPORTED residue, the .module.css import
+    # is gone (inlined as a StyleSheet), and provenance is rule-resolved.
     pc = by_path["src/components/ProductCard.tsx"]
-    assert pc.provenance == ConfidenceSource.UNHANDLED
-    assert "CSS_MODULE" in {u.code for u in pc.unhandled}
+    pc_codes = {u.code for u in pc.unhandled}
+    assert "CSS_MODULE" not in pc_codes
+    assert "TW_UNSUPPORTED" not in pc_codes
+    assert pc.provenance != ConfidenceSource.UNHANDLED
+    pc_text = (out / "src" / "components" / "ProductCard.tsx").read_text()
+    assert ".module.css" not in pc_text
+    assert "StyleSheet.create(" in pc_text
+
+    # No .module.css file is emitted anywhere (that is what broke Metro).
+    assert list(out.rglob("*.module.css")) == []
+
+    # Navbar keeps ONLY genuinely-unresolvable residue: a runtime <Link to>.
+    nav = by_path["src/components/Navbar.tsx"]
+    nav_codes = {u.code for u in nav.unhandled}
+    assert "NAV_ACTIVE" not in nav_codes      # resolved to a static className
+    assert "TW_UNSUPPORTED" not in nav_codes  # hover/backdrop/… resolved
+    assert nav_codes == {"NAV_LINK"}          # only the runtime link remains
+
     # A supported-only component (Footer) is clean deterministic.
     footer = by_path["src/components/Footer.tsx"]
     assert footer.provenance in (
