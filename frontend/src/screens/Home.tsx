@@ -4,6 +4,7 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 import './Home.css'
+import rejoxLogo from '../assets/rejox-logo.png'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -31,13 +32,17 @@ gsap.registerPlugin(ScrollTrigger)
  * Everything is scoped under `.rx-home`; the /app workflow is untouched.
  */
 
-const NAV_ITEMS = ['Home', 'Features', 'How it works', 'Pricing', 'About']
+const NAV_ITEMS = ['Home', 'About', 'Docs', 'Features']
 
 const BLACK = '#050505'
 const WHITE = '#ffffff'
 
 /** Progress at which Phase 1 (flood) completes and Phase 2 (slide) begins. */
 const PHASE_1 = 0.55
+
+/** Extra px Section 02 travels past yPercent 0, so its rounded top corners
+ * (and the matching extra height added in Home.css) scroll fully out of view. */
+const SECTION2_OVERSHOOT_PX = 56
 
 function ArrowRight() {
   return (
@@ -118,11 +123,6 @@ export function Home() {
         0,
       )
       tl.to(
-        '.rx-logo',
-        { backgroundColor: BLACK, color: WHITE, boxShadow: '0 6px 20px rgba(0,0,0,0.3)', duration: d },
-        0,
-      )
-      tl.to(
         '.rx-nav-item.is-active',
         { backgroundColor: BLACK, color: WHITE, borderColor: BLACK, duration: d },
         0,
@@ -138,8 +138,16 @@ export function Home() {
         0,
       )
 
-      // ---- Phase 2 (PHASE_1 → 1): Section 02 slides up over the fixed hero ----
-      tl.to(section2, { yPercent: 0, duration: 1 - PHASE_1 }, PHASE_1)
+      // ---- Phase 2 (PHASE_1 → 1): Section 02 slides up over the fixed hero.
+      // yPercent:0 lands its top edge at the viewport top; the extra `y`
+      // overshoot (matched by the extra height in Home.css) pushes it further
+      // so the rounded top corners clear the top of the screen while the
+      // bottom edge still lands exactly flush with the viewport bottom. ----
+      tl.to(
+        section2,
+        { yPercent: 0, y: -SECTION2_OVERSHOOT_PX, duration: 1 - PHASE_1 },
+        PHASE_1,
+      )
     }, home)
 
     return () => ctx.revert()
@@ -159,11 +167,7 @@ export function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
-            {/* Logo mark — drop a real Rejox logo at src/assets and swap this
-                tile for an <img>; falls back to the orange "R" tile below. */}
-            <span className="rx-logo" aria-label="Rejox">
-              R
-            </span>
+            <img className="rx-logo" src={rejoxLogo} alt="Rejox" />
 
             <nav className="rx-nav" aria-label="Primary">
               {NAV_ITEMS.map((item, i) => (
@@ -181,7 +185,7 @@ export function Home() {
             </nav>
 
             <button type="button" className="rx-cta-pill">
-              Start migration
+              Login
             </button>
           </motion.header>
 
