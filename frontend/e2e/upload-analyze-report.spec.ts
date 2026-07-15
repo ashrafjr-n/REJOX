@@ -46,7 +46,7 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
   fs.mkdirSync(SHOTS, { recursive: true })
 
   // --- 1 · Upload screen ---------------------------------------------------
-  await page.goto('/')
+  await page.goto('/app')
   await expect(
     page.getByRole('heading', { name: /Hand Rejox a React codebase/i }),
   ).toBeVisible()
