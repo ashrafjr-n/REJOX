@@ -32,6 +32,7 @@ from app.models.plan import (
     PlanStep,
     Question,
     QuestionOption,
+    StepFinding,
     UnsupportedItem,
 )
 
@@ -477,9 +478,95 @@ def _steps(
     return steps
 
 
-# --- Review + unsupported ---------------------------------------------------
+# --- Waves (topological layer of each step over its dependsOn edges) ---------
+
+
+def _assign_waves(steps: list[PlanStep]) -> None:
+    """Set ``step.wave`` = its longest-path layer over ``dependsOn`` (leaves = 0).
+
+    ``dependsOn`` only ever references already-created steps, so the step graph
+    is a DAG by construction; the visiting guard is belt-and-braces. This is the
+    *step* wave (the plan DAG's layering), a superset concept over the component
+    ``renders`` waves that produced the component-conversion steps.
+    """
+    by_id = {s.id: s for s in steps}
+    memo: dict[str, int] = {}
+    visiting: set[str] = set()
+
+    def wave_of(sid: str) -> int:
+        cached = memo.get(sid)
+        if cached is not None:
+            return cached
+        step = by_id.get(sid)
+        deps = [d for d in (step.dependsOn if step else []) if d in by_id]
+        if not step or not deps:
+            memo[sid] = 0
+            return 0
+        if sid in visiting:  # defensive: never loop on an unexpected cycle
+            return 0
+        visiting.add(sid)
+        wave = 1 + max(wave_of(d) for d in deps)
+        visiting.discard(sid)
+        memo[sid] = wave
+        return wave
+
+    for s in steps:
+        s.wave = wave_of(s.id)
+
+
+# --- Findings (per-step, associated over real KG ids) -----------------------
 
 _REVIEW_ISSUE_CODES = frozenset({"CSS_MODULE", "DYNAMIC_CLASSNAME"})
+
+
+def _component_findings(report: AnalysisReport) -> list[tuple[str, StepFinding]]:
+    """Every review-worthy finding, as ``(source_file, StepFinding)`` pairs.
+
+    Same signal the manual-review list is built from (difficulty ≥ medium, plus
+    the review issue codes), but structured and keyed by the component's source
+    *file* so it can attach to any step whose targets touch that file.
+    """
+    out: list[tuple[str, StepFinding]] = []
+    for c in report.components:
+        if c.difficulty in ("medium", "hard", "blocked"):
+            out.append((
+                c.file,
+                StepFinding(
+                    componentId=c.componentId,
+                    code="DIFFICULTY",
+                    severity="blocker" if c.difficulty == "blocked" else "warning",
+                    message=f"difficulty={c.difficulty} (score {c.score})",
+                ),
+            ))
+        for issue in c.issues:
+            if issue.code in _REVIEW_ISSUE_CODES:
+                out.append((
+                    c.file,
+                    StepFinding(
+                        componentId=c.componentId,
+                        code=issue.code,
+                        severity=issue.severity,
+                        message=issue.message,
+                    ),
+                ))
+    return out
+
+
+def _attach_findings(steps: list[PlanStep], report: AnalysisReport) -> None:
+    """Attach each finding to every step whose targets touch its source file.
+
+    A target may be a bare file (``src/pages/X.tsx``) or a KG id
+    (``src/pages/X.tsx#X``); we match on the file portion, so a page's finding
+    reaches the routing step (file target) AND its component wave (id target) —
+    not only the component waves the old frontend join could see.
+    """
+    findings = _component_findings(report)
+    for step in steps:
+        target_files = {t.split("#", 1)[0] for t in step.targets}
+        step.findings = [f for (file, f) in findings if file in target_files]
+
+
+# --- Review + unsupported ---------------------------------------------------
 
 
 def _manual_review(report: AnalysisReport) -> list[ManualReviewCandidate]:
@@ -524,6 +611,8 @@ def plan_migration(report: AnalysisReport, kg: KnowledgeGraph) -> MigrationPlan:
     question_ids = [q.id for q in questions]
     waves = _component_waves(report, kg)
     steps = _steps(report, kg, waves, question_ids)
+    _assign_waves(steps)          # each step's topological layer (was UI-side)
+    _attach_findings(steps, report)  # per-step issues over real KG ids
 
     return MigrationPlan(
         projectName=report.projectName,

@@ -210,3 +210,64 @@ def test_plan_endpoint_rejects_bad_path() -> None:
     client = TestClient(app)
     resp = client.post("/api/plan", json={"path": "/no/such/project/xyz"})
     assert resp.status_code == 400
+
+
+# --- Waves (topological layer, moved from the frontend) ---------------------
+
+
+def _longest_path_waves(plan: MigrationPlan) -> dict[str, int]:
+    """The frontend's old longest-path layering — the answer the Planner must
+    now reproduce itself (same answer, new owner)."""
+    by_id = {s.id: s for s in plan.steps}
+    memo: dict[str, int] = {}
+
+    def depth(sid: str) -> int:
+        if sid in memo:
+            return memo[sid]
+        deps = [d for d in by_id[sid].dependsOn if d in by_id]
+        memo[sid] = 0 if not deps else 1 + max(depth(d) for d in deps)
+        return memo[sid]
+
+    return {s.id: depth(s.id) for s in plan.steps}
+
+
+def test_sample_app_has_13_steps_in_9_waves(plan: MigrationPlan) -> None:
+    assert len(plan.steps) == 13
+    assert len({s.wave for s in plan.steps}) == 9
+
+
+def test_backend_waves_equal_frontend_longest_path_layering(plan: MigrationPlan) -> None:
+    """Moving the wave computation into the Planner must not change the answer."""
+    expected = _longest_path_waves(plan)
+    for s in plan.steps:
+        assert s.wave == expected[s.id], f"{s.id}: {s.wave} != {expected[s.id]}"
+    # Leaves at 0; the layering is contiguous 0..N-1.
+    waves = sorted({s.wave for s in plan.steps})
+    assert waves == list(range(len(waves)))
+    assert _step(plan, "setup").wave == 0
+
+
+# --- Per-step findings (associated over real KG ids) ------------------------
+
+
+def test_findings_reach_non_component_steps(plan: MigrationPlan) -> None:
+    """The routing step (NOT a component wave) carries a finding the old frontend
+    join missed — it matched only ``file#Component`` targets, but routing's
+    targets are bare page files."""
+    routing = _step(plan, "routing")
+    assert routing.kind == "routing"
+    assert routing.findings, "routing should carry findings from its page targets"
+    assert any("ProductDetailPage" in f.componentId for f in routing.findings)
+
+
+def test_clean_steps_have_empty_findings(plan: MigrationPlan) -> None:
+    for sid in ("setup", "api", "state"):
+        assert _step(plan, sid).findings == []
+
+
+def test_every_finding_belongs_to_a_target_file(plan: MigrationPlan) -> None:
+    """A finding only attaches where a step's targets touch its source file."""
+    for s in plan.steps:
+        target_files = {t.split("#", 1)[0] for t in s.targets}
+        for f in s.findings:
+            assert f.componentId.split("#", 1)[0] in target_files

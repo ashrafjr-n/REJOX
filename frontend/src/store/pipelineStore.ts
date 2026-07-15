@@ -16,7 +16,7 @@ export type Stage =
   | 'report'
   | 'plan'
   | 'ask'
-  | 'submitted'
+  | 'migrate'
 
 interface PipelineState {
   stage: Stage
@@ -48,7 +48,7 @@ interface PipelineState {
   setPlan: (plan: MigrationPlan) => void
   goToAsk: () => void
   setAnswer: (questionId: string, optionId: string) => void
-  markSubmitted: (jobId: string) => void
+  beginMigration: (jobId: string) => void
   reset: () => void
 }
 
@@ -70,7 +70,7 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   goToAsk: () => set({ stage: 'ask' }),
   setAnswer: (questionId, optionId) =>
     set((s) => ({ answers: { ...s.answers, [questionId]: optionId } })),
-  markSubmitted: (jobId) => set({ jobId, stage: 'submitted' }),
+  beginMigration: (jobId) => set({ jobId, stage: 'migrate' }),
   reset: () =>
     set({
       stage: 'upload',

@@ -95,7 +95,7 @@ export interface paths {
         put?: never;
         /**
          * Analyze
-         * @description Analysis stage: parse the project, then analyze migratability.
+         * @description Analysis stage: parse the project, then analyze migratability (cached per run).
          */
         post: operations["analyze_api_analyze_post"];
         delete?: never;
@@ -115,7 +115,7 @@ export interface paths {
         put?: never;
         /**
          * Plan
-         * @description Plan stage: parse + analyze + plan; returns the report and plan together.
+         * @description Plan stage: parse + analyze + plan (cached per run — a 2nd call is a read).
          */
         post: operations["plan_api_plan_post"];
         delete?: never;
@@ -927,6 +927,11 @@ export interface components {
             id: string;
             /** Order */
             order: number;
+            /**
+             * Wave
+             * @default 0
+             */
+            wave: number;
             /** Title */
             title: string;
             /** Description */
@@ -947,6 +952,8 @@ export interface components {
             dependsOn?: string[];
             /** Affectedbyquestions */
             affectedByQuestions?: string[];
+            /** Findings */
+            findings?: components["schemas"]["StepFinding"][];
             /** Notes */
             notes?: string | null;
         };
@@ -1175,6 +1182,27 @@ export interface components {
             library: "zustand" | "context" | "none";
             /** Stores */
             stores?: components["schemas"]["Store"][];
+        };
+        /**
+         * StepFinding
+         * @description An issue/TODO that pertains to one of a step's targets.
+         *
+         *     Associated by the Planner over real KG ids (matched by source file), so a
+         *     finding attaches to *every* step that touches the file — not only the
+         *     component-conversion waves. ``componentId`` is the KG id it came from.
+         */
+        StepFinding: {
+            /** Componentid */
+            componentId: string;
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "blocker";
+            /** Message */
+            message: string;
         };
         /** Store */
         Store: {

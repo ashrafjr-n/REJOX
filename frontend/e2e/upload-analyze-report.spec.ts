@@ -7,6 +7,7 @@ import { expect, test } from '@playwright/test'
 const dir = path.dirname(fileURLToPath(import.meta.url))
 const SHOTS = path.resolve(dir, '../../docs/screenshots')
 const ZIP = path.join(dir, 'fixtures', 'sample-app.zip')
+const API = 'http://localhost:8000'
 
 /** Mirror the frontend's formatScore() so on-screen text can be asserted. */
 function formatScore(value: number): string {
@@ -32,27 +33,16 @@ interface AnalyzeResponse {
 
 interface PlanStepLite {
   id: string
-  dependsOn?: string[]
+  wave: number
 }
 
-/** Same longest-path layering the app uses — the expected wave count. */
+/** Distinct wave count, sourced straight from the backend's step.wave. */
 function waveCount(steps: PlanStepLite[]): number {
-  const byId = new Map(steps.map((s) => [s.id, s]))
-  const memo = new Map<string, number>()
-  const depth = (id: string): number => {
-    const cached = memo.get(id)
-    if (cached !== undefined) return cached
-    const s = byId.get(id)
-    const deps = (s?.dependsOn ?? []).filter((d) => byId.has(d))
-    const w = !s || deps.length === 0 ? 0 : 1 + Math.max(...deps.map(depth))
-    memo.set(id, w)
-    return w
-  }
-  const maxW = steps.length ? Math.max(...steps.map((s) => depth(s.id))) : -1
-  return maxW + 1
+  return new Set(steps.map((s) => s.wave)).size
 }
 
 test('Upload → Analyze → Report against the real backend', async ({ page }) => {
+  test.setTimeout(300_000) // the full path includes a real ~2-min migration
   fs.mkdirSync(SHOTS, { recursive: true })
 
   // --- 1 · Upload screen ---------------------------------------------------
@@ -142,19 +132,79 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
   await expect(page.getByTestId('ask-question')).toHaveCount(questions.length)
   await page.screenshot({ path: path.join(SHOTS, '06-ask.png'), fullPage: true })
 
-  // --- 6 · Submit answers to the real /api/migrate -------------------------
+  // --- 6 · Submit → the migration job starts -------------------------------
   const migrateResponse = page.waitForResponse(
     (r) => r.url().includes('/api/migrate') && r.request().method() === 'POST',
   )
   await page.getByRole('button', { name: /Start migration/i }).click()
   const migrate = await migrateResponse
   expect(migrate.status(), 'migrate accepted the answers (202)').toBe(202)
-  expect((await migrate.json()).jobId, 'migrate returned a jobId').toBeTruthy()
-  await expect(page.getByTestId('submitted')).toBeVisible()
+  const jobId = (await migrate.json()).jobId as string
+  expect(jobId, 'migrate returned a jobId').toBeTruthy()
+
+  // --- 7 · Migrate screen streams real events ------------------------------
+  await expect(page.getByTestId('migrate-screen')).toBeVisible()
+  // Capture the live streaming state (a stage in flight — no terminal yet).
+  await expect(page.getByTestId('stage-emit')).toHaveAttribute('data-state', 'done', {
+    timeout: 60_000,
+  })
+  await page.screenshot({ path: path.join(SHOTS, '07-migrating.png'), fullPage: true })
+
+  // --- 8 · Terminal: validated result + download ---------------------------
+  await expect(page.getByTestId('migrate-result')).toBeVisible({ timeout: 220_000 })
+
+  // The canonical numbers: the job's own MigrationResult (source of truth).
+  const job = await (await page.request.get(`${API}/api/jobs/${jobId}`)).json()
+  const result = job.result
+  expect(result, 'job finished with a result').toBeTruthy()
+
+  // On-screen verdicts equal the backend's.
+  await expect(page.getByTestId('migrate-tsc')).toHaveText(
+    result.typecheckPassed ? 'tsc PASS' : 'tsc FAIL',
+  )
+  await expect(page.getByTestId('migrate-metro')).toHaveText(
+    result.bundlePassed ? 'Metro PASS' : /Metro/,
+  )
+  expect(result.typecheckPassed, 'tsc passed').toBe(true)
+  expect(result.bundlePassed, 'Metro passed').toBe(true)
+
+  // The thesis: exactly one LLM call, shown on screen == the result.
+  expect(result.llmCalls).toBe(1)
+  await expect(page.getByTestId('migrate-llm-calls')).toHaveText(String(result.llmCalls))
+
+  // Validated numbers on screen equal the terminal MigrationResult.
+  const fmt = (v: number) => {
+    const r = Math.round(v * 10) / 10
+    return Number.isInteger(r) ? String(r) : r.toFixed(1)
+  }
+  await expect(page.getByTestId('validated-coverage')).toHaveText(
+    fmt(result.validatedScores.workingCoverage),
+  )
+  await expect(page.getByTestId('validated-confidence')).toHaveText(
+    fmt(result.validatedScores.confidence),
+  )
+
+  // Predicted and validated are shown as SEPARATE values (two distinct axes).
+  const predictedCov = await page.getByTestId('predicted-coverage').textContent()
+  const validatedCov = await page.getByTestId('validated-coverage').textContent()
+  expect(predictedCov).not.toBeNull()
+  expect(predictedCov).not.toBe(validatedCov) // sample-app: 82.x predicted vs 100 validated
+
+  await page.screenshot({ path: path.join(SHOTS, '08-validated.png'), fullPage: true })
+
+  // --- 9 · Download returns a real file ------------------------------------
+  const href = await page.getByTestId('download-button').getAttribute('href')
+  expect(href).toContain(`/api/runs/${result.runId}/download`)
+  const dl = await page.request.get(href!)
+  expect(dl.status()).toBe(200)
+  expect(dl.headers()['content-type']).toContain('zip')
+  expect((await dl.body()).length).toBeGreaterThan(0)
 
   // eslint-disable-next-line no-console
   console.log(
-    `[e2e] plan: ${steps.length} nodes, ${expectedWaves} waves; ` +
-      `ask: ${questions.length} questions; migration started`,
+    `[e2e] plan ${steps.length}/${expectedWaves}; ask ${questions.length}; ` +
+      `migrate tsc=${result.typecheckPassed} metro=${result.bundlePassed} ` +
+      `llm=${result.llmCalls} validatedCov=${result.validatedScores.workingCoverage} ` +
+      `predictedCov=${report.coverage}`,
   )
 })

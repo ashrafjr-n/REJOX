@@ -123,6 +123,45 @@ def test_download_before_migrate_is_404(client) -> None:
     assert dl.status_code == 404
 
 
+def test_plan_is_cached_per_run(client, monkeypatch) -> None:
+    """A second /api/plan for the same runId is served from the workspace cache
+    — it must not rebuild the knowledge graph (the expensive recompute)."""
+    import app.main as main
+
+    up = client.post(
+        "/api/upload",
+        files={"file": ("sample-app.zip", _sample_zip(), "application/zip")},
+    )
+    run_id = up.json()["runId"]
+
+    calls = {"n": 0}
+    real_build = main.build_knowledge_graph
+
+    def counting(src):
+        calls["n"] += 1
+        return real_build(src)
+
+    monkeypatch.setattr(main, "build_knowledge_graph", counting)
+
+    first = client.post("/api/plan", json={"runId": run_id})
+    assert first.status_code == 200, first.text
+    assert calls["n"] == 1, "first call computes the plan once"
+
+    second = client.post("/api/plan", json={"runId": run_id})
+    assert second.status_code == 200, second.text
+    assert calls["n"] == 1, "second call is served from cache — no re-parse"
+
+    # Identical plan both times, carrying the fields the Planner now owns.
+    assert first.json() == second.json()
+    steps = second.json()["plan"]["steps"]
+    assert steps and all("wave" in s and "findings" in s for s in steps)
+
+    # /api/analyze for the same run is also cache-served (no extra parse).
+    analyzed = client.post("/api/analyze", json={"runId": run_id})
+    assert analyzed.status_code == 200
+    assert calls["n"] == 1
+
+
 def test_download_unknown_run_is_404(client) -> None:
     assert client.get("/api/runs/deadbeefdeadbeef/download").status_code == 404
 

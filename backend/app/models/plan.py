@@ -13,7 +13,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.analysis import AnalysisReport
+from app.models.analysis import AnalysisReport, Severity
 
 StepKind = Literal[
     "setup", "routing", "components", "styling", "state", "api",
@@ -58,9 +58,27 @@ class Question(PlanBase):
 # --- Plan steps -------------------------------------------------------------
 
 
+class StepFinding(PlanBase):
+    """An issue/TODO that pertains to one of a step's targets.
+
+    Associated by the Planner over real KG ids (matched by source file), so a
+    finding attaches to *every* step that touches the file — not only the
+    component-conversion waves. ``componentId`` is the KG id it came from.
+    """
+
+    componentId: str
+    code: str
+    severity: Severity
+    message: str
+
+
 class PlanStep(PlanBase):
     id: str
     order: int
+    # Topological wave (0-based) — the step's longest-path layer over
+    # ``dependsOn``. The Planner's own concept (leaves = 0), stated here so the
+    # UI never has to recompute it. Distinct from ``order`` (the linear sequence).
+    wave: int = 0
     title: str
     description: str
     kind: StepKind
@@ -68,6 +86,8 @@ class PlanStep(PlanBase):
     estimatedEffort: Effort
     dependsOn: list[str] = Field(default_factory=list)
     affectedByQuestions: list[str] = Field(default_factory=list)
+    # Issues/TODOs on this step's targets (empty when the step is clean).
+    findings: list[StepFinding] = Field(default_factory=list)
     notes: Optional[str] = None
 
 
