@@ -106,25 +106,11 @@
 }
 
 .rx-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
+  display: block;
   height: 42px;
-  border-radius: 11px;
-  background: var(--rx-orange);
-  color: var(--rx-black);
-  font-weight: 800;
-  font-size: 22px;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  user-select: none;
-  box-shadow: 0 6px 20px rgba(255, 106, 0, 0.28);
-}
-.rx-logo img {
-  width: 100%;
-  height: 100%;
+  width: auto;
   object-fit: contain;
+  user-select: none;
 }
 
 /* centered capsule nav */
@@ -153,14 +139,14 @@
   transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 .rx-nav-item:hover {
-  background: var(--rx-orange);
+  background: var(--rx-light-silver);
   color: var(--rx-black);
-  border-color: var(--rx-orange);
+  border-color: var(--rx-light-silver);
 }
 .rx-nav-item.is-active {
-  background: var(--rx-orange);
+  background: var(--rx-light-silver);
   color: var(--rx-black);
-  border-color: var(--rx-orange);
+  border-color: var(--rx-light-silver);
   font-weight: 600;
 }
 .rx-nav-item.is-inactive {
@@ -171,7 +157,7 @@
 .rx-cta-pill {
   appearance: none;
   border: none;
-  background: var(--rx-orange);
+  background: var(--rx-light-silver);
   color: var(--rx-black);
   font-size: 13px;
   font-weight: 600;
@@ -180,11 +166,11 @@
   cursor: pointer;
   white-space: nowrap;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
-  box-shadow: 0 6px 18px rgba(255, 106, 0, 0.25);
+  box-shadow: 0 6px 18px rgba(201, 201, 206, 0.35);
 }
 .rx-cta-pill:hover {
   transform: scale(1.04);
-  box-shadow: 0 8px 24px rgba(255, 106, 0, 0.4);
+  box-shadow: 0 8px 24px rgba(201, 201, 206, 0.55);
 }
 
 /* ============================ mid: left block ============================ */
@@ -228,7 +214,7 @@
   gap: 10px;
   appearance: none;
   border: none;
-  background: var(--rx-orange);
+  background: var(--rx-light-silver);
   color: var(--rx-black);
   font-size: 13px;
   font-weight: 700;
@@ -238,11 +224,11 @@
   border-radius: 999px;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
-  box-shadow: 0 8px 22px rgba(255, 106, 0, 0.28);
+  box-shadow: 0 8px 22px rgba(201, 201, 206, 0.32);
 }
 .rx-start:hover {
   transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 12px 30px rgba(255, 106, 0, 0.42);
+  box-shadow: 0 12px 30px rgba(201, 201, 206, 0.5);
 }
 .rx-start svg {
   width: 16px;
@@ -294,7 +280,12 @@
    (JS) that slides up over the pinned hero; in reduced-motion it stays here in
    normal flow, stacked directly below the hero. */
 .rx-section2 {
-  height: 100vh;
-  min-height: 100svh;
+  /* extra height beyond one viewport = the settle overshoot below, so the
+     panel still covers the viewport flush at the bottom once its top edge
+     (and rounded corners) have scrolled past the top of the screen. */
+  height: calc(100vh + 56px);
+  min-height: calc(100svh + 56px);
   background: #ffffff;
+  border-top-left-radius: 32px;
+  border-top-right-radius: 32px;
 }
