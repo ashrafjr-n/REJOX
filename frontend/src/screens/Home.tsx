@@ -14,8 +14,12 @@ gsap.registerPlugin(ScrollTrigger)
  * One scrubbed timeline drives the whole sequence while the hero stays pinned
  * (fixed) the entire time:
  *   Phase 1 (progress 0 → 0.55): the flood. Black bg floods to #B0480C, REJOX
- *     crossfades outlined → solid white, the left text turns white and every
- *     orange-on-black accent inverts. Fully completes by ~0.55.
+ *     crossfades outlined → solid white (while also shrinking from a taller
+ *     rest height down to today's height, width locked throughout), the left
+ *     text turns white, and the Login pill inverts. Header nav items
+ *     (Home/About/Docs/Features) and the hero "Start migration" button/chip
+ *     are intentionally locked — their color never moves with scroll.
+ *     Fully completes by ~0.55.
  *   Phase 2 (progress 0.55 → 1): Section 02 (white) slides up from the bottom
  *     (translateY 100% → 0), overlapping and fully covering the fixed hero.
  *     The hero never moves — only Section 02 travels.
@@ -27,8 +31,21 @@ gsap.registerPlugin(ScrollTrigger)
  * *when* the slide starts — a single scrubbed timeline expresses that exactly,
  * whereas pure sticky couples the slide to raw scroll position.
  *
+ * The header is a THIRD sibling of the hero and Section 02 (not nested inside
+ * either), styled `position: fixed` with z-index above both (z50 vs hero z1 /
+ * Section 02 z2) — this is deliberate: nesting it inside `.rx-hero` would trap
+ * it under that element's own stacking context (position:absolute + z-index),
+ * so no z-index on the header could ever lift it above Section 02 once that
+ * panel slides over. Being a plain sibling avoids that trap, and it stays
+ * visible past the pinned sequence entirely, for the whole page. GSAP's
+ * `.rx-cta-pill` selector-tween still finds it because gsap.context's scope is
+ * `home` (the shared ancestor), not `hero`. `.rx-mid` carries a compensating
+ * margin-top (39.5px) so removing the header from `.rx-frame`'s flex flow
+ * doesn't shift the left content block that used to sit below it.
+ *
  * prefers-reduced-motion: no pin/scrub/slide. The static rest hero renders,
- * with Section 02 stacked normally below it (the default document flow).
+ * with Section 02 stacked normally below it (the default document flow); the
+ * header stays fixed regardless, since that's independent of the animation.
  * Everything is scoped under `.rx-home`; the /app workflow is untouched.
  */
 
@@ -114,27 +131,21 @@ export function Home() {
       tl.fromTo('.rx-flood', { scale: 0.001 }, { scale: 1.35, duration: d }, 0)
       tl.to('.rx-glow', { opacity: 0, duration: d * 0.5 }, 0)
       tl.to('.rx-wordmark-fill', { opacity: 1, duration: d }, 0)
+      // Height-only: scaleY never touches the X axis, so width is locked at
+      // every scroll position. Runs on the same 0→d timeline as the fill
+      // crossfade above, alongside it rather than replacing it.
+      tl.to('.rx-wordmark', { scaleY: 1, duration: d }, 0)
       tl.to('.rx-label', { color: WHITE, duration: d }, 0)
       tl.to('.rx-rule', { backgroundColor: WHITE, duration: d }, 0)
       tl.to('.rx-sentence', { color: WHITE, duration: d }, 0)
-      tl.to(
-        '.rx-start',
-        { backgroundColor: BLACK, color: WHITE, boxShadow: '0 8px 22px rgba(0,0,0,0.35)', duration: d },
-        0,
-      )
-      tl.to(
-        '.rx-nav-item.is-active',
-        { backgroundColor: BLACK, color: WHITE, borderColor: BLACK, duration: d },
-        0,
-      )
+      // The hero "Start migration" button and its chip are intentionally NOT
+      // tweened — like the nav items, their color is locked to one fixed
+      // scheme (light-silver pill, black chip) at every scroll position.
+      // Nav items (Home/About/Docs/Features) are also NOT tweened — their
+      // color is locked and must not move with scroll progress.
       tl.to(
         '.rx-cta-pill',
         { backgroundColor: BLACK, color: WHITE, boxShadow: '0 6px 18px rgba(0,0,0,0.3)', duration: d },
-        0,
-      )
-      tl.to(
-        '.rx-nav-item.is-inactive',
-        { color: WHITE, borderColor: 'rgba(255,255,255,0.55)', duration: d },
         0,
       )
 
@@ -155,40 +166,44 @@ export function Home() {
 
   return (
     <div className="rx-home" ref={homeRef}>
+      {/* ---------- floating capsule header: fixed to the viewport, sibling
+          of both the hero and Section 02 (not nested in either) so it stays
+          visible above both for the whole page, not just the pinned hero
+          sequence — see the file doc comment for why it can't live inside
+          `.rx-hero` and still escape via z-index. ---------- */}
+      <motion.header
+        className="rx-header"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <img className="rx-logo" src={rejoxLogo} alt="Rejox" />
+
+        <nav className="rx-nav" aria-label="Primary">
+          {NAV_ITEMS.map((item, i) => (
+            <button
+              key={item}
+              type="button"
+              className={
+                'rx-nav-item ' + (i === 0 ? 'is-active' : 'is-inactive')
+              }
+              aria-current={i === 0 ? 'page' : undefined}
+            >
+              {item}
+            </button>
+          ))}
+        </nav>
+
+        <button type="button" className="rx-cta-pill">
+          Login
+        </button>
+      </motion.header>
+
       <div className="rx-hero" ref={heroRef}>
         <div className="rx-glow" />
         <div className="rx-flood" />
 
         <div className="rx-frame">
-          {/* ---------- floating capsule header ---------- */}
-          <motion.header
-            className="rx-header"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <img className="rx-logo" src={rejoxLogo} alt="Rejox" />
-
-            <nav className="rx-nav" aria-label="Primary">
-              {NAV_ITEMS.map((item, i) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={
-                    'rx-nav-item ' + (i === 0 ? 'is-active' : 'is-inactive')
-                  }
-                  aria-current={i === 0 ? 'page' : undefined}
-                >
-                  {item}
-                </button>
-              ))}
-            </nav>
-
-            <button type="button" className="rx-cta-pill">
-              Login
-            </button>
-          </motion.header>
-
           {/* ---------- mid: left content block; center/right left empty ---------- */}
           <div className="rx-mid">
             <motion.div
@@ -206,8 +221,10 @@ export function Home() {
                 Native architecture, powered by AI.
               </p>
               <button type="button" className="rx-start">
-                Start migration
-                <ArrowRight />
+                <span className="rx-start-label">Start migration</span>
+                <span className="rx-start-chip" aria-hidden="true">
+                  <ArrowRight />
+                </span>
               </button>
             </motion.div>
           </div>
