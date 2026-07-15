@@ -63,31 +63,49 @@
   z-index: 0;
 }
 
-/* --- the orange FLOOD: a top-left-anchored radial with a feathered leading
-   edge, scaled up by scroll. Soft/organic edge (no hard circle rim). Sits
-   above the black bg + glow, below the framed content so text stays readable. */
-.rx-flood {
+/* --- the orange FLOOD: multiple irregular ink-blot shapes, each scattered at
+   its own origin across the hero, growing independently (staggered, see
+   Home.tsx) until their union reads as one seamless solid #B0480C field.
+   Replaces the old single top-left-anchored growing circle.
+
+   Each blob is a hand-authored organic SVG path (closed Catmull-Rom spline
+   through a perturbed circle) rather than an feTurbulence/feDisplacementMap
+   filter — no filter recomputation risk at all, cross-browser-predictable,
+   and cheap: only `transform: scale()` is ever animated, so the browser can
+   composite each blob's already-rasterized shape on the GPU without
+   recomputing any geometry per frame. Fill is flat/opaque (no gradient, no
+   blur) so overlapping blobs are pixel-identical where they overlap — that's
+   what actually guarantees "no visible seams", rather than something that
+   needs to be carefully tuned. */
+.rx-blobs {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 170vmax;
-  height: 170vmax;
-  transform-origin: 0 0;
-  /* invisible at rest (scale ~0) so progress 0 is exactly the rest state,
-     including under prefers-reduced-motion where no JS runs. */
-  transform: scale(0.001);
-  pointer-events: none;
+  inset: 0;
   z-index: 0;
-  will-change: transform;
-  background: radial-gradient(
-    circle at 0 0,
-    #b0480c 0%,
-    #b0480c 46%,
-    rgba(176, 72, 12, 0.85) 56%,
-    rgba(176, 72, 12, 0.4) 66%,
-    rgba(176, 72, 12, 0) 73%
-  );
+  pointer-events: none;
 }
+.rx-blob {
+  position: absolute;
+  width: 110vmax;
+  height: 110vmax;
+  /* invisible at rest — opacity:0 as well as scale~0, since a scale(0.001)
+     shape still rasterizes as a faint sub-pixel dot against pure black.
+     This is the rest-state default (also what prefers-reduced-motion
+     permanently sees, since no JS runs to animate it further). */
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.001);
+  will-change: transform, opacity;
+}
+.rx-blob svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.rx-blob-1 { top: 6%; left: 8%; }
+.rx-blob-2 { top: 10%; left: 92%; }
+.rx-blob-3 { top: 42%; left: 46%; }
+.rx-blob-4 { top: 88%; left: 14%; }
+.rx-blob-5 { top: 92%; left: 86%; }
+.rx-blob-6 { top: 100%; left: 50%; }
 
 /* --- the bounding frame: 1px hairline inset from all four edges --- */
 .rx-frame {
