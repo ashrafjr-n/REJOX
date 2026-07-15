@@ -14,12 +14,11 @@ const STEPPER: { id: Stage; label: string }[] = [
   { id: 'report', label: 'Report' },
   { id: 'plan', label: 'Plan' },
   { id: 'ask', label: 'Ask' },
+  { id: 'migrate', label: 'Migrate' },
 ]
 
 function Stepper({ stage }: { stage: Stage }) {
-  // 'submitted' is past the last stage — everything reads as done.
-  const activeIndex =
-    stage === 'submitted' ? STEPPER.length : STEPPER.findIndex((s) => s.id === stage)
+  const activeIndex = STEPPER.findIndex((s) => s.id === stage)
   return (
     <nav className="hidden items-center gap-1 md:flex" aria-label="Pipeline progress">
       {STEPPER.map((step, i) => {

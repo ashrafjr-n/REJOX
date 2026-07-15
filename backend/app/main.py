@@ -18,7 +18,7 @@ import os
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeVar
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -174,6 +174,35 @@ def upload_github(req: GithubUploadRequest) -> IngestedProject:
 
 # --- analysis stages ---------------------------------------------------------
 
+# Per-run caches. A run's source is immutable after ingest, so the analysis and
+# plan derived from it never change for that runId — a second call is a read.
+# The cache is invalidated only by a new upload (new runId → fresh workspace) or
+# the run being reaped (TTL sweep / cleanup). A stale/corrupt file is ignored
+# and recomputed, which also covers a schema change across versions.
+_ANALYSIS_CACHE = "analysis.json"
+_PLAN_CACHE = "plan.json"
+
+_ModelT = TypeVar("_ModelT", bound=BaseModel)
+
+
+def _run_for(req: SourceRequest) -> Optional[workspace.Run]:
+    """The run backing this request (for caching), or None in local-path mode."""
+    return _get_run_or_404(req.runId) if req.runId else None
+
+
+def _read_cache(run: workspace.Run, name: str, model: type[_ModelT]) -> Optional[_ModelT]:
+    path = run.root / name
+    if not path.is_file():
+        return None
+    try:
+        return model.model_validate_json(path.read_text())
+    except Exception:  # stale/corrupt (e.g. schema drift) → recompute
+        return None
+
+
+def _write_cache(run: workspace.Run, name: str, value: BaseModel) -> None:
+    (run.root / name).write_text(value.model_dump_json())
+
 
 @app.post("/api/parse", response_model=KnowledgeGraph)
 def parse(req: SourceRequest) -> KnowledgeGraph:
@@ -183,16 +212,38 @@ def parse(req: SourceRequest) -> KnowledgeGraph:
 
 @app.post("/api/analyze", response_model=AnalysisReport)
 def analyze(req: SourceRequest) -> AnalysisReport:
-    """Analysis stage: parse the project, then analyze migratability."""
-    return analyze_graph(_build_kg(_source_for(req)))
+    """Analysis stage: parse the project, then analyze migratability (cached per run)."""
+    run = _run_for(req)
+    if run is not None:
+        cached = _read_cache(run, _ANALYSIS_CACHE, AnalysisReport)
+        if cached is not None:
+            return cached
+        plan_cached = _read_cache(run, _PLAN_CACHE, PlanResponse)
+        if plan_cached is not None:
+            return plan_cached.report
+
+    report = analyze_graph(_build_kg(_source_for(req)))
+    if run is not None:
+        _write_cache(run, _ANALYSIS_CACHE, report)
+    return report
 
 
 @app.post("/api/plan", response_model=PlanResponse)
 def plan(req: SourceRequest) -> PlanResponse:
-    """Plan stage: parse + analyze + plan; returns the report and plan together."""
+    """Plan stage: parse + analyze + plan (cached per run — a 2nd call is a read)."""
+    run = _run_for(req)
+    if run is not None:
+        cached = _read_cache(run, _PLAN_CACHE, PlanResponse)
+        if cached is not None:
+            return cached
+
     kg = _build_kg(_source_for(req))
     report = analyze_graph(kg)
-    return PlanResponse(report=report, plan=plan_migration(report, kg))
+    response = PlanResponse(report=report, plan=plan_migration(report, kg))
+    if run is not None:
+        _write_cache(run, _PLAN_CACHE, response)
+        _write_cache(run, _ANALYSIS_CACHE, report)
+    return response
 
 
 # --- Migrate stage -----------------------------------------------------------

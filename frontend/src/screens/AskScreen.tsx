@@ -15,7 +15,7 @@ export function AskScreen() {
   const plan = usePipelineStore((s) => s.plan)
   const answers = usePipelineStore((s) => s.answers)
   const setAnswer = usePipelineStore((s) => s.setAnswer)
-  const markSubmitted = usePipelineStore((s) => s.markSubmitted)
+  const beginMigration = usePipelineStore((s) => s.beginMigration)
   const goToPlan = usePipelineStore((s) => s.goToPlan)
   const reset = usePipelineStore((s) => s.reset)
 
@@ -62,7 +62,7 @@ export function AskScreen() {
     )
     try {
       const job = await startMigration(source, payload)
-      markSubmitted(job.jobId)
+      beginMigration(job.jobId)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not start the migration.')
       setSubmitting(false)

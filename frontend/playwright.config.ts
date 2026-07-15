@@ -33,8 +33,10 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: {
-        // Prove the analyze path needs no LLM key.
+        // No real key needed; the offline provider makes the one deterministic
+        // navigator-shape LLM call, so a migration reports exactly 1 LLM call.
         GEMINI_API_KEY: '',
+        REJOX_AI_PROVIDER: 'fake',
         REJOX_CORS_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173',
       },
     },

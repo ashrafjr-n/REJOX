@@ -18,21 +18,23 @@ import { Panel } from '../components/ui/Panel'
 import { AlertIcon, ArrowRightIcon } from '../components/icons'
 import { cn } from '../lib/cn'
 import {
-  computeWaves,
   findingsForStep,
+  groupByWave,
   positionOf,
   stepIsFlagged,
 } from '../lib/planGraph'
 import { EFFORT_TONE, STEP_KIND_TONE } from '../lib/display'
 import { usePipelineStore } from '../store/pipelineStore'
-import type {
-  ManualReviewCandidate,
-  MigrationPlan,
-  PlanStep,
-  SourceRequest,
-} from '../types/api'
+import type { MigrationPlan, PlanStep, Severity, SourceRequest } from '../types/api'
 
 const NODE_TYPES = { planStep: PlanNode }
+
+/** Finding severity → literal text color class (kept static for Tailwind JIT). */
+const SEVERITY_TEXT: Record<Severity, string> = {
+  info: 'text-info',
+  warning: 'text-warn',
+  blocker: 'text-danger',
+}
 
 export function PlanScreen() {
   const ingest = usePipelineStore((s) => s.ingest)
@@ -118,7 +120,8 @@ function PlanView({
   const questions = plan.questions ?? []
   const unsupported = plan.unsupportedItems ?? []
 
-  const { waves } = useMemo(() => computeWaves(steps), [steps])
+  // Waves come straight from the backend (step.wave) — no recomputation here.
+  const { waves } = useMemo(() => groupByWave(steps), [steps])
 
   const { nodes, edges } = useMemo(() => {
     const nodes: Node<PlanNodeData>[] = []
@@ -130,7 +133,7 @@ function PlanView({
           position: positionOf(waveIndex, rowIndex),
           data: {
             step,
-            findingCount: findingsForStep(step, candidates).length,
+            findingCount: findingsForStep(step).length,
             gated: (step.affectedByQuestions ?? []).length > 0,
           },
         })
@@ -150,7 +153,7 @@ function PlanView({
       }
     }
     return { nodes, edges }
-  }, [waves, steps, candidates])
+  }, [waves, steps])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected = steps.find((s) => s.id === selectedId) ?? null
@@ -226,7 +229,7 @@ function PlanView({
         {/* Side panel — details of the selected node (real plan fields only). */}
         <div className="lg:h-[560px] lg:overflow-y-auto">
           {selected ? (
-            <StepDetail step={selected} candidates={candidates} />
+            <StepDetail step={selected} />
           ) : (
             <Panel title="Inspect a step" className="h-full">
               <p className="text-[13px] leading-relaxed text-ink-3">
@@ -281,18 +284,12 @@ function PlanView({
   )
 }
 
-function StepDetail({
-  step,
-  candidates,
-}: {
-  step: PlanStep
-  candidates: ManualReviewCandidate[]
-}) {
+function StepDetail({ step }: { step: PlanStep }) {
   const targets = step.targets ?? []
   const deps = step.dependsOn ?? []
   const gates = step.affectedByQuestions ?? []
-  const findings = findingsForStep(step, candidates)
-  const flagged = stepIsFlagged(step, candidates)
+  const findings = findingsForStep(step)
+  const flagged = stepIsFlagged(step)
 
   return (
     <Panel
@@ -337,12 +334,20 @@ function StepDetail({
       )}
 
       {findings.length > 0 && (
-        <Section title="Manual-review findings">
+        <Section title={`Findings (${findings.length})`}>
           <ul className="space-y-1.5">
-            {findings.map((f) => (
-              <li key={f.componentId} className="flex gap-2 text-[12px] text-warn">
-                <AlertIcon className="mt-0.5 shrink-0 text-[13px]" />
-                <span className="text-ink-2">{f.reason}</span>
+            {findings.map((f, i) => (
+              <li key={`${f.componentId}-${f.code}-${i}`} className="flex gap-2 text-[12px]">
+                <AlertIcon
+                  className={cn('mt-0.5 shrink-0 text-[13px]', SEVERITY_TEXT[f.severity])}
+                />
+                <span className="min-w-0">
+                  <span className="font-mono text-[10.5px] text-ink-4">{f.code}</span>{' '}
+                  <span className="text-ink-2">{f.message}</span>
+                  <span className="block truncate font-mono text-[10.5px] text-ink-4">
+                    {f.componentId}
+                  </span>
+                </span>
               </li>
             ))}
           </ul>

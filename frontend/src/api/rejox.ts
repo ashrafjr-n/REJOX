@@ -10,6 +10,7 @@ import type {
   AnalysisReport,
   IngestedProject,
   JobCreated,
+  JobState,
   PlanResponse,
   SourceRequest,
   ValidationError,
@@ -114,6 +115,20 @@ export async function startMigration(
   const body = { ...source, answers, install: true, runBundle: true }
   try {
     const { data } = await api.post<JobCreated>('/api/migrate', body)
+    return data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+/**
+ * Job state — the reconstructable source of truth for a migration job (status,
+ * every event so far, terminal result/error). Read on mount before/instead of
+ * streaming, so a late joiner or reconnect loses nothing.
+ */
+export async function getJob(jobId: string): Promise<JobState> {
+  try {
+    const { data } = await api.get<JobState>(`/api/jobs/${jobId}`)
     return data
   } catch (err) {
     throw toApiError(err)
