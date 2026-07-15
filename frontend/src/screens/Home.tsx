@@ -1,58 +1,85 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 import './Home.css'
 import rejoxLogo from '../assets/rejox-logo.png'
 
-gsap.registerPlugin(ScrollTrigger)
-
 /**
- * Rejox marketing home — hero + a pinned OVERLAP reveal into Section 02.
+ * Rejox marketing home — hero + a scroll-TRIGGERED (not scroll-linked) two
+ * stage reveal into Section 02.
  *
- * One scrubbed timeline drives the whole sequence while the hero stays pinned
- * (fixed) the entire time:
- *   Phase 1 (progress 0 → 0.55): the flood — six irregular ink-blot shapes
- *     (BLOBS below), scattered at different origins across the hero, each
- *     growing from scale~0 on its own staggered slice of the same 0→d
- *     timeline (no independent timers, fully scrubbable/reversible). Their
- *     union reads as solid #B0480C by ~0.55 with no visible seams, because
- *     every blob is the same flat opaque fill — see Home.css for why that
- *     (not a gradient) is what actually guarantees seamlessness. REJOX
- *     crossfades outlined → solid white (while also shrinking from a taller
- *     rest height down to today's height, width locked throughout), the left
- *     text turns white, and the Login pill inverts. Header nav items
- *     (Home/About/Docs/Features) and the hero "Start migration" button/chip
- *     are intentionally locked — their color never moves with scroll.
- *     Fully completes by ~0.55.
- *   Phase 2 (progress 0.55 → 1): Section 02 (white) slides up from the bottom
- *     (translateY 100% → 0), overlapping and fully covering the fixed hero.
- *     The hero never moves — only Section 02 travels.
+ * This used to be one scrubbed ScrollTrigger timeline mapping scroll position
+ * 1:1 to progress (partial scroll = partial animation, reversible by
+ * scrolling back). It's now two independent, fixed-duration, one-shot GSAP
+ * timelines fired by discrete scroll GESTURES rather than driven by scroll
+ * position:
  *
- * Technique: GSAP ScrollTrigger pins a one-viewport stage that holds the hero
- * (layer z1) and Section 02 (layer z2). Both are transform/opacity only, so
- * nothing animates layout. Chose a GSAP pin over CSS sticky because the two
- * phases need precise, independent control of *when* the flood finishes and
- * *when* the slide starts — a single scrubbed timeline expresses that exactly,
- * whereas pure sticky couples the slide to raw scroll position.
+ *   Stage A (flood, STAGE_A_DURATION ≈ 1.2s): the first wheel/touch input
+ *     at rest plays the blob spread + REJOX outline→solid-white crossfade
+ *     (+ height settle) + label/rule/sentence color + Login pill inversion
+ *     to full completion, regardless of whether the user keeps scrolling or
+ *     stops immediately. Every sub-tween keeps the exact same relative
+ *     start/duration proportions it had under the old scrubbed timeline —
+ *     they were already expressed as fractions of a 0→d span, so porting
+ *     them just means swapping that span's unit from "fraction of scroll
+ *     progress" to "fraction of STAGE_A_DURATION seconds". The choreography
+ *     is unchanged; only what drives it is.
+ *   Stage B (overlap reveal, STAGE_B_DURATION = 1s): only once Stage A has
+ *     fully completed does the NEXT scroll input play Section 02's
+ *     slide-up-to-cover-hero to completion, same one-shot fixed-duration
+ *     approach.
  *
- * The header is a THIRD sibling of the hero and Section 02 (not nested inside
- * either), styled `position: fixed` with z-index above both (z50 vs hero z1 /
- * Section 02 z2) — this is deliberate: nesting it inside `.rx-hero` would trap
- * it under that element's own stacking context (position:absolute + z-index),
- * so no z-index on the header could ever lift it above Section 02 once that
- * panel slides over. Being a plain sibling avoids that trap, and it stays
- * visible past the pinned sequence entirely, for the whole page. GSAP's
- * `.rx-cta-pill` selector-tween still finds it because gsap.context's scope is
- * `home` (the shared ancestor), not `hero`. `.rx-mid` carries a compensating
- * margin-top (39.5px) so removing the header from `.rx-frame`'s flex flow
- * doesn't shift the left content block that used to sit below it.
+ * Trigger + lock mechanism: a persistent `wheel`/`touchstart`/`touchmove`
+ * listener pair on `window`, not GSAP ScrollTrigger. ScrollTrigger's
+ * onEnter/toggleActions lifecycle is built around real scroll position
+ * crossing a marker — it doesn't give the fine-grained "swallow every input
+ * during this specific 1.2s, then listen for exactly one more gesture,
+ * directionally" control this needs, so a small manual state machine
+ * (`Stage` below) is a better fit. `home` has a fixed height:100vh and both
+ * the hero and Section 02 are absolutely-positioned overlays inside it (as
+ * before) — there is no real extra document height to scroll into during
+ * the two-stage sequence, so every "scroll" here is virtual: we
+ * preventDefault the input and react to its direction/magnitude, rather
+ * than reading real scrollTop. `document.documentElement`/`body` also get
+ * `overflow: hidden` for the ~1.2s / ~1s a timeline is actively playing, as
+ * a second, CSS-level guarantee against any scroll (incl. keyboard/
+ * scrollbar-drag) leaking through mid-animation — belt and suspenders with
+ * the preventDefault calls, which are what actually gate the *triggering*
+ * logic.
  *
- * prefers-reduced-motion: no pin/scrub/slide. The static rest hero renders,
- * with Section 02 stacked normally below it (the default document flow); the
- * header stays fixed regardless, since that's independent of the animation.
- * Everything is scoped under `.rx-home`; the /app workflow is untouched.
+ * Reverse/reset: proper reverse-PLAY (`tl.reverse()`), not an instant
+ * `pause(0)` cut. Each timeline gets its own reverse counterpart state
+ * (`reverseA/reverseB`) so a reverse gesture is treated exactly like a
+ * forward one — a fixed-duration, eased, one-shot animation that swallows
+ * further input until it finishes (`onReverseComplete`, GSAP's mirror of
+ * `onComplete`). The one deliberate asymmetry: a reverse gesture during an
+ * ACTIVE forward play (`stageA`/`stageB`) is NOT swallowed — it interrupts
+ * and reverses from wherever the timeline currently sits, via plain
+ * `tl.reverse()` with no `.pause(0)`/`.seek()` beforehand. GSAP's reverse()
+ * is direction-aware and mid-flight-safe by design (it reverses from the
+ * timeline's current position, not from its end), so this "just works" as
+ * long as nothing forces the playhead to a fixed spot first — which is
+ * exactly the bug the old `pause(0)`-based reset had. The same
+ * interruptibility works the other way too: a forward gesture during
+ * `reverseA`/`reverseB` calls `tl.play()` (no `(0)` — resumes from the
+ * current position) to flip back to forward from wherever the reverse had
+ * gotten to.
+ *
+ * The header is a THIRD sibling of the hero and Section 02 (not nested
+ * inside either), `position: fixed`, z-index above both (z50 vs hero z1 /
+ * Section 02 z2) — nesting it inside `.rx-hero` would trap it under that
+ * element's own stacking context, so no z-index on the header could ever
+ * lift it above Section 02 once that panel covers the screen. `.rx-mid`
+ * carries a compensating margin-top (39.5px) so the header being fixed
+ * (removed from `.rx-frame`'s flex flow) doesn't shift the left content
+ * block that used to sit below it.
+ *
+ * prefers-reduced-motion: no timelines, no listeners, no lock. The static
+ * rest hero renders, with Section 02 stacked normally below it (the default
+ * document flow); the header stays fixed regardless, since that's
+ * independent of the animation. Everything is scoped under `.rx-home`; the
+ * /app workflow is untouched.
  */
 
 const NAV_ITEMS = ['Home', 'About', 'Docs', 'Features']
@@ -60,12 +87,19 @@ const NAV_ITEMS = ['Home', 'About', 'Docs', 'Features']
 const BLACK = '#050505'
 const WHITE = '#ffffff'
 
-/** Progress at which Phase 1 (flood) completes and Phase 2 (slide) begins. */
-const PHASE_1 = 0.55
+/** Stage A (flood + inversions): fixed duration, one-shot, not scrubbed. */
+const STAGE_A_DURATION = 1.2
+/** Stage B (Section 02 slide-up): fixed duration, one-shot, not scrubbed. */
+const STAGE_B_DURATION = 1
 
 /** Extra px Section 02 travels past yPercent 0, so its rounded top corners
  * (and the matching extra height added in Home.css) scroll fully out of view. */
 const SECTION2_OVERSHOOT_PX = 56
+
+/** Minimum |delta| (wheel deltaY, or touch px moved) to count as a deliberate
+ * scroll gesture rather than noise — deliberately small so "the first
+ * wheel/touch delta" triggers immediately, not after a large swipe. */
+const GESTURE_THRESHOLD = 2
 
 /** Four hand-authored organic blob outlines (closed Catmull-Rom splines
  * through a perturbed circle, viewBox 0 0 200 200) — irregular, non-circular
@@ -77,18 +111,34 @@ const BLOB_PATHS = [
   'M180.37,100.00 C178.40,114.11 174.84,128.56 167.43,138.93 C160.02,149.30 147.17,155.52 135.93,162.23 C124.69,168.94 112.14,178.89 100.00,179.18 C87.86,179.46 73.69,171.02 63.08,163.95 C52.48,156.87 45.28,147.40 36.37,136.74 C27.46,126.08 11.13,113.12 9.62,100.00 C8.12,86.88 18.54,68.89 27.33,58.05 C36.13,47.20 50.31,38.26 62.42,34.91 C74.53,31.56 87.37,38.11 100.00,37.93 C112.63,37.75 124.99,31.12 138.20,33.84 C151.40,36.56 172.22,43.22 179.25,54.25 C186.27,65.27 182.34,85.89 180.37,100.00 Z',
 ]
 
-/** Placement (className, matches Home.css) + which outline + staggered
- * [startFrac, endFrac] window (fractions of `d`, the flood's own 0→PHASE_1
- * span) each blob grows across. Staggered/uneven on purpose — not lockstep —
- * but all finish comfortably before d so the field reads solid by ~0.55. */
+/** Placement (className, matches Home.css — each has a fixed off-screen
+ * center point beyond a hero edge/corner, not the middle) + which outline +
+ * staggered [startFrac, endFrac] window (fractions of STAGE_A_DURATION) each
+ * blob grows across. Staggered/uneven on purpose — not lockstep — but all
+ * finish comfortably before the end of Stage A so the field reads solid. */
 const BLOBS = [
-  { cls: 'rx-blob-1', path: 0, start: 0.0, end: 0.6 },
-  { cls: 'rx-blob-2', path: 1, start: 0.06, end: 0.66 },
-  { cls: 'rx-blob-3', path: 2, start: 0.1, end: 0.72 },
-  { cls: 'rx-blob-4', path: 3, start: 0.03, end: 0.62 },
-  { cls: 'rx-blob-5', path: 1, start: 0.14, end: 0.78 },
-  { cls: 'rx-blob-6', path: 3, start: 0.08, end: 0.7 },
+  { cls: 'rx-blob-1', path: 0, start: 0.0, end: 0.6 }, // top-left corner
+  { cls: 'rx-blob-2', path: 1, start: 0.06, end: 0.66 }, // top-right corner
+  { cls: 'rx-blob-3', path: 2, start: 0.1, end: 0.72 }, // bottom-left corner
+  { cls: 'rx-blob-4', path: 3, start: 0.03, end: 0.62 }, // bottom-right corner
+  { cls: 'rx-blob-5', path: 1, start: 0.14, end: 0.78 }, // top edge, mid
+  { cls: 'rx-blob-6', path: 3, start: 0.08, end: 0.7 }, // bottom edge, mid
+  { cls: 'rx-blob-7', path: 2, start: 0.12, end: 0.74 }, // left edge, mid
+  { cls: 'rx-blob-8', path: 0, start: 0.16, end: 0.76 }, // right edge, mid
 ] as const
+
+/** The scroll-gesture state machine.
+ * - 'rest' / 'betweenAB' / 'done': idle waypoints. A down-gesture here
+ *   starts the next stage forward; an up-gesture (where meaningful) starts
+ *   the previous stage's reverse.
+ * - 'stageA' / 'stageB': that timeline is playing forward. A down-gesture
+ *   is swallowed (can't skip ahead); an up-gesture INTERRUPTS and reverses
+ *   it from its current position (tl.reverse(), no seek/pause first).
+ * - 'reverseA' / 'reverseB': that timeline is playing in reverse. An
+ *   up-gesture is swallowed (can't skip ahead in reverse either); a
+ *   down-gesture interrupts and resumes forward from the current position
+ *   (tl.play(), no arg — NOT tl.play(0), which would restart from 0). */
+type Stage = 'rest' | 'stageA' | 'reverseA' | 'betweenAB' | 'stageB' | 'reverseB' | 'done'
 
 function ArrowRight() {
   return (
@@ -115,15 +165,23 @@ export function Home() {
     const section2 = section2Ref.current
     if (!home || !hero || !section2) return
 
-    // Respect reduced-motion: no pin/scrub/slide. Leave the default flow —
-    // static rest hero with Section 02 stacked below it.
+    // Respect reduced-motion: no timelines, no listeners, no scroll-lock.
+    // Leave the default flow — static rest hero with Section 02 stacked
+    // below it.
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduce) return
+
+    let onWheel: (e: WheelEvent) => void = () => {}
+    let onTouchStart: (e: TouchEvent) => void = () => {}
+    let onTouchMove: (e: TouchEvent) => void = () => {}
 
     const ctx = gsap.context(() => {
       // Motion layout: the stage is exactly one viewport; the hero and
       // Section 02 become stacked full-bleed layers within it. Section 02
       // starts fully below the fold (yPercent 100) and above the hero (z2).
+      // No ScrollTrigger/pin: `home` simply has a fixed height, so there's
+      // no real extra document height for the two-stage sequence to need —
+      // it's driven entirely by the gesture listeners below.
       gsap.set(home, { position: 'relative', height: '100vh' })
       gsap.set(hero, {
         position: 'absolute',
@@ -143,64 +201,203 @@ export function Home() {
         yPercent: 100,
       })
 
-      const tl = gsap.timeline({
-        defaults: { ease: 'none' },
-        scrollTrigger: {
-          trigger: home,
-          start: 'top top',
-          end: '+=160%', // scrub distance for the two phases
-          pin: true,
-          scrub: true,
-        },
-      })
-
-      // ---- Phase 1 (0 → PHASE_1): the flood, exactly as before but compressed
-      // so every corner is solid #B0480C by ~0.55 and holds through Phase 2. ----
-      const d = PHASE_1
-      // Six staggered blobs, each scrubbed off its own slice of the same
-      // 0→d span — see BLOBS above for placement/timing, Home.css for why
-      // a flat opaque fill (not a gradient) is what guarantees no seams.
+      // ---- Stage A: the flood + REJOX crossfade + color inversions. Same
+      // choreography as the old scrubbed Phase 1, just re-timed from
+      // "fraction of scroll progress" to "fraction of STAGE_A_DURATION", and
+      // re-eased (was flat `ease:'none'` throughout, i.e. linear — read as
+      // mechanical). Blobs keep their own distinct ease: they're a
+      // DIFFERENT visual language (irregular, staggered ink emerging), not
+      // meant to feel synced with each other. power1.out → power2.out for a
+      // more confident, organic deceleration as each blob settles into its
+      // final shape. Everything else here — the wordmark's fill+scaleY, the
+      // label/rule/sentence colors, and the Login pill's inversion — reacts
+      // to the SAME underlying event (the world going orange) and shares
+      // identical duration/start/ease (power2.inOut) so they read as one
+      // cohesive wave rather than several similar-but-not-quite-synced
+      // tweens; only the shared curve changed from a mechanical straight
+      // line to a smooth accelerate-then-settle S-curve. ----
+      const tlA = gsap.timeline({ paused: true, defaults: { ease: 'none' } })
       for (const b of BLOBS) {
-        tl.fromTo(
+        tlA.fromTo(
           `.${b.cls}`,
-          { scale: 0.001, opacity: 0 },
-          { scale: 1, opacity: 1, duration: (b.end - b.start) * d, ease: 'power1.out' },
-          b.start * d,
+          { scale: 0 },
+          { scale: 1, duration: (b.end - b.start) * STAGE_A_DURATION, ease: 'power2.out' },
+          b.start * STAGE_A_DURATION,
         )
       }
-      tl.to('.rx-glow', { opacity: 0, duration: d * 0.5 }, 0)
-      tl.to('.rx-wordmark-fill', { opacity: 1, duration: d }, 0)
-      // Height-only: scaleY never touches the X axis, so width is locked at
-      // every scroll position. Runs on the same 0→d timeline as the fill
-      // crossfade above, alongside it rather than replacing it.
-      tl.to('.rx-wordmark', { scaleY: 1, duration: d }, 0)
-      tl.to('.rx-label', { color: WHITE, duration: d }, 0)
-      tl.to('.rx-rule', { backgroundColor: WHITE, duration: d }, 0)
-      tl.to('.rx-sentence', { color: WHITE, duration: d }, 0)
-      // The hero "Start migration" button and its chip are intentionally NOT
-      // tweened — like the nav items, their color is locked to one fixed
-      // scheme (light-silver pill, black chip) at every scroll position.
-      // Nav items (Home/About/Docs/Features) are also NOT tweened — their
-      // color is locked and must not move with scroll progress.
-      tl.to(
+      tlA.to('.rx-wordmark-fill', { opacity: 1, duration: STAGE_A_DURATION, ease: 'power2.inOut' }, 0)
+      tlA.to('.rx-wordmark', { scaleY: 1, duration: STAGE_A_DURATION, ease: 'power2.inOut' }, 0)
+      tlA.to('.rx-label', { color: WHITE, duration: STAGE_A_DURATION, ease: 'power2.inOut' }, 0)
+      tlA.to('.rx-rule', { backgroundColor: WHITE, duration: STAGE_A_DURATION, ease: 'power2.inOut' }, 0)
+      tlA.to('.rx-sentence', { color: WHITE, duration: STAGE_A_DURATION, ease: 'power2.inOut' }, 0)
+      // Nav items and the hero "Start migration" button/chip are
+      // intentionally NOT tweened — their color is locked to one fixed
+      // scheme at every point in the sequence.
+      tlA.to(
         '.rx-cta-pill',
-        { backgroundColor: BLACK, color: WHITE, boxShadow: '0 6px 18px rgba(0,0,0,0.3)', duration: d },
+        {
+          backgroundColor: BLACK,
+          color: WHITE,
+          boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+          duration: STAGE_A_DURATION,
+          ease: 'power2.inOut',
+        },
         0,
       )
 
-      // ---- Phase 2 (PHASE_1 → 1): Section 02 slides up over the fixed hero.
-      // yPercent:0 lands its top edge at the viewport top; the extra `y`
-      // overshoot (matched by the extra height in Home.css) pushes it further
-      // so the rounded top corners clear the top of the screen while the
-      // bottom edge still lands exactly flush with the viewport bottom. ----
-      tl.to(
-        section2,
-        { yPercent: 0, y: -SECTION2_OVERSHOOT_PX, duration: 1 - PHASE_1 },
-        PHASE_1,
-      )
+      // ---- Stage B: Section 02 slides up over the fixed hero. Same
+      // yPercent/y overshoot technique as before, just its own independent
+      // fixed-duration timeline instead of the tail end of a shared one.
+      // power3.out: a strong, confident deceleration into place for a
+      // panel this large — no overshoot (power eases never overshoot by
+      // construction), which is what "confident arrival" calls for here. ----
+      const tlB = gsap.timeline({ paused: true, defaults: { ease: 'none' } })
+      tlB.to(section2, {
+        yPercent: 0,
+        y: -SECTION2_OVERSHOOT_PX,
+        duration: STAGE_B_DURATION,
+        ease: 'power3.out',
+      })
+
+      let stage: Stage = 'rest'
+
+      const lock = () => {
+        document.documentElement.style.overflow = 'hidden'
+        document.body.style.overflow = 'hidden'
+      }
+      const unlock = () => {
+        document.documentElement.style.overflow = ''
+        document.body.style.overflow = ''
+      }
+
+      tlA.eventCallback('onComplete', () => {
+        stage = 'betweenAB'
+        unlock()
+      })
+      tlA.eventCallback('onReverseComplete', () => {
+        stage = 'rest'
+        unlock()
+      })
+      tlB.eventCallback('onComplete', () => {
+        stage = 'done'
+        unlock()
+      })
+      tlB.eventCallback('onReverseComplete', () => {
+        stage = 'betweenAB'
+        unlock()
+      })
+
+      function handleGesture(delta: number, e: Event) {
+        const down = delta > GESTURE_THRESHOLD
+        const up = delta < -GESTURE_THRESHOLD
+
+        if (stage === 'stageA') {
+          // Forward-playing: a further down-gesture can't skip ahead, but
+          // an up-gesture interrupts and reverses cleanly from wherever the
+          // timeline currently is — plain tl.reverse(), no seek first.
+          if (up) {
+            e.preventDefault()
+            stage = 'reverseA'
+            tlA.reverse()
+          } else if (down) {
+            e.preventDefault()
+          }
+          return
+        }
+        if (stage === 'reverseA') {
+          // Reverse-playing: symmetric to the above — a down-gesture
+          // interrupts and resumes forward from the current position
+          // (tl.play(), NOT tl.play(0)).
+          if (down) {
+            e.preventDefault()
+            stage = 'stageA'
+            tlA.play()
+          } else if (up) {
+            e.preventDefault()
+          }
+          return
+        }
+        if (stage === 'stageB') {
+          if (up) {
+            e.preventDefault()
+            stage = 'reverseB'
+            tlB.reverse()
+          } else if (down) {
+            e.preventDefault()
+          }
+          return
+        }
+        if (stage === 'reverseB') {
+          if (down) {
+            e.preventDefault()
+            stage = 'stageB'
+            tlB.play()
+          } else if (up) {
+            e.preventDefault()
+          }
+          return
+        }
+        if (stage === 'rest') {
+          if (down) {
+            e.preventDefault()
+            stage = 'stageA'
+            lock()
+            tlA.play(0)
+          }
+          return
+        }
+        if (stage === 'betweenAB') {
+          if (down) {
+            e.preventDefault()
+            stage = 'stageB'
+            lock()
+            tlB.play(0)
+          } else if (up) {
+            e.preventDefault()
+            stage = 'reverseA'
+            lock() // betweenAB is unlocked at rest; re-lock, we're animating again
+            tlA.reverse()
+          }
+          return
+        }
+        // stage === 'done': only intercept an upward gesture at the very
+        // top (reversing Section 02 back down); otherwise let normal
+        // scrolling happen (there's nothing to scroll into yet in
+        // Section 02, but this keeps the mechanism correct if that
+        // changes later).
+        if (stage === 'done' && up && window.scrollY <= 0) {
+          e.preventDefault()
+          stage = 'reverseB'
+          lock()
+          tlB.reverse()
+        }
+      }
+
+      onWheel = (e) => handleGesture(e.deltaY, e)
+
+      let touchStartY = 0
+      onTouchStart = (e) => {
+        touchStartY = e.touches[0].clientY
+      }
+      onTouchMove = (e) => {
+        // touchStartY − currentY: finger moving up (content scrolling down)
+        // is positive, matching wheel's deltaY sign convention.
+        handleGesture(touchStartY - e.touches[0].clientY, e)
+      }
+
+      window.addEventListener('wheel', onWheel, { passive: false })
+      window.addEventListener('touchstart', onTouchStart, { passive: true })
+      window.addEventListener('touchmove', onTouchMove, { passive: false })
     }, home)
 
-    return () => ctx.revert()
+    return () => {
+      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove', onTouchMove)
+      document.documentElement.style.overflow = ''
+      document.body.style.overflow = ''
+      ctx.revert()
+    }
   }, [])
 
   return (
@@ -239,7 +436,6 @@ export function Home() {
       </motion.header>
 
       <div className="rx-hero" ref={heroRef}>
-        <div className="rx-glow" />
         <div className="rx-blobs" aria-hidden="true">
           {BLOBS.map((b) => (
             <div key={b.cls} className={'rx-blob ' + b.cls}>
