@@ -18,7 +18,7 @@ test('health LED reflects a real /health probe (ready + unreachable)', async ({
   fs.mkdirSync(SHOTS, { recursive: true })
 
   // Backend is up (Playwright webServer) → the poll should reach "ready".
-  await page.goto('/')
+  await page.goto('/app')
   await expect(page.getByText('engine ready')).toBeVisible({ timeout: 10_000 })
 
   // Now force /health to fail and reload: the poll must report "unreachable".
