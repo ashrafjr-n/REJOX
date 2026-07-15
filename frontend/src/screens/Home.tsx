@@ -13,7 +13,13 @@ gsap.registerPlugin(ScrollTrigger)
  *
  * One scrubbed timeline drives the whole sequence while the hero stays pinned
  * (fixed) the entire time:
- *   Phase 1 (progress 0 → 0.55): the flood. Black bg floods to #B0480C, REJOX
+ *   Phase 1 (progress 0 → 0.55): the flood — six irregular ink-blot shapes
+ *     (BLOBS below), scattered at different origins across the hero, each
+ *     growing from scale~0 on its own staggered slice of the same 0→d
+ *     timeline (no independent timers, fully scrubbable/reversible). Their
+ *     union reads as solid #B0480C by ~0.55 with no visible seams, because
+ *     every blob is the same flat opaque fill — see Home.css for why that
+ *     (not a gradient) is what actually guarantees seamlessness. REJOX
  *     crossfades outlined → solid white (while also shrinking from a taller
  *     rest height down to today's height, width locked throughout), the left
  *     text turns white, and the Login pill inverts. Header nav items
@@ -60,6 +66,29 @@ const PHASE_1 = 0.55
 /** Extra px Section 02 travels past yPercent 0, so its rounded top corners
  * (and the matching extra height added in Home.css) scroll fully out of view. */
 const SECTION2_OVERSHOOT_PX = 56
+
+/** Four hand-authored organic blob outlines (closed Catmull-Rom splines
+ * through a perturbed circle, viewBox 0 0 200 200) — irregular, non-circular
+ * edges without any SVG filter. Reused across the 6 placed instances below. */
+const BLOB_PATHS = [
+  'M170.73,100.00 C165.63,113.03 157.65,118.94 152.39,130.25 C147.14,141.56 147.92,159.40 139.18,167.87 C130.45,176.34 113.92,179.61 100.00,181.09 C86.08,182.57 66.59,183.97 55.69,176.74 C44.80,169.51 40.85,150.52 34.65,137.73 C28.45,124.94 18.65,112.66 18.50,100.00 C18.36,87.34 25.41,70.78 33.80,61.78 C42.19,52.78 57.79,52.75 68.83,46.01 C79.86,39.26 87.60,24.80 100.00,21.32 C112.40,17.84 129.39,20.00 143.22,25.13 C157.06,30.26 178.41,39.61 182.99,52.09 C187.57,64.56 175.83,86.97 170.73,100.00 Z',
+  'M179.07,100.00 C179.12,114.00 179.03,129.85 172.92,142.10 C166.81,154.35 154.59,167.84 142.43,173.50 C130.28,179.16 112.80,178.39 100.00,176.06 C87.20,173.73 74.70,166.95 65.65,159.50 C56.59,152.05 54.87,141.28 45.68,131.36 C36.49,121.44 14.99,113.04 10.51,100.00 C6.02,86.96 10.57,64.73 18.77,53.10 C26.97,41.47 46.18,33.64 59.72,30.23 C73.25,26.81 87.84,30.42 100.00,32.62 C112.16,34.83 120.55,39.21 132.65,43.45 C144.75,47.70 164.87,48.65 172.61,58.08 C180.35,67.50 179.02,86.00 179.07,100.00 Z',
+  'M189.17,100.00 C186.72,113.48 170.89,124.65 162.70,136.20 C154.51,147.75 150.47,163.77 140.02,169.31 C129.57,174.86 112.50,170.94 100.00,169.48 C87.50,168.03 76.46,165.56 65.02,160.59 C53.58,155.61 40.55,149.72 31.37,139.63 C22.18,129.53 12.07,114.46 9.90,100.00 C7.74,85.54 8.64,62.02 18.38,52.88 C28.12,43.74 54.73,47.84 68.33,45.15 C81.94,42.46 88.44,38.49 100.00,36.75 C111.56,35.01 124.80,31.61 137.70,34.70 C150.60,37.80 168.82,44.43 177.40,55.31 C185.98,66.19 191.63,86.52 189.17,100.00 Z',
+  'M180.37,100.00 C178.40,114.11 174.84,128.56 167.43,138.93 C160.02,149.30 147.17,155.52 135.93,162.23 C124.69,168.94 112.14,178.89 100.00,179.18 C87.86,179.46 73.69,171.02 63.08,163.95 C52.48,156.87 45.28,147.40 36.37,136.74 C27.46,126.08 11.13,113.12 9.62,100.00 C8.12,86.88 18.54,68.89 27.33,58.05 C36.13,47.20 50.31,38.26 62.42,34.91 C74.53,31.56 87.37,38.11 100.00,37.93 C112.63,37.75 124.99,31.12 138.20,33.84 C151.40,36.56 172.22,43.22 179.25,54.25 C186.27,65.27 182.34,85.89 180.37,100.00 Z',
+]
+
+/** Placement (className, matches Home.css) + which outline + staggered
+ * [startFrac, endFrac] window (fractions of `d`, the flood's own 0→PHASE_1
+ * span) each blob grows across. Staggered/uneven on purpose — not lockstep —
+ * but all finish comfortably before d so the field reads solid by ~0.55. */
+const BLOBS = [
+  { cls: 'rx-blob-1', path: 0, start: 0.0, end: 0.6 },
+  { cls: 'rx-blob-2', path: 1, start: 0.06, end: 0.66 },
+  { cls: 'rx-blob-3', path: 2, start: 0.1, end: 0.72 },
+  { cls: 'rx-blob-4', path: 3, start: 0.03, end: 0.62 },
+  { cls: 'rx-blob-5', path: 1, start: 0.14, end: 0.78 },
+  { cls: 'rx-blob-6', path: 3, start: 0.08, end: 0.7 },
+] as const
 
 function ArrowRight() {
   return (
@@ -128,7 +157,17 @@ export function Home() {
       // ---- Phase 1 (0 → PHASE_1): the flood, exactly as before but compressed
       // so every corner is solid #B0480C by ~0.55 and holds through Phase 2. ----
       const d = PHASE_1
-      tl.fromTo('.rx-flood', { scale: 0.001 }, { scale: 1.35, duration: d }, 0)
+      // Six staggered blobs, each scrubbed off its own slice of the same
+      // 0→d span — see BLOBS above for placement/timing, Home.css for why
+      // a flat opaque fill (not a gradient) is what guarantees no seams.
+      for (const b of BLOBS) {
+        tl.fromTo(
+          `.${b.cls}`,
+          { scale: 0.001, opacity: 0 },
+          { scale: 1, opacity: 1, duration: (b.end - b.start) * d, ease: 'power1.out' },
+          b.start * d,
+        )
+      }
       tl.to('.rx-glow', { opacity: 0, duration: d * 0.5 }, 0)
       tl.to('.rx-wordmark-fill', { opacity: 1, duration: d }, 0)
       // Height-only: scaleY never touches the X axis, so width is locked at
@@ -201,7 +240,15 @@ export function Home() {
 
       <div className="rx-hero" ref={heroRef}>
         <div className="rx-glow" />
-        <div className="rx-flood" />
+        <div className="rx-blobs" aria-hidden="true">
+          {BLOBS.map((b) => (
+            <div key={b.cls} className={'rx-blob ' + b.cls}>
+              <svg viewBox="0 0 200 200">
+                <path d={BLOB_PATHS[b.path]} fill="#b0480c" />
+              </svg>
+            </div>
+          ))}
+        </div>
 
         <div className="rx-frame">
           {/* ---------- mid: left content block; center/right left empty ---------- */}
