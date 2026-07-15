@@ -1,0 +1,300 @@
+/* ------------------------------------------------------------------ *
+ * Rejox marketing hero — STATIC rest state. Everything is scoped under
+ * `.rx-hero` so the /app workflow theme is never touched.
+ * ------------------------------------------------------------------ */
+
+/* Self-hosted wide/expanded black grotesque for the bottom wordmark. */
+@font-face {
+  font-family: 'Archivo Expanded';
+  font-style: normal;
+  font-weight: 900;
+  font-stretch: 125%;
+  font-display: swap;
+  src: url('../assets/archivo-expanded-900.woff2') format('woff2');
+}
+
+.rx-hero {
+  /* --- brand palette, scoped to the hero --- */
+  --rx-black: #050505;
+  --rx-orange: #ff6a00;
+  --rx-red: #c53322;
+  --rx-blue: #2f6bff;
+  --rx-white: #ffffff;
+  --rx-dark-silver: #8a8a8f;
+  --rx-light-silver: #c9c9ce;
+
+  --rx-frame-inset: 28px;
+  --rx-frame-pad: 26px;
+  --rx-hairline: rgba(255, 255, 255, 0.12);
+
+  position: relative;
+  height: 100vh;
+  min-height: 100svh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--rx-black);
+  color: var(--rx-white);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- top-left corner glow: small, dense, tight bloom (not a wide wash) --- */
+.rx-glow {
+  position: absolute;
+  top: -70px;
+  left: -70px;
+  width: 360px;
+  height: 360px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 32% 32%,
+    rgba(255, 106, 0, 0.95) 0%,
+    rgba(255, 106, 0, 0.7) 16%,
+    rgba(255, 106, 0, 0.32) 32%,
+    rgba(255, 106, 0, 0.08) 46%,
+    rgba(255, 106, 0, 0) 58%
+  );
+  filter: blur(4px);
+  z-index: 0;
+}
+
+/* --- the orange FLOOD: a top-left-anchored radial with a feathered leading
+   edge, scaled up by scroll. Soft/organic edge (no hard circle rim). Sits
+   above the black bg + glow, below the framed content so text stays readable. */
+.rx-flood {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 170vmax;
+  height: 170vmax;
+  transform-origin: 0 0;
+  /* invisible at rest (scale ~0) so progress 0 is exactly the rest state,
+     including under prefers-reduced-motion where no JS runs. */
+  transform: scale(0.001);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+  background: radial-gradient(
+    circle at 0 0,
+    #b0480c 0%,
+    #b0480c 46%,
+    rgba(176, 72, 12, 0.85) 56%,
+    rgba(176, 72, 12, 0.4) 66%,
+    rgba(176, 72, 12, 0) 73%
+  );
+}
+
+/* --- the bounding frame: 1px hairline inset from all four edges --- */
+.rx-frame {
+  position: absolute;
+  inset: var(--rx-frame-inset);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--rx-frame-pad);
+  border: 1px solid var(--rx-hairline);
+  border-radius: 4px;
+}
+
+/* ============================ header ============================ */
+.rx-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex: 0 0 auto;
+}
+
+.rx-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: var(--rx-orange);
+  color: var(--rx-black);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  user-select: none;
+  box-shadow: 0 6px 20px rgba(255, 106, 0, 0.28);
+}
+.rx-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* centered capsule nav */
+.rx-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+}
+.rx-nav-item {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--rx-light-silver);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.rx-nav-item:hover {
+  background: var(--rx-orange);
+  color: var(--rx-black);
+  border-color: var(--rx-orange);
+}
+.rx-nav-item.is-active {
+  background: var(--rx-orange);
+  color: var(--rx-black);
+  border-color: var(--rx-orange);
+  font-weight: 600;
+}
+.rx-nav-item.is-inactive {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* right start-migration pill */
+.rx-cta-pill {
+  appearance: none;
+  border: none;
+  background: var(--rx-orange);
+  color: var(--rx-black);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 6px 18px rgba(255, 106, 0, 0.25);
+}
+.rx-cta-pill:hover {
+  transform: scale(1.04);
+  box-shadow: 0 8px 24px rgba(255, 106, 0, 0.4);
+}
+
+/* ============================ mid: left block ============================ */
+.rx-mid {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+}
+.rx-left {
+  max-width: 560px;
+}
+.rx-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.rx-eyebrow .rx-rule {
+  display: block;
+  width: 34px;
+  height: 1px;
+  background: var(--rx-orange);
+}
+.rx-eyebrow .rx-label {
+  color: var(--rx-orange);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.rx-sentence {
+  color: var(--rx-light-silver);
+  font-size: clamp(18px, 1.7vw, 24px);
+  line-height: 1.5;
+  font-weight: 400;
+  margin: 0 0 30px;
+}
+.rx-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  appearance: none;
+  border: none;
+  background: var(--rx-orange);
+  color: var(--rx-black);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 14px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 8px 22px rgba(255, 106, 0, 0.28);
+}
+.rx-start:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(255, 106, 0, 0.42);
+}
+.rx-start svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================ bottom wordmark ============================ */
+/* Two identical stacked layers: an outlined (stroke) layer always visible, and
+   a solid-white fill layer crossfaded in by scroll (outlined → solid white). */
+.rx-wordmark-wrap {
+  flex: 0 0 auto;
+  position: relative;
+  width: 100%;
+  /* pull the descenderless caps flush to the frame's bottom padding */
+  margin-bottom: -0.06em;
+}
+.rx-wordmark {
+  margin: 0;
+  width: 100%;
+  text-align: center;
+  font-family: 'Archivo Expanded', 'Arial Black', sans-serif;
+  font-weight: 900;
+  font-stretch: 125%;
+  font-size: 20.3vw;
+  line-height: 0.78;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  user-select: none;
+}
+/* stroke layer (rest state): transparent fill + near-white outline */
+.rx-wordmark-stroke {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.92);
+  text-stroke: 1.5px rgba(255, 255, 255, 0.92);
+}
+/* fill layer: solid white, overlaid exactly, faded in over the same progress */
+.rx-wordmark-fill {
+  position: absolute;
+  inset: 0;
+  color: #ffffff;
+  -webkit-text-stroke: 0;
+  text-stroke: 0;
+  opacity: 0;
+  will-change: opacity;
+}
+
+/* ============================ Section 02 ============================ */
+/* Empty white panel. In motion it is turned into a full-bleed overlay layer
+   (JS) that slides up over the pinned hero; in reduced-motion it stays here in
+   normal flow, stacked directly below the hero. */
+.rx-section2 {
+  height: 100vh;
+  min-height: 100svh;
+  background: #ffffff;
+}
