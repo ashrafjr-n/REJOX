@@ -14,6 +14,15 @@
 }
 
 .rx-home {
+  /* Own stacking context (isolation) + the page's black base. The fixed
+     light-pillar layer (`.rx-pillar-fixed`, z0) screen-blends against this
+     black; the hero and Section 02 are transparent so that one continuous
+     fixed background shows through both — no per-section background seam.
+     `isolation` (not transform/filter) is used so the pillar stays fixed to
+     the viewport rather than to `.rx-home`. */
+  position: relative;
+  isolation: isolate;
+  background: var(--rx-black);
   /* --- brand palette + spacing tokens. Scoped here (not on `.rx-hero`) so
      the fixed header — a sibling of `.rx-hero`, not a descendant — still
      inherits them; custom properties cascade through the DOM tree regardless
@@ -42,15 +51,27 @@
   --rx-hairline: rgba(255, 255, 255, 0.12);
 }
 
+/* Full-viewport, fixed background layer holding the WebGL light pillar. It
+   spans the whole viewport (not clipped to the hero), so as the page scrolls
+   from the hero into Section 02 the shader settles in place with no hard seam.
+   Sits below the frame (z1) and header (z50); pointer-events:none. */
+.rx-pillar-fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* The hero is a normal, full-viewport block; the page scrolls naturally past
-   it into Section 02 below. Background stays solid black at all times. */
+   it into Section 02 below. It is transparent so the fixed pillar layer behind
+   it (screen-blended over `.rx-home`'s black base) provides the background. */
 .rx-hero {
   position: relative;
   height: 100vh;
   min-height: 100svh;
   width: 100%;
   overflow: hidden;
-  background: var(--rx-black);
+  background: transparent;
   color: var(--rx-white);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -293,10 +314,13 @@
 }
 
 /* ============================ Section 02 ============================ */
-/* A plain dark section (flat --rx-black, matching the hero's base color —
-   no LightPillar/WebGL here) that flows normally below the hero in document
-   order. Square corners, no radius. */
+/* Flows normally below the hero in document order. Transparent, so the fixed
+   light-pillar layer behind it shows through: by the time Section 02 fills the
+   screen the pillar has settled to flat black (matching --rx-black, the page's
+   base), which is what reads here — the animated hero background resolves into
+   this section's dark background instead of cutting off at a seam. */
 .rx-section2 {
+  position: relative;
   min-height: 100vh;
-  background: var(--rx-black);
+  background: transparent;
 }
