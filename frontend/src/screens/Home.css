@@ -154,8 +154,14 @@
   background: var(--rx-light-silver);
   color: var(--rx-black);
 }
+/* Current-page item (`/` root → "Home"): persistently wears the same visual
+   treatment as the :hover state above (light-silver fill, black text) since we
+   ARE on that page, plus the bold font-weight. The other items only pick up
+   that treatment on :hover. */
 .rx-nav-item.is-active {
   font-weight: 600;
+  background: var(--rx-light-silver);
+  color: var(--rx-black);
 }
 
 /* right Login pill — fixed white background, black text, at every scroll
@@ -194,11 +200,12 @@
   max-width: 560px;
   /* Task 3: slight rightward nudge of the whole left-content block. */
   margin-left: 40px;
-  /* Task 4: raise the block (label + paragraph + button) so the gap between
-     the START MIGRATION button and the REJOX wordmark below widens. Using a
+  /* Task 4 (+ later nudge): raise the block (label + paragraph + button) so the
+     gap between the START MIGRATION button and the REJOX wordmark below widens.
+     Nudged further up (was -56px) to open the gap slightly more. Using a
      transform keeps this purely visual — the wordmark and the flex sizing of
      `.rx-mid` are untouched. */
-  transform: translateY(-56px);
+  transform: translateY(-80px);
 }
 .rx-eyebrow {
   display: flex;
@@ -291,6 +298,161 @@
 }
 .rx-start:hover .rx-start-chip svg {
   transform: translateX(3px) rotate(0deg);
+}
+
+/* ==================== right-side frosted glow cards ==================== */
+/* Absolutely positioned inside `.rx-frame` (its padding box), upper-right:
+   below the fixed header, clear of the REJOX wordmark at the bottom, balancing
+   the raised left content block on the other side. z above the frame content
+   but the cards themselves stay interactive (pointer-events default). */
+.rx-cards {
+  position: absolute;
+  z-index: 2;
+  top: 70px;
+  /* align the cards' right edge to the frame content column (same column the
+     header and left block use), leaving a matching gutter to the viewport. */
+  right: var(--rx-frame-pad);
+  width: min(330px, 33vw);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* The card text is wrapped in `.rx-card-body` (a child of BorderGlow's content
+   wrapper), so the padding + flow live there — not on `.rx-card`, whose direct
+   children are the ported glow/mesh layers. Cards inherit Clash Display from
+   `.rx-hero`. (Unlayered rules here win over Tailwind's layered utilities on the
+   ported markup, so `flex-direction: row` below overrides the `flex-col`
+   utility on the small card.) */
+.rx-card {
+  color: var(--rx-white);
+}
+.rx-card-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.rx-card-lg {
+  min-height: 176px;
+}
+.rx-card-body-lg {
+  padding: 24px 24px 26px;
+  justify-content: flex-start;
+}
+.rx-card-sm {
+  min-height: 92px;
+}
+.rx-card-body-sm {
+  padding: 18px 20px;
+  flex-direction: row;
+  align-items: center;
+}
+
+/* Icon chip — a small rounded warm-tinted square holding the stroked glyph. */
+.rx-card-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  margin-bottom: 16px;
+  font-size: 20px;
+  color: var(--rx-white);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 106, 0, 0.9),
+    rgba(255, 159, 252, 0.85)
+  );
+  box-shadow: 0 6px 18px -6px rgba(255, 106, 0, 0.55);
+}
+.rx-card-chip svg {
+  width: 20px;
+  height: 20px;
+}
+.rx-card-chip-sm {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  margin-bottom: 0;
+  margin-right: 14px;
+  background: linear-gradient(
+    140deg,
+    rgba(197, 51, 34, 0.9),
+    rgba(255, 159, 252, 0.85)
+  );
+}
+.rx-card-chip-sm svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rx-card-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff9ffc;
+  margin-bottom: 8px;
+}
+.rx-card-title {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
+  color: var(--rx-white);
+}
+.rx-card-sub {
+  margin-top: 10px;
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--rx-light-silver);
+}
+
+/* Small card: title sits inline beside the icon chip (row layout on
+   `.rx-card-body-sm` above). */
+.rx-card-title-sm {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+/* Short viewports (common wide-but-short laptops, e.g. 1366×768 / 1280×720):
+   the REJOX wordmark is docked to the frame bottom and its glyph height grows
+   with viewport WIDTH, so on a short viewport its top edge rises toward the
+   fixed-`top` cards. Tighten the cards' footprint (smaller offset, gaps, min-
+   heights and type) so they keep clearance above the wordmark instead of
+   colliding with its "X". Taller viewports keep the roomier default sizes. */
+@media (max-height: 800px) {
+  .rx-cards {
+    top: 56px;
+    gap: 12px;
+    width: min(310px, 30vw);
+  }
+  .rx-card-lg {
+    min-height: 146px;
+  }
+  .rx-card-body-lg {
+    padding: 18px 20px 20px;
+  }
+  .rx-card-sm {
+    min-height: 76px;
+  }
+  .rx-card-chip {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 12px;
+  }
+  .rx-card-eyebrow {
+    margin-bottom: 6px;
+  }
+  .rx-card-title {
+    font-size: 19px;
+  }
+  .rx-card-sub {
+    margin-top: 8px;
+    font-size: 12.5px;
+  }
 }
 
 /* ============================ bottom wordmark ============================ */

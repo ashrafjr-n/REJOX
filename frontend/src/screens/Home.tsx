@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 
 import './Home.css'
+import BorderGlow from './BorderGlow'
 import LightPillar from './LightPillar'
 import rejoxLogo from '../assets/rejox-logo.svg'
 
@@ -44,6 +45,44 @@ function ArrowRight() {
         strokeLinejoin="round"
       />
     </svg>
+  )
+}
+
+/* Small inline icons for the hero cards (24-grid, stroked to match the site's
+   icon set in components/icons.tsx). Kept local to the hero. */
+function ChipBase({ children }: { children: React.ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  )
+}
+
+/* CPU / chip with a spark — "intelligent, AST-precise" migration. */
+function ChipIcon() {
+  return (
+    <ChipBase>
+      <rect x="7" y="7" width="10" height="10" rx="2" />
+      <path d="M10 3v2M14 3v2M10 19v2M14 19v2M3 10h2M3 14h2M19 10h2M19 14h2" />
+      <path d="M12 10.5 11 13h2l-1 2.5" />
+    </ChipBase>
+  )
+}
+
+/* Lightning bolt — speed / production-ready output. */
+function BoltIcon() {
+  return (
+    <ChipBase>
+      <path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z" />
+    </ChipBase>
   )
 }
 
@@ -131,6 +170,71 @@ export function Home() {
               </button>
             </motion.div>
           </div>
+
+          {/* ---------- right side: stacked frosted BorderGlow cards ----------
+              Absolutely positioned in the hero's upper-right (below the header,
+              above the REJOX wordmark) to balance the left content block. Glassy
+              /translucent so the LightPillar shows through; glow tuned to the
+              hero's orange→pink palette. */}
+          <motion.div
+            className="rx-cards"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.28 }}
+          >
+            {/* Large card — glow from the hero's orange (HSL triplet, the format
+                the port's parseHSL expects), mesh from the LightPillar's
+                topColor→bottomColor (orange→pink). Glassy via backdropBlur. */}
+            <BorderGlow
+              className="rx-card rx-card-lg"
+              glowColor="25 100 50"
+              colors={['#ff6a00', '#ff9ffc']}
+              backgroundColor="rgba(20, 12, 16, 0.34)"
+              borderRadius={22}
+              glowRadius={50}
+              glowIntensity={1}
+              coneSpread={22}
+              edgeSensitivity={22}
+              fillOpacity={0.6}
+              backdropBlur={16}
+            >
+              <div className="rx-card-body rx-card-body-lg">
+                <span className="rx-card-chip" aria-hidden="true">
+                  <ChipIcon />
+                </span>
+                <span className="rx-card-eyebrow">Deterministic + AI-assisted</span>
+                <span className="rx-card-title">Intelligent migration</span>
+                <span className="rx-card-sub">
+                  AST-precise transforms first — AI only for the residue.
+                </span>
+              </div>
+            </BorderGlow>
+
+            {/* Small card — glow from the hero's pink (HSL triplet), mesh
+                including --rx-red. */}
+            <BorderGlow
+              className="rx-card rx-card-sm"
+              glowColor="302 100 81"
+              colors={['#c53322', '#ff9ffc']}
+              backgroundColor="rgba(20, 12, 16, 0.34)"
+              borderRadius={18}
+              glowRadius={40}
+              glowIntensity={1}
+              coneSpread={22}
+              edgeSensitivity={22}
+              fillOpacity={0.6}
+              backdropBlur={16}
+            >
+              <div className="rx-card-body rx-card-body-sm">
+                <span className="rx-card-chip rx-card-chip-sm" aria-hidden="true">
+                  <BoltIcon />
+                </span>
+                <span className="rx-card-title rx-card-title-sm">
+                  Production-ready React Native
+                </span>
+              </div>
+            </BorderGlow>
+          </motion.div>
 
           {/* ---------- bottom wordmark: static outlined stroke ---------- */}
           <motion.div
