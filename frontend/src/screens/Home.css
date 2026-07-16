@@ -172,10 +172,10 @@
   display: block;
   width: 34px;
   height: 1px;
-  background: var(--rx-orange);
+  background: linear-gradient(90deg, var(--rx-red), #ff9ffc);
 }
 .rx-eyebrow .rx-label {
-  color: var(--rx-orange);
+  color: var(--rx-white);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.18em;
