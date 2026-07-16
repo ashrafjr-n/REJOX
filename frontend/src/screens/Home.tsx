@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 
 import './Home.css'
 import LightPillar from './LightPillar'
-import rejoxLogo from '../assets/rejox-logo.png'
+import rejoxLogo from '../assets/rejox-logo.svg'
 
 /**
  * Rejox marketing home — a static hero followed by a normal Section 02.
