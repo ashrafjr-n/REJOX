@@ -1,0 +1,66 @@
+<svg width="1328" height="972" viewBox="0 0 1328 972" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="silverGradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2f2f4"/>
+      <stop offset="45%" stop-color="#c7c8cc"/>
+      <stop offset="70%" stop-color="#8b8d93"/>
+      <stop offset="100%" stop-color="#55565c"/>
+    </linearGradient>
+    <linearGradient id="silverGradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e9eaec"/>
+      <stop offset="50%" stop-color="#b3b5ba"/>
+      <stop offset="100%" stop-color="#4c4d52"/>
+    </linearGradient>
+    <linearGradient id="pinkGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#ff9fd6"/>
+      <stop offset="45%" stop-color="#e83f8f"/>
+      <stop offset="100%" stop-color="#9b1f5c"/>
+    </linearGradient>
+    <linearGradient id="darkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3a3a3d"/>
+      <stop offset="100%" stop-color="#111113"/>
+    </linearGradient>
+    <filter id="glowPink" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glowSoft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Bar 1 (leftmost silver diagonal) -->
+  <g filter="url(#glowSoft)">
+    <polygon points="520,98 686,98 288,822 130,822"
+             fill="url(#silverGradA)" stroke="#ff6fa8" stroke-opacity="0.55" stroke-width="2"/>
+  </g>
+
+  <!-- Bar 2 (second silver diagonal) -->
+  <g filter="url(#glowSoft)">
+    <polygon points="742,98 878,98 495,822 358,822"
+             fill="url(#silverGradB)" stroke="#ff6fa8" stroke-opacity="0.55" stroke-width="2"/>
+  </g>
+
+  <!-- Pink/magenta arm (rounded top-right corner, tapering to a point) -->
+  <g filter="url(#glowPink)">
+    <path d="M 934,98
+             L 1112,98
+             Q 1160,98 1160,146
+             L 1160,272
+             Q 1160,318 1120,332
+             L 700,548
+             Z"
+          fill="url(#pinkGrad)" stroke="#ffd0ec" stroke-width="2.5"/>
+  </g>
+
+  <!-- Dark leg crossing lower-right -->
+  <polygon points="700,548 838,565 1132,858 838,858 686,700"
+           fill="url(#darkGrad)" stroke="#ffffff" stroke-opacity="0.25" stroke-width="2"/>
+</svg>
