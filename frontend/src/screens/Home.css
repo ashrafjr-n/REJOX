@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------ *
- * Rejox marketing hero — STATIC rest state. Everything is scoped under
- * `.rx-hero` so the /app workflow theme is never touched.
+ * Rejox marketing hero — STATIC. Everything is scoped under `.rx-hero`
+ * (and `.rx-home`) so the /app workflow theme is never touched.
  * ------------------------------------------------------------------ */
 
 /* Self-hosted wide/expanded black grotesque for the bottom wordmark. */
@@ -23,21 +23,14 @@
   --rx-red: #c53322;
   --rx-blue: #2f6bff;
   --rx-white: #ffffff;
-  /* Was #8a8a8f (a mid-gray) but unused anywhere — repurposed to an actual
-     near-black for the nav capsule CONTAINER's background (see .rx-nav).
-     The individual nav-item pills use --rx-nav-item-bg below, a shade
-     lighter, so the pills read as distinct from the container behind them. */
+  /* Near-black for the nav capsule CONTAINER's background (see .rx-nav). The
+     individual nav-item pills use --rx-nav-item-bg below, a shade lighter, so
+     the pills read as distinct from the container behind them. */
   --rx-dark-silver: #1c1c1f;
   /* One step lighter than --rx-dark-silver — the nav-item pills' own rest
      background, so they're visibly distinguishable from the darker capsule
-     container they sit in (previously both used --rx-dark-silver and read
-     too close/similar). */
+     container they sit in. */
   --rx-nav-item-bg: #2a2a2f;
-  /* Exact midpoint between dark-silver and light-silver (per-channel average
-     of #1c1c1f and #c9c9ce) — the Login pill's rest shade, distinct from
-     both the nav items' dark-silver-family rest state and their
-     light-silver hover/focus state. */
-  --rx-mid-silver: #737377;
   --rx-light-silver: #c9c9ce;
 
   --rx-frame-inset: 28px;
@@ -45,6 +38,8 @@
   --rx-hairline: rgba(255, 255, 255, 0.12);
 }
 
+/* The hero is a normal, full-viewport block; the page scrolls naturally past
+   it into Section 02 below. Background stays solid black at all times. */
 .rx-hero {
   position: relative;
   height: 100vh;
@@ -56,95 +51,6 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-
-/* --- the orange FLOOD: multiple irregular ink-blot shapes, each anchored at
-   the hero's edges (4 corners + the midpoint of each of the 4 edges — see
-   BLOBS in Home.tsx), growing independently (staggered) until their union
-   reads as one seamless solid #B0480C field. Replaces the old single
-   top-left-anchored growing circle and its corner glow accent (both gone —
-   redundant now).
-
-   Each blob is a hand-authored organic SVG path (closed Catmull-Rom spline
-   through a perturbed circle) rather than an feTurbulence/feDisplacementMap
-   filter — no filter recomputation risk at all, cross-browser-predictable,
-   and cheap: only `transform: scale()` is ever animated, so the browser can
-   composite each blob's already-rasterized shape on the GPU without
-   recomputing any geometry per frame.
-
-   Fill is flat/opaque at all times (no opacity tween, no gradient, no blur)
-   — every blob is the exact same solid #B0480C, so overlapping regions are
-   pixel-identical to non-overlapping ones; a fade-in was tried before and
-   rejected because staggered *semi-transparent* blobs stacking on top of
-   each other visibly darkened wherever they overlapped. Growth reads purely
-   through advancing shape/coverage (scale 0→1), never through opacity. */
-.rx-blobs {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-.rx-blob {
-  position: absolute;
-  width: 240vmax;
-  height: 240vmax;
-  /* Every blob shares the same transform-origin (its own dead center) and
-     the same base transform (scale(0), nothing else) — no translateX/Y, no
-     percentage-based offset mixed into the same transform list as scale.
-     That combination is what caused visible drift before: a percentage
-     translate resolves against the element's *unscaled* box on every frame,
-     while scale's own implicit shift around transform-origin changes with
-     the animated value, so the two don't stay in sync as scale moves — the
-     apparent center crept across the screen instead of holding still.
-     Positioning is done with plain top/left instead (per instance below),
-     which is immune to that: it's normal box layout, not part of the
-     transform matrix, so it can never interact with an animated scale.
-     Invisible at rest via scale(0) — a literal zero, not a near-zero
-     fraction: at scale(0.001) the shape still rasterizes as a visible
-     sub-pixel dot against pure black even at full opacity, and every blob
-     must stay fully opaque (see comment above). A true zero has zero area,
-     so there is nothing to rasterize. This is the rest-state default, and
-     what prefers-reduced-motion permanently sees since no JS runs to
-     animate it further. */
-  transform-origin: 50% 50%;
-  transform: scale(0);
-  will-change: transform;
-}
-.rx-blob svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-/* Each blob's *center point* (not its box edge) is fixed at a coordinate
-   10vmax beyond its assigned edge/corner, entirely outside the viewport —
-   so it visibly emerges INTO frame from beyond that edge as it scales up,
-   rather than growing from a point sitting exactly on the boundary. top/left
-   below are each (center − half the 240vmax box), i.e. plain arithmetic, no
-   transform involved: e.g. top-left's center is (−10vmax, −10vmax), so
-   top = left = −10vmax − 120vmax = −130vmax.
-
-   Note the box is much larger than the old edge-anchored design's 130vmax:
-   that design put transform-origin AT the box's own edge, so scaling to 1
-   gave the FULL box height of reach into the viewport from the origin. A
-   center-anchored box only reaches HALF its size from center in any one
-   direction, minus the 10vmax spent just getting back past the edge — so
-   matching the old reach needs a substantially bigger box. First tried
-   160vmax and re-ran the same full-frame gap scan from the previous task;
-   it reopened a small gap (a sliver at the bottom-mid edge, inside one
-   blob's locally-thinner irregular silhouette) that 130vmax + edge-origin
-   never had. 240vmax closes it — see the file's gap re-check note. */
-.rx-blob-1 { top: -130vmax; left: -130vmax; } /* center (-10,-10): beyond top-left corner */
-.rx-blob-2 { top: -130vmax; left: -10vmax; } /* center (110,-10): beyond top-right corner */
-.rx-blob-3 { top: -10vmax; left: -130vmax; } /* center (-10,110): beyond bottom-left corner */
-.rx-blob-4 { top: -10vmax; left: -10vmax; } /* center (110,110): beyond bottom-right corner */
-.rx-blob-5 { top: -130vmax; left: -70vmax; } /* center (50,-10): beyond top edge, mid */
-.rx-blob-6 { top: -10vmax; left: -70vmax; } /* center (50,110): beyond bottom edge, mid */
-/* Left-mid/right-mid — added because the 4 corners' irregular (non-circular)
-   silhouettes don't reach uniformly in every direction, and left empty
-   slivers at the vertical middle of the left/right edges by ~0.55 without
-   a blob anchored there specifically to cover that spot. */
-.rx-blob-7 { top: -70vmax; left: -130vmax; } /* center (-10,50): beyond left edge, mid */
-.rx-blob-8 { top: -70vmax; left: -10vmax; } /* center (110,50): beyond right edge, mid */
 
 /* --- the bounding frame: 1px hairline inset from all four edges --- */
 .rx-frame {
@@ -159,12 +65,11 @@
 }
 
 /* ============================ header ============================ */
-/* Fixed to the viewport (not a `.rx-frame` flex child anymore) so it stays
-   visible for the whole page, not just the pinned hero. top/left/right
-   reproduce its old flex position exactly: frame inset + 1px border + frame
-   padding on all sides, with the top nudged up 10px closer to the hairline
-   (matches the earlier "sits higher" tweak). z-index sits above both the
-   hero (z1) and Section 02 (z2), which are its siblings under `.rx-home`. */
+/* Fixed to the viewport (not a `.rx-frame` flex child) so it stays visible
+   for the whole page. top/left/right reproduce its old flex position exactly:
+   frame inset + 1px border + frame padding on all sides, with the top nudged
+   up 10px closer to the hairline. z-index sits above the hero and Section 02,
+   which are its siblings under `.rx-home`. */
 .rx-header {
   position: fixed;
   top: calc(var(--rx-frame-inset) + 1px + var(--rx-frame-pad) - 10px);
@@ -185,24 +90,13 @@
   user-select: none;
 }
 
-/* centered capsule nav — fully opaque, same dark-silver/light-silver
-   treatment as the individual nav-item pills. Was a translucent
-   rgba(255,255,255,0.03) + backdrop-filter: blur(8px) "frosted glass" fill:
-   each pill itself was already opaque, but that translucent + blurred
-   background showed through in the capsule's padding/gaps around the pills
-   and along its border, picking up and blending with whatever sat behind
-   the header — barely visible over the dark hero, an obvious light wash-out
-   once scrolled over Section 02's white background. An opaque background has
-   nothing behind it to blend with, so backdrop-filter is also removed —
-   it has no visible effect once nothing can show through, and keeping it
-   around was dead weight. */
+/* centered capsule nav — fully opaque, borderless. */
 .rx-nav {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 5px;
   border-radius: 999px;
-  border: 1px solid var(--rx-light-silver);
   background: var(--rx-dark-silver);
 }
 .rx-nav-item {
@@ -212,7 +106,7 @@
      distinct from the container behind them. No border — the pill reads
      purely as a fill against the container. Applies uniformly to every item
      (including the current-page one, which keeps only its bold font-weight
-     below as its distinguishing mark); color is still never scroll-reactive. */
+     below as its distinguishing mark). */
   border: none;
   background: var(--rx-nav-item-bg);
   color: var(--rx-light-silver);
@@ -233,15 +127,12 @@
   font-weight: 600;
 }
 
-/* right start-migration pill */
+/* right Login pill — fixed white background, black text, at every scroll
+   position (no scroll/flood-tied color inversion). */
 .rx-cta-pill {
   appearance: none;
   border: none;
-  /* Mid-silver rest shade — sits between the nav items' dark-silver rest
-     state and their light-silver hover/focus state, so the header reads as
-     3 distinct tones. Flood-tied inversion (below, in Home.tsx) still
-     animates from whatever this base color is toward black, unaffected. */
-  background: var(--rx-mid-silver);
+  background: var(--rx-white);
   color: var(--rx-black);
   font-size: 13px;
   font-weight: 600;
@@ -262,7 +153,7 @@
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  /* Compensates for the header no longer being a flex child here (it's now
+  /* Compensates for the header no longer being a flex child here (it's
      `position: fixed`, see .rx-header) — reproduces its old reserved flow
      height exactly (49.5px rendered height minus its 10px negative margin)
      so the left content block below doesn't shift up into its old spot. */
@@ -360,8 +251,7 @@
 }
 
 /* ============================ bottom wordmark ============================ */
-/* Two identical stacked layers: an outlined (stroke) layer always visible, and
-   a solid-white fill layer crossfaded in by scroll (outlined → solid white). */
+/* Static outlined (stroke) wordmark, flush to the frame's bottom padding. */
 .rx-wordmark-wrap {
   flex: 0 0 auto;
   position: relative;
@@ -381,43 +271,25 @@
   letter-spacing: 0.005em;
   white-space: nowrap;
   user-select: none;
-  /* Rest state: letterforms stretched taller (scaleY only — the X axis is
-     never touched, so rendered WIDTH is pixel-identical at every scroll
-     position). Grows upward from the baseline so the wordmark stays flush
-     with the frame's bottom edge as it animates. Scroll drives this down to
-     scaleY(1) — today's height — by full flood, see Home.tsx. */
+  /* Letterforms stretched taller (scaleY only — the X axis is never touched,
+     so rendered WIDTH is unchanged), growing upward from the baseline so the
+     wordmark stays flush with the frame's bottom edge. */
   transform: scaleY(1.32);
   transform-origin: 50% 100%;
-  will-change: transform;
 }
-/* stroke layer (rest state): transparent fill + near-white outline */
+/* stroke layer: transparent fill + near-white outline */
 .rx-wordmark-stroke {
   color: transparent;
   -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.92);
   text-stroke: 1.5px rgba(255, 255, 255, 0.92);
 }
-/* fill layer: solid white, overlaid exactly, faded in over the same progress */
-.rx-wordmark-fill {
-  position: absolute;
-  inset: 0;
-  color: #ffffff;
-  -webkit-text-stroke: 0;
-  text-stroke: 0;
-  opacity: 0;
-  will-change: opacity;
-}
 
 /* ============================ Section 02 ============================ */
-/* Empty white panel. In motion it is turned into a full-bleed overlay layer
-   (JS) that slides up over the pinned hero; in reduced-motion it stays here in
-   normal flow, stacked directly below the hero. */
+/* A plain white section that flows normally below the hero in document order.
+   Rounded top corners are purely cosmetic. */
 .rx-section2 {
-  /* extra height beyond one viewport = the settle overshoot below, so the
-     panel still covers the viewport flush at the bottom once its top edge
-     (and rounded corners) have scrolled past the top of the screen. */
-  height: calc(100vh + 56px);
-  min-height: calc(100svh + 56px);
-  background: #ffffff;
+  min-height: 100vh;
+  background: var(--rx-white);
   border-top-left-radius: 32px;
   border-top-right-radius: 32px;
 }
