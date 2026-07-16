@@ -16,6 +16,19 @@ interface LightPillarProps {
   mixBlendMode?: CSSProperties['mixBlendMode'];
   pillarRotation?: number;
   quality?: 'low' | 'medium' | 'high';
+  /**
+   * When true, the shader "settles" as the page scrolls: over `settleDistance`
+   * px of downward scroll (default = one viewport height) the pillar's rotation
+   * slows, its intensity fades (smoothstep) and its glow shrinks in lockstep,
+   * resolving to pure black. This is applied imperatively inside the render
+   * loop (one cheap `window.scrollY` read per throttled frame — no scroll
+   * listener, no per-frame React re-render), so it costs nothing at rest and
+   * leaves the low/medium/high device-tier logic untouched. At scrollY 0 the
+   * output is byte-for-byte identical to `scrollSettle={false}`.
+   */
+  scrollSettle?: boolean;
+  /** Scroll distance (px) over which the pillar fully resolves. Default: viewport height. */
+  settleDistance?: number;
 }
 
 const LightPillar = ({
@@ -31,7 +44,9 @@ const LightPillar = ({
   noiseIntensity = 0.5,
   mixBlendMode = 'screen',
   pillarRotation = 0,
-  quality = 'high'
+  quality = 'high',
+  scrollSettle = false,
+  settleDistance
 }: LightPillarProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -43,6 +58,13 @@ const LightPillar = ({
   const mouseRef = useRef(new THREE.Vector2(0, 0));
   const timeRef = useRef(0);
   const rotationSpeedRef = useRef(rotationSpeed);
+  // Base intensity/glow the scroll-settle modulation multiplies against, plus
+  // the live scroll-settle config — all kept in refs so the render loop reads
+  // current values without re-running the WebGL setup effect.
+  const baseIntensityRef = useRef(intensity);
+  const baseGlowRef = useRef(glowAmount);
+  const scrollSettleRef = useRef(scrollSettle);
+  const settleDistanceRef = useRef(settleDistance);
   const [webGLSupported, setWebGLSupported] = useState(true);
 
   useEffect(() => {
@@ -264,11 +286,29 @@ const LightPillar = ({
       if (!materialRef.current || !rendererRef.current || !sceneRef.current || !cameraRef.current) return;
       const deltaTime = currentTime - lastTime;
       if (deltaTime >= frameTime) {
-        timeRef.current += 0.016 * rotationSpeedRef.current;
+        // `settle`: 1 at the top of the page → 0 once the user has scrolled
+        // `settleDistance` px. Drives three facets of the shader at once so the
+        // pillar visibly *calms* (slower motion, dimmer, tighter glow) rather
+        // than flat-fading. At settle === 1 every factor is 1.0 → resting look.
+        let settle = 1;
+        if (scrollSettleRef.current) {
+          const dist = settleDistanceRef.current || window.innerHeight || 1;
+          const p = Math.min(Math.max(window.scrollY / dist, 0), 1);
+          settle = 1 - p;
+        }
+        // Rotation slows toward 12% (eases to a near-stop instead of freezing
+        // abruptly mid-transition) so `uTime` keeps a little life while fading.
+        const motionScale = 0.12 + 0.88 * settle;
+        timeRef.current += 0.016 * rotationSpeedRef.current * motionScale;
         const t = timeRef.current;
         materialRef.current.uniforms.uTime.value = t;
         materialRef.current.uniforms.uRotCos.value = Math.cos(t * 0.3);
         materialRef.current.uniforms.uRotSin.value = Math.sin(t * 0.3);
+        if (scrollSettleRef.current) {
+          const eased = settle * settle * (3 - 2 * settle); // smoothstep energy curve
+          materialRef.current.uniforms.uIntensity.value = baseIntensityRef.current * eased;
+          materialRef.current.uniforms.uGlowAmount.value = baseGlowRef.current * (0.25 + 0.75 * settle);
+        }
         rendererRef.current.render(sceneRef.current, cameraRef.current);
         lastTime = currentTime - (deltaTime % frameTime);
       }
@@ -345,6 +385,7 @@ const LightPillar = ({
   }, [bottomColor]);
 
   useEffect(() => {
+    baseIntensityRef.current = intensity;
     if (!materialRef.current) return;
     materialRef.current.uniforms.uIntensity.value = intensity;
   }, [intensity]);
@@ -355,9 +396,24 @@ const LightPillar = ({
   }, [interactive]);
 
   useEffect(() => {
+    baseGlowRef.current = glowAmount;
     if (!materialRef.current) return;
     materialRef.current.uniforms.uGlowAmount.value = glowAmount;
   }, [glowAmount]);
+
+  useEffect(() => {
+    scrollSettleRef.current = scrollSettle;
+    // When settling is turned off, restore the resting base uniforms the loop
+    // is no longer maintaining.
+    if (!scrollSettle && materialRef.current) {
+      materialRef.current.uniforms.uIntensity.value = baseIntensityRef.current;
+      materialRef.current.uniforms.uGlowAmount.value = baseGlowRef.current;
+    }
+  }, [scrollSettle]);
+
+  useEffect(() => {
+    settleDistanceRef.current = settleDistance;
+  }, [settleDistance]);
 
   useEffect(() => {
     if (!materialRef.current) return;
