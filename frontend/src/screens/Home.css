@@ -161,11 +161,11 @@
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  /* Compensates for the header no longer being a flex child here (it's
-     `position: fixed`, see .rx-header) — reproduces its old reserved flow
-     height exactly (49.5px rendered height minus its 10px negative margin)
-     so the left content block below doesn't shift up into its old spot. */
-  margin-top: 39.5px;
+  /* Nudges the vertically-centered left content block up, opening more
+     visible gap between the START MIGRATION button and the REJOX wordmark
+     below (wordmark position is unaffected — it's a separate flex sibling
+     docked to the frame's bottom, not dependent on this margin). */
+  margin-top: 0;
 }
 .rx-left {
   max-width: 560px;
@@ -293,11 +293,10 @@
 }
 
 /* ============================ Section 02 ============================ */
-/* A plain white section that flows normally below the hero in document order.
-   Rounded top corners are purely cosmetic. */
+/* A plain dark section (flat --rx-black, matching the hero's base color —
+   no LightPillar/WebGL here) that flows normally below the hero in document
+   order. Square corners, no radius. */
 .rx-section2 {
   min-height: 100vh;
-  background: var(--rx-white);
-  border-top-left-radius: 32px;
-  border-top-right-radius: 32px;
+  background: var(--rx-black);
 }
