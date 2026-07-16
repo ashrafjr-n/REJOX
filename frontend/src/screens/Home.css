@@ -77,7 +77,9 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* --- the bounding frame: 1px hairline inset from all four edges --- */
+/* --- the content frame: inset from all four edges. The visible hairline
+   border has been removed; the frame now only lays out its content (the
+   inset, padding and column flow are unchanged). --- */
 .rx-frame {
   position: absolute;
   /* top is larger than the sides/bottom to leave room for the header above it */
@@ -86,8 +88,6 @@
   display: flex;
   flex-direction: column;
   padding: var(--rx-frame-pad);
-  border: 1px solid var(--rx-hairline);
-  border-radius: 4px;
 }
 
 /* ============================ header ============================ */
@@ -190,6 +190,13 @@
 }
 .rx-left {
   max-width: 560px;
+  /* Task 3: slight rightward nudge of the whole left-content block. */
+  margin-left: 40px;
+  /* Task 4: raise the block (label + paragraph + button) so the gap between
+     the START MIGRATION button and the REJOX wordmark below widens. Using a
+     transform keeps this purely visual — the wordmark and the flex sizing of
+     `.rx-mid` are untouched. */
+  transform: translateY(-56px);
 }
 .rx-eyebrow {
   display: flex;
@@ -274,9 +281,14 @@
   width: 16px;
   height: 16px;
   transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  /* Rest state: arrow points diagonally up-left. On hover it rotates back to
+     its rightward orientation (rotate 0) while keeping the existing 3px nudge.
+     translateX(0) is stated explicitly so the two transform lists interpolate
+     component-wise for a smooth rotate. */
+  transform: translateX(0) rotate(-135deg);
 }
 .rx-start:hover .rx-start-chip svg {
-  transform: translateX(3px);
+  transform: translateX(3px) rotate(0deg);
 }
 
 /* ============================ bottom wordmark ============================ */
