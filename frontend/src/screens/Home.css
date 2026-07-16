@@ -33,7 +33,11 @@
   --rx-nav-item-bg: #2a2a2f;
   --rx-light-silver: #c9c9ce;
 
-  --rx-frame-inset: 28px;
+  /* Frame inset from the viewport edges. Sides + bottom share one value;
+     the top is deliberately larger (--rx-frame-inset-top) so the fixed
+     header can live in the extra margin ABOVE the frame's top border. */
+  --rx-frame-inset: 48px;
+  --rx-frame-inset-top: 78px;
   --rx-frame-pad: 26px;
   --rx-hairline: rgba(255, 255, 255, 0.12);
 }
@@ -55,7 +59,8 @@
 /* --- the bounding frame: 1px hairline inset from all four edges --- */
 .rx-frame {
   position: absolute;
-  inset: var(--rx-frame-inset);
+  /* top is larger than the sides/bottom to leave room for the header above it */
+  inset: var(--rx-frame-inset-top) var(--rx-frame-inset) var(--rx-frame-inset);
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -66,13 +71,16 @@
 
 /* ============================ header ============================ */
 /* Fixed to the viewport (not a `.rx-frame` flex child) so it stays visible
-   for the whole page. top/left/right reproduce its old flex position exactly:
-   frame inset + 1px border + frame padding on all sides, with the top nudged
-   up 10px closer to the hairline. z-index sits above the hero and Section 02,
-   which are its siblings under `.rx-home`. */
+   for the whole page. It now sits ABOVE the frame's top border, in the
+   enlarged top margin between the viewport edge and the frame: `top` is a
+   small fixed offset from the viewport (well above the frame border, which
+   starts at --rx-frame-inset-top), while left/right stay aligned to the
+   frame's inner content columns (frame inset + 1px border + frame padding).
+   z-index sits above the hero and Section 02, which are its siblings under
+   `.rx-home`. */
 .rx-header {
   position: fixed;
-  top: calc(var(--rx-frame-inset) + 1px + var(--rx-frame-pad) - 10px);
+  top: 20px;
   left: calc(var(--rx-frame-inset) + 1px + var(--rx-frame-pad));
   right: calc(var(--rx-frame-inset) + 1px + var(--rx-frame-pad));
   z-index: 50;
@@ -95,7 +103,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px;
+  padding: 4px 5px;
   border-radius: 999px;
   background: var(--rx-dark-silver);
 }
@@ -113,7 +121,7 @@
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.01em;
-  padding: 8px 16px;
+  padding: 6px 16px;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
@@ -136,7 +144,7 @@
   color: var(--rx-black);
   font-size: 13px;
   font-weight: 600;
-  padding: 10px 20px;
+  padding: 8px 20px;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
