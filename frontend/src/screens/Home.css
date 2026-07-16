@@ -73,7 +73,9 @@
   overflow: hidden;
   background: transparent;
   color: var(--rx-white);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Inherit the site font system (Clash Display, defined in index.css).
+     The REJOX wordmark below overrides this with Archivo Expanded. */
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -304,10 +306,15 @@
   margin: 0;
   width: 100%;
   text-align: center;
+  /* Archivo Expanded (self-hosted, weight 900) — the wordmark keeps its own
+     display face; Clash Display remains the site font everywhere else. */
   font-family: 'Archivo Expanded', 'Arial Black', sans-serif;
   font-weight: 900;
   font-stretch: 125%;
-  font-size: 20.3vw;
+  /* Slightly larger again (from 18.27vw); the bulk of the size increase is
+     width, applied via scaleX below rather than font-size, so the wordmark
+     reads noticeably WIDER rather than uniformly bigger. */
+  font-size: 19vw;
   line-height: 0.78;
   letter-spacing: 0.005em;
   white-space: nowrap;
@@ -315,10 +322,20 @@
   /* Letterforms stretched taller (scaleY only — the X axis is never touched,
      so rendered WIDTH is unchanged), growing upward from the baseline so the
      wordmark stays flush with the frame's bottom edge. */
-  transform: scaleY(1.32);
+  /* scaleY: taller letterforms. scaleX(1.08): widen the wordmark horizontally
+     (the width emphasis) while staying centered via the 50% origin. translateY:
+     nudged further down (was 18px) — applied here rather than on the
+     motion-driven `.rx-wordmark-wrap`, whose inline entrance transform would
+     override it. */
+  transform: translateY(30px) scaleY(1.32) scaleX(1.08);
   transform-origin: 50% 100%;
+  /* More transparent than before (was 0.92) so the wordmark reads as a faint
+     hollow outline; the letters' interior is already see-through via the
+     stroke-only style below — this just fades the overall mark further while
+     the stroke edge stays legible against the background. */
+  opacity: 0.6;
 }
-/* stroke layer: transparent fill + near-white outline */
+/* stroke layer: transparent (hollow) fill + near-white outline edge */
 .rx-wordmark-stroke {
   color: transparent;
   -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.92);
