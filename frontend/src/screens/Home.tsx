@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 import './Home.css'
 import BorderGlow from './BorderGlow'
 import LightPillar from './LightPillar'
 import ScrollReveal from './ScrollReveal'
 import rejoxLogo from '../assets/rejox-logo.svg'
+
+gsap.registerPlugin(ScrollTrigger)
 
 /**
  * Rejox marketing home — a static hero followed by a normal Section 02.
@@ -89,32 +93,39 @@ function BoltIcon() {
 }
 
 /* ============================================================================
- * Project Intelligence — the live, looping "watch Rejox analyze" scene that
- * flows directly below the hero (this replaces the old empty Section 02).
+ * Project Intelligence — the live "watch Rejox analyze" scene that flows
+ * directly below the hero (this replaces the old empty Section 02).
  *
- * It is NOT a static info block: it plays a ~6s cycle that reads as Rejox
- * analyzing ONE fixed sample project in real time, then loops.
+ * It is NOT a static info block: it plays ONCE, triggered the first time the
+ * section scrolls into view, then stops permanently — it never loops and
+ * never restarts on subsequent scroll-ins. The only motion that persists
+ * after the sequence ends is the small "live" status dot on the dashboard
+ * panel bar (a generic "system is live" indicator, not part of the reveal).
  *
- * Sequencing model — a single ordered PI_TIMELINE of `{ t, id }` events drives
- * everything. A chained-setTimeout driver advances one scalar reveal threshold
- * (`revealedT`); every element derives its own visibility from
- * `event.t <= revealedT`. That keeps the whole scene coherent from one number
- * and costs only ~17 state updates per cycle (no per-frame rAF).
+ * Sequencing model — a single async `run()` walks the story top to bottom:
+ * upload bar fill -> typed "uploaded" line -> the file tree, one line at a
+ * time with a real character-by-character typewriter effect (a blinking
+ * cursor rides the END of whichever line is currently typing, and only while
+ * something is actively typing) -> counted-up stat numbers synced to the
+ * line that revealed them -> "Project Intelligence Complete" -> a synced
+ * count-up + fill of the readiness bar -> a warning line -> a one-shot
+ * "Knowledge Graph Built" flash above the terminal that fades in, holds
+ * briefly, fades out, and never reappears.
  *
- * Causal tree -> card sync — each card event is scheduled ~80ms AFTER its
- * triggering tree node's event, so the node lands and then the matching stat
- * card pops. The reveal reads as *caused by* the detection, not as two
- * independent animations (Pages->37 Pages, Components->142 Components,
- * Hooks->React 19, Libraries->the four library pills).
+ * Causal tree -> card sync — each dashboard stat card mounts shortly AFTER
+ * its triggering tree line finishes typing (and, for Pages/Components,
+ * after their number finishes counting up), so the reveal reads as *caused
+ * by* the detection. A thin one-shot "beam" is drawn from the terminal's
+ * right edge to each card the instant it mounts (measured via
+ * getBoundingClientRect against the live two-panel wrapper), reinforcing
+ * that the dashboard is fed by what the terminal just found.
  *
  * Fixed facts — every number/name below (142 Components, 37 Pages, React 19,
  * Tailwind, Zustand, Axios, Framer Motion, 96% readiness) is a hard-coded
- * constant describing the SAME one sample project. Nothing is randomized, so
- * the story is identical on every loop.
+ * constant describing the SAME one sample project.
  *
- * Performance — an IntersectionObserver pauses the whole loop while the section
- * is scrolled out of view, and `prefers-reduced-motion` collapses it to the
- * finished state with no animation.
+ * Performance — `prefers-reduced-motion` skips straight to the fully
+ * resolved frame (no typing, no counting, no flash, no beams).
  * ==========================================================================*/
 
 const PI_SAMPLE = 'sample-app'
@@ -124,11 +135,11 @@ const PI_READINESS = 96
 
 /* Tree children, in the exact order Project |-- Pages ... `-- Routing.
    `dot` flags the nodes whose detection triggers a stat reveal on the right,
-   so the causal link is legible in the tree itself. `badge` mirrors the
-   right-side number on the node the moment it is detected. */
-const PI_TREE: { id: string; label: string; badge?: string; dot?: boolean }[] = [
-  { id: 'pages', label: 'Pages', badge: '37', dot: true },
-  { id: 'components', label: 'Components', badge: '142', dot: true },
+   so the causal link is legible in the tree itself. `count` drives a synced
+   count-up badge for the two nodes that carry a number. */
+const PI_TREE: { id: string; label: string; count?: number; dot?: boolean }[] = [
+  { id: 'pages', label: 'Pages', count: 37, dot: true },
+  { id: 'components', label: 'Components', count: 142, dot: true },
   { id: 'hooks', label: 'Hooks', dot: true },
   { id: 'apis', label: 'APIs' },
   { id: 'assets', label: 'Assets' },
@@ -136,44 +147,22 @@ const PI_TREE: { id: string; label: string; badge?: string; dot?: boolean }[] = 
   { id: 'routing', label: 'Routing' },
 ]
 
-/* The four detected libraries, each with its own reveal event id. */
+/* The four detected libraries, each with its own staggered reveal. */
 const PI_LIBS = [
-  { id: 'card:tailwind', label: 'Tailwind' },
-  { id: 'card:zustand', label: 'Zustand' },
-  { id: 'card:axios', label: 'Axios' },
-  { id: 'card:framer', label: 'Framer Motion' },
+  { id: 'tailwind', label: 'Tailwind' },
+  { id: 'zustand', label: 'Zustand' },
+  { id: 'axios', label: 'Axios' },
+  { id: 'framer', label: 'Framer Motion' },
 ] as const
 
-type PiEvent = { t: number; id: string }
-
-/* Single source of truth for timing. Card events sit ~80ms after their tree
-   node so detection visibly precedes the card pop. The tail is deliberately
-   unhurried: a readable beat on "Complete", a prompt gauge fill, then ~1s of
-   settled 96% before the soft fade-out and reset. */
-const PI_TIMELINE: PiEvent[] = [
-  { t: 450, id: 'node:project' },
-  { t: 700, id: 'node:pages' },
-  { t: 780, id: 'card:pages' },
-  { t: 1040, id: 'node:components' },
-  { t: 1120, id: 'card:components' },
-  { t: 1380, id: 'node:hooks' },
-  { t: 1460, id: 'card:react' },
-  { t: 1700, id: 'node:apis' },
-  { t: 1980, id: 'node:assets' },
-  { t: 2300, id: 'node:libraries' },
-  { t: 2400, id: 'card:tailwind' },
-  { t: 2520, id: 'card:zustand' },
-  { t: 2640, id: 'card:axios' },
-  { t: 2760, id: 'card:framer' },
-  { t: 3080, id: 'node:routing' },
-  { t: 3560, id: 'complete' },
-  { t: 4080, id: 'readiness' },
-]
-const PI_EVENT_AT: Record<string, number> = Object.fromEntries(
-  PI_TIMELINE.map((e) => [e.id, e.t])
-)
-const PI_CYCLE_MS = 6000
-const PI_FADE_MS = 320
+/* Timing constants for the one-shot sequence (ms). */
+const PI_UPLOAD_MS = 460
+const PI_CHAR_MS = 17
+const PI_COUNT_MS = 500
+const PI_NODE_PAUSE_MS = 160
+const PI_LIB_STAGGER_MS = 130
+const PI_READY_MS = 900
+const PI_CARD_DELAY_MS = 90
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -185,20 +174,6 @@ function usePrefersReducedMotion() {
     return () => mq.removeEventListener('change', sync)
   }, [])
   return reduced
-}
-
-/* Small stroked folder glyph for the tree rows. */
-function FolderGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
 }
 
 function CheckGlyph() {
@@ -215,61 +190,300 @@ function CheckGlyph() {
   )
 }
 
+function piWait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+/* Types `text` into `onUpdate` one character at a time. Checks `cancelled`
+   after every await so an unmount/reduced-motion switch mid-sequence stops
+   cleanly instead of continuing to write into stale state. */
+async function piType(
+  text: string,
+  onUpdate: (partial: string) => void,
+  charMs: number,
+  cancelled: { current: boolean }
+) {
+  for (let i = 1; i <= text.length; i++) {
+    if (cancelled.current) return
+    onUpdate(text.slice(0, i))
+    if (i < text.length) await piWait(charMs)
+  }
+}
+
+function piEaseOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3)
+}
+
+/* Counts 0 -> target over durationMs via rAF (eased), independent of the
+   chained-setTimeout driver so it stays smooth regardless of tab throttling. */
+function piCountUp(
+  target: number,
+  durationMs: number,
+  onUpdate: (n: number) => void,
+  cancelled: { current: boolean }
+): Promise<void> {
+  return new Promise((resolve) => {
+    const start = performance.now()
+    function frame(now: number) {
+      if (cancelled.current) return resolve()
+      const t = Math.min(1, (now - start) / durationMs)
+      onUpdate(Math.round(target * piEaseOutCubic(t)))
+      if (t < 1) requestAnimationFrame(frame)
+      else resolve()
+    }
+    requestAnimationFrame(frame)
+  })
+}
+
+type PiBeam = { id: string; top: number; left: number; width: number }
+
 function ProjectIntelligence() {
   const sectionRef = useRef<HTMLElement | null>(null)
+  const piInnerRef = useRef<HTMLDivElement | null>(null)
+  const liveRef = useRef<HTMLDivElement | null>(null)
+  const terminalRef = useRef<HTMLDivElement | null>(null)
+  const beamedRef = useRef<Set<string>>(new Set())
   const reduced = usePrefersReducedMotion()
-  const [inView, setInView] = useState(false)
-  const [revealedT, setRevealedT] = useState(0)
-  const [fading, setFading] = useState(false)
-  const [cycle, setCycle] = useState(0)
+  const [started, setStarted] = useState(false)
 
-  /* Pause the whole loop whenever the section is scrolled out of view. */
+  const [uploading, setUploading] = useState(true)
+  const [uploadTyped, setUploadTyped] = useState('')
+  const [rootOn, setRootOn] = useState(false)
+  const [nodeTyped, setNodeTyped] = useState<Record<string, string>>({})
+  const [nodeCount, setNodeCount] = useState<Record<string, number>>({})
+  const [activeLine, setActiveLine] = useState<string | null>(null)
+  const [completeTyped, setCompleteTyped] = useState('')
+  const [readinessOn, setReadinessOn] = useState(false)
+  const [readinessPct, setReadinessPct] = useState(0)
+  const [warnTyped, setWarnTyped] = useState('')
+  const [cardOn, setCardOn] = useState<Record<string, boolean>>({})
+  const [flash, setFlash] = useState<'hidden' | 'visible' | 'gone'>('hidden')
+  const [beams, setBeams] = useState<PiBeam[]>([])
+
+  /* Scroll-driven entrance/exit for the whole live-analysis card — tilt-in
+     entrance (rotate baseRotation->0) with opacity + blur in, then a straight
+     fade/blur out on exit (NO rotation). Applied to the OUTER .rx-pi-inner
+     wrapper. Skipped under reduced-motion (content stays fully visible). */
+  useEffect(() => {
+    const el = piInnerRef.current
+    if (!el || reduced) return
+    const baseOpacity = 0
+    const baseRotation = 3
+    const blurStrength = 10
+    const ctx = gsap.context(() => {
+      const revealTrigger = {
+        trigger: el,
+        start: 'top bottom',
+        end: 'top center',
+        scrub: true,
+      }
+      gsap.fromTo(
+        el,
+        {
+          transformOrigin: '0% 50%',
+          rotate: baseRotation,
+          opacity: baseOpacity,
+          filter: `blur(${blurStrength}px)`,
+        },
+        {
+          ease: 'none',
+          rotate: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          scrollTrigger: revealTrigger,
+        }
+      )
+      gsap.to(el, {
+        ease: 'none',
+        opacity: baseOpacity,
+        filter: `blur(${blurStrength}px)`,
+        immediateRender: false,
+        scrollTrigger: { trigger: el, start: 'top 20%', end: '+=50%', scrub: true },
+      })
+    }, el)
+    return () => ctx.revert()
+  }, [reduced])
+
+  /* Trigger the sequence exactly once, the first time the section scrolls
+     into view — then disconnect so it can never fire again. */
   useEffect(() => {
     const el = sectionRef.current
     if (!el) return
     const io = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      { threshold: 0.15 }
+      ([entry]) => {
+        console.log('[PI] IO fired, isIntersecting=', entry.isIntersecting, 'ratio=', entry.intersectionRatio)
+        if (entry.isIntersecting) {
+          setStarted(true)
+          io.disconnect()
+        }
+      },
+      { threshold: 0.25 }
     )
     io.observe(el)
     return () => io.disconnect()
   }, [])
 
-  /* The driver. reduced-motion => jump straight to the finished frame and never
-     animate. Otherwise, while in view, walk PI_TIMELINE with chained timeouts,
-     advancing the reveal threshold; fade out near the end; then loop. Bumping
-     `cycle` re-keys the CSS-driven upload bar + gauge so they restart cleanly. */
+  /* Draw a one-shot thin beam from the terminal's right edge to a dashboard
+     card's left edge, measured against the live two-panel wrapper so it
+     lands correctly regardless of viewport width. Skipped under reduced
+     motion and guarded so each card only ever spawns one beam. */
+  const spawnBeam = (id: string, cardEl: HTMLElement) => {
+    if (reduced || beamedRef.current.has(id)) return
+    const liveEl = liveRef.current
+    const termEl = terminalRef.current
+    if (!liveEl || !termEl) return
+    const liveBox = liveEl.getBoundingClientRect()
+    const termBox = termEl.getBoundingClientRect()
+    const cardBox = cardEl.getBoundingClientRect()
+    const width = Math.round(cardBox.left - termBox.right)
+    if (width < 4) return
+    beamedRef.current.add(id)
+    setBeams((b) => [
+      ...b,
+      {
+        id,
+        top: Math.round(cardBox.top + cardBox.height / 2 - liveBox.top),
+        left: Math.round(termBox.right - liveBox.left),
+        width,
+      },
+    ])
+  }
+
+  /* The one-shot driver. reduced-motion => jump straight to the finished
+     frame with no animation, no flash, no beams. Otherwise walk the story
+     once with a single cancellable async function; nothing ever resets. */
   useEffect(() => {
+    console.log('[PI] driver effect fired, started=', started, 'reduced=', reduced)
+    if (!started) return
+
     if (reduced) {
-      setRevealedT(Number.MAX_SAFE_INTEGER)
-      setFading(false)
+      setUploading(false)
+      setUploadTyped(`${PI_SAMPLE}.zip uploaded`)
+      setRootOn(true)
+      setNodeTyped(Object.fromEntries(PI_TREE.map((n) => [n.id, n.label])))
+      setNodeCount(
+        Object.fromEntries(
+          PI_TREE.filter((n): n is typeof n & { count: number } => typeof n.count === 'number').map(
+            (n) => [n.id, n.count]
+          )
+        )
+      )
+      setCardOn({
+        pages: true,
+        components: true,
+        react: true,
+        libraries: true,
+        tailwind: true,
+        zustand: true,
+        axios: true,
+        framer: true,
+      })
+      setCompleteTyped('Project Intelligence Complete')
+      setReadinessOn(true)
+      setReadinessPct(PI_READINESS)
+      setWarnTyped('2 unsupported libraries detected')
+      setActiveLine(null)
+      setFlash('gone')
       return
     }
-    if (!inView) return
-    let timers: number[] = []
-    const at = (fn: () => void, ms: number) => {
-      timers.push(window.setTimeout(fn, ms))
-    }
-    const runCycle = () => {
-      timers.forEach((t) => clearTimeout(t))
-      timers = []
-      setFading(false)
-      setRevealedT(0)
-      setCycle((c) => c + 1)
-      for (const ev of PI_TIMELINE) at(() => setRevealedT(ev.t), ev.t)
-      at(() => setFading(true), PI_CYCLE_MS - PI_FADE_MS)
-      at(runCycle, PI_CYCLE_MS)
-    }
-    runCycle()
-    return () => {
-      timers.forEach((t) => clearTimeout(t))
-    }
-  }, [inView, reduced])
 
-  const isOn = (id: string) => revealedT >= (PI_EVENT_AT[id] ?? Infinity)
-  const uploading = !isOn('node:project')
-  const complete = isOn('complete')
-  const readiness = isOn('readiness')
+    const cancelled = { current: false }
+    ;(window as any).__piRuns = ((window as any).__piRuns ?? 0) + 1
+    const runId = (window as any).__piRuns
+    console.log('[PI] run start', runId)
+
+    async function run() {
+      try {
+      await piWait(400)
+      console.log('[PI] after 400 wait', runId, 'cancelled=', cancelled.current)
+      if (cancelled.current) return
+
+      // Upload progress track fills via its own CSS animation (0.46s); wait
+      // for it to visually resolve before flipping to the "uploaded" state.
+      await piWait(PI_UPLOAD_MS)
+      console.log('[PI] after upload wait', runId)
+      if (cancelled.current) return
+      setUploading(false)
+      setActiveLine('upload')
+      await piType(`${PI_SAMPLE}.zip uploaded`, setUploadTyped, PI_CHAR_MS, cancelled)
+      if (cancelled.current) return
+
+      await piWait(240)
+      if (cancelled.current) return
+      setRootOn(true)
+      setActiveLine(null)
+      await piWait(200)
+      if (cancelled.current) return
+
+      for (const node of PI_TREE) {
+        setActiveLine(node.id)
+        setNodeTyped((s) => ({ ...s, [node.id]: '' }))
+        await piType(
+          node.label,
+          (partial) => setNodeTyped((s) => ({ ...s, [node.id]: partial })),
+          PI_CHAR_MS,
+          cancelled
+        )
+        if (cancelled.current) return
+
+        if (typeof node.count === 'number') {
+          setNodeCount((s) => ({ ...s, [node.id]: 0 }))
+          await piCountUp(
+            node.count,
+            PI_COUNT_MS,
+            (n) => setNodeCount((s) => ({ ...s, [node.id]: n })),
+            cancelled
+          )
+          if (cancelled.current) return
+        }
+
+        if (node.id === 'pages' || node.id === 'components' || node.id === 'hooks') {
+          await piWait(PI_CARD_DELAY_MS)
+          if (cancelled.current) return
+          setCardOn((s) => ({ ...s, [node.id === 'hooks' ? 'react' : node.id]: true }))
+        } else if (node.id === 'libraries') {
+          setCardOn((s) => ({ ...s, libraries: true }))
+          for (const lib of PI_LIBS) {
+            await piWait(PI_LIB_STAGGER_MS)
+            if (cancelled.current) return
+            setCardOn((s) => ({ ...s, [lib.id]: true }))
+          }
+        }
+
+        await piWait(PI_NODE_PAUSE_MS)
+        if (cancelled.current) return
+      }
+
+      setActiveLine('complete')
+      await piType('Project Intelligence Complete', setCompleteTyped, PI_CHAR_MS, cancelled)
+      if (cancelled.current) return
+
+      await piWait(260)
+      if (cancelled.current) return
+      setReadinessOn(true)
+      await piCountUp(PI_READINESS, PI_READY_MS, setReadinessPct, cancelled)
+      if (cancelled.current) return
+
+      await piWait(180)
+      if (cancelled.current) return
+      setActiveLine('warn')
+      await piType('2 unsupported libraries detected', setWarnTyped, PI_CHAR_MS, cancelled)
+      if (cancelled.current) return
+      setActiveLine(null)
+
+      await piWait(320)
+      if (cancelled.current) return
+      setFlash('visible')
+      } catch (err) {
+        console.error('[PI] run() threw', err)
+      }
+    }
+
+    run()
+    return () => {
+      cancelled.current = true
+    }
+  }, [started, reduced])
 
   return (
     <>
@@ -321,142 +535,220 @@ function ProjectIntelligence() {
         </div>
       </section>
 
-      {/* Live-analysis section — the terminal/tree/dashboard, UNCHANGED. Flows
-          after the intro in scroll order. Keeps the IntersectionObserver ref so
-          its build/loop still pauses while off-screen. */}
+      {/* Live-analysis section — the terminal/tree/dashboard. Flows after the
+          intro in scroll order. Keeps the IntersectionObserver ref so the
+          one-shot sequence starts the first time it scrolls into view. */}
       <section
         ref={sectionRef}
         className="rx-section2 rx-pi"
         aria-label="Project Intelligence Analysis"
       >
-      <div className="rx-pi-inner">
-        {/* MIDDLE + RIGHT fade out together just before each reset. */}
-        <div className={'rx-pi-live' + (fading ? ' is-fading' : '')}>
-          {/* MIDDLE — upload -> live tree build -> complete -> readiness gauge. */}
-          <div className="rx-pi-scene">
-            <div className="rx-pi-upload">
-              {uploading ? (
-                <>
-                  <span className="rx-pi-upload-label">
-                    Upload {PI_SAMPLE}.zip
-                  </span>
-                  <span className="rx-pi-upload-track" aria-hidden="true">
-                    <span key={cycle} className="rx-pi-upload-fill" />
-                  </span>
-                </>
-              ) : (
-                <span className="rx-pi-upload-done">
-                  <span className="rx-pi-upload-check" aria-hidden="true">
-                    <CheckGlyph />
-                  </span>
-                  {PI_SAMPLE}.zip uploaded
-                </span>
-              )}
+      <div className="rx-pi-inner" ref={piInnerRef}>
+        <div className="rx-pi-live" ref={liveRef}>
+          {/* One-shot "Knowledge Graph Built" flash — appears above the
+              terminal only once, right after the typing sequence finishes,
+              fades in/out over ~1s, then is removed from the DOM for good. */}
+          {flash === 'visible' && (
+            <div
+              className="rx-pi-flash"
+              onAnimationEnd={() => setFlash('gone')}
+            >
+              <CheckGlyph />
+              Knowledge Graph Built
             </div>
+          )}
 
-            <div className="rx-pi-tree" role="tree" aria-label="Project structure">
-              {isOn('node:project') && (
-                <div className="rx-pi-node rx-pi-node-root">
-                  <span className="rx-pi-folder" aria-hidden="true">
-                    <FolderGlyph />
+          {/* Thin one-shot beams from the terminal's right edge to each
+              dashboard card, drawn the instant that card mounts. */}
+          <div className="rx-pi-wire" aria-hidden="true">
+            {beams.map((b) => (
+              <span
+                key={b.id}
+                className="rx-pi-beam"
+                style={{ top: b.top, left: b.left, width: b.width }}
+              />
+            ))}
+          </div>
+
+          {/* LEFT — terminal / code-editor window: a chromed panel (window-control
+              dots + filename) whose monospace body streams the live analysis:
+              upload -> tree build (line by line, real character-by-character
+              typing, blinking cursor on the active line only) -> Complete ->
+              Readiness. */}
+          <div className="rx-pi-scene rx-pi-panel rx-pi-terminal" ref={terminalRef}>
+            <div className="rx-pi-panel-bar rx-pi-term-bar" aria-hidden="true">
+              <span className="rx-pi-term-dots">
+                <span className="rx-pi-term-dot" />
+                <span className="rx-pi-term-dot" />
+                <span className="rx-pi-term-dot" />
+              </span>
+              <span className="rx-pi-term-title">{PI_SAMPLE}.zip</span>
+              <span className="rx-pi-term-tag">analysis</span>
+            </div>
+            <div className="rx-pi-panel-body rx-pi-term-body">
+              <div className="rx-pi-upload">
+                {uploading ? (
+                  <>
+                    <span className="rx-pi-upload-label">
+                      Upload {PI_SAMPLE}.zip
+                    </span>
+                    <span className="rx-pi-upload-track" aria-hidden="true">
+                      <span className="rx-pi-upload-fill" />
+                    </span>
+                  </>
+                ) : (
+                  <span className="rx-pi-upload-done">
+                    <span className="rx-pi-upload-check" aria-hidden="true">
+                      <CheckGlyph />
+                    </span>
+                    {uploadTyped}
+                    {activeLine === 'upload' && (
+                      <span className="rx-pi-cursor" aria-hidden="true" />
+                    )}
                   </span>
-                  <span className="rx-pi-node-label">Project</span>
-                </div>
-              )}
-              {PI_TREE.map((node, i) => {
-                const last = i === PI_TREE.length - 1
-                return (
-                  isOn('node:' + node.id) && (
+                )}
+              </div>
+
+              <div className="rx-pi-tree" role="tree" aria-label="Project structure">
+                {rootOn && (
+                  <div className="rx-pi-node rx-pi-node-root">
+                    <span className="rx-pi-node-label rx-pi-dir">Project</span>
+                  </div>
+                )}
+                {PI_TREE.map((node, i) => {
+                  const last = i === PI_TREE.length - 1
+                  const typed = nodeTyped[node.id]
+                  if (typed === undefined) return null
+                  const done = typed === node.label
+                  const count = nodeCount[node.id]
+                  return (
                     <div key={node.id} className="rx-pi-node">
                       <span className="rx-pi-branch" aria-hidden="true">
                         {last ? '└──' : '├──'}
                       </span>
                       <span
                         className={
-                          'rx-pi-folder' + (node.dot ? ' is-detected' : '')
+                          'rx-pi-node-label' +
+                          (done ? ' rx-pi-dir' : '') +
+                          (node.dot && done ? ' is-detected' : '')
                         }
-                        aria-hidden="true"
                       >
-                        <FolderGlyph />
+                        {typed}
                       </span>
-                      <span className="rx-pi-node-label">{node.label}</span>
-                      {node.badge && (
-                        <span className="rx-pi-node-badge">{node.badge}</span>
+                      {count !== undefined && (
+                        <span className="rx-pi-node-count">{count}</span>
+                      )}
+                      {activeLine === node.id && (
+                        <span className="rx-pi-cursor" aria-hidden="true" />
                       )}
                     </div>
                   )
-                )
-              })}
-            </div>
-
-            {complete && (
-              <div className="rx-pi-complete">
-                <span className="rx-pi-complete-check" aria-hidden="true">
-                  <CheckGlyph />
-                </span>
-                Project Intelligence Complete
+                })}
               </div>
-            )}
 
-            {readiness && (
-              <div className="rx-pi-readiness">
-                <div className={'rx-pi-gauge' + (reduced ? ' no-anim' : '')}>
-                  {/* r=36 => circumference 226.195; the CSS fills the arc to 96%.
-                      Keep this radius in sync with the dashoffset literals in
-                      Home.css (.rx-pi-gauge-arc / @keyframes piGaugeFill). */}
-                  <svg viewBox="0 0 88 88" aria-hidden="true">
-                    <circle className="rx-pi-gauge-track" cx="44" cy="44" r="36" />
-                    <circle className="rx-pi-gauge-arc" cx="44" cy="44" r="36" />
-                  </svg>
-                  <span className="rx-pi-gauge-num">{PI_READINESS}%</span>
-                </div>
-                <div className="rx-pi-readiness-copy">
-                  <span className="rx-pi-readiness-title">
-                    Migration Readiness
+              {completeTyped && (
+                <div className="rx-pi-termline rx-pi-line-ok">
+                  <span className="rx-pi-line-glyph" aria-hidden="true">
+                    <CheckGlyph />
                   </span>
-                  <span className="rx-pi-readiness-note">
-                    2 unsupported libraries detected
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT — lighter stat pills/cards, revealed in sync with the tree. */}
-          <div className="rx-pi-stats" aria-label="Detected project facts">
-            {isOn('card:pages') && (
-              <div className="rx-pi-stat">
-                <span className="rx-pi-stat-value">37</span>
-                <span className="rx-pi-stat-label">Pages</span>
-              </div>
-            )}
-            {isOn('card:components') && (
-              <div className="rx-pi-stat">
-                <span className="rx-pi-stat-value">142</span>
-                <span className="rx-pi-stat-label">Components</span>
-              </div>
-            )}
-            {isOn('card:react') && (
-              <div className="rx-pi-stat">
-                <span className="rx-pi-stat-value">React 19</span>
-                <span className="rx-pi-stat-label">Framework</span>
-              </div>
-            )}
-            {isOn('node:libraries') && (
-              <div className="rx-pi-stat rx-pi-stat-libs">
-                <span className="rx-pi-stat-label">Libraries</span>
-                <div className="rx-pi-pills">
-                  {PI_LIBS.map(
-                    (lib) =>
-                      isOn(lib.id) && (
-                        <span key={lib.id} className="rx-pi-pill">
-                          {lib.label}
-                        </span>
-                      )
+                  {completeTyped}
+                  {activeLine === 'complete' && (
+                    <span className="rx-pi-cursor" aria-hidden="true" />
                   )}
                 </div>
+              )}
+
+              {readinessOn && (
+                <div className="rx-pi-readiness">
+                  <div className="rx-pi-readiness-top">
+                    <span className="rx-pi-readiness-pct">{readinessPct}%</span>
+                    <span className="rx-pi-readiness-label">
+                      Migration Readiness
+                    </span>
+                  </div>
+                  <div
+                    className={'rx-pi-readiness-bar' + (reduced ? ' no-anim' : '')}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className="rx-pi-readiness-fill"
+                      style={reduced ? undefined : { transform: `scaleX(${readinessPct / 100})` }}
+                    />
+                  </div>
+                  {warnTyped && (
+                    <div className="rx-pi-termline rx-pi-line-warn">
+                      <span className="rx-pi-line-glyph" aria-hidden="true">
+                        !
+                      </span>
+                      {warnTyped}
+                      {activeLine === 'warn' && (
+                        <span className="rx-pi-cursor" aria-hidden="true" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT — dashboard panel: same panel chrome as the terminal (matching
+              radius / border / shadow) so the two read as one console. A grid of
+              stat cards, each mounted once its cause (a tree line + count, where
+              applicable) has resolved. */}
+          <div className="rx-pi-dash rx-pi-panel" aria-label="Detected project facts">
+            <div className="rx-pi-panel-bar rx-pi-dash-bar" aria-hidden="true">
+              <span className="rx-pi-live-dot" />
+              <span className="rx-pi-dash-title">Project Analysis</span>
+            </div>
+            <div className="rx-pi-panel-body rx-pi-dash-body">
+              <div className="rx-pi-stats">
+                {cardOn.pages && (
+                  <div
+                    className="rx-pi-stat"
+                    ref={(el) => el && spawnBeam('pages', el)}
+                  >
+                    <span className="rx-pi-stat-value">{nodeCount.pages ?? 37}</span>
+                    <span className="rx-pi-stat-label">Pages</span>
+                  </div>
+                )}
+                {cardOn.components && (
+                  <div
+                    className="rx-pi-stat"
+                    ref={(el) => el && spawnBeam('components', el)}
+                  >
+                    <span className="rx-pi-stat-value">{nodeCount.components ?? 142}</span>
+                    <span className="rx-pi-stat-label">Components</span>
+                  </div>
+                )}
+                {cardOn.react && (
+                  <div
+                    className="rx-pi-stat rx-pi-stat-wide"
+                    ref={(el) => el && spawnBeam('react', el)}
+                  >
+                    <span className="rx-pi-stat-label">Framework</span>
+                    <span className="rx-pi-stat-fw">React 19</span>
+                  </div>
+                )}
+                {cardOn.libraries && (
+                  <div
+                    className="rx-pi-stat rx-pi-stat-wide rx-pi-stat-libs"
+                    ref={(el) => el && spawnBeam('libraries', el)}
+                  >
+                    <span className="rx-pi-stat-label">Libraries</span>
+                    <div className="rx-pi-pills">
+                      {PI_LIBS.map(
+                        (lib) =>
+                          cardOn[lib.id] && (
+                            <span key={lib.id} className="rx-pi-pill">
+                              {lib.label}
+                            </span>
+                          )
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

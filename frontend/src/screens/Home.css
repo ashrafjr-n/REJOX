@@ -530,6 +530,10 @@
   color: var(--rx-white);
   font-family: var(--font-sans);
   padding: clamp(48px, 7vh, 88px) var(--rx-frame-inset) clamp(80px, 12vh, 150px);
+  /* The card scroll-rotates from baseRotation to 0 on entrance; clip the
+     transient horizontal sweep so it never becomes a page-level horizontal
+     scrollbar (same guard the intro section uses). Vertical scroll unaffected. */
+  overflow-x: clip;
 }
 .rx-pi-inner {
   width: 100%;
@@ -689,29 +693,218 @@
   }
 }
 
-/* MIDDLE + RIGHT share one wrapper so they fade out together before a reset,
-   turning the loop restart into a soft crossfade rather than a hard cut. */
+/* The two console panels share one wrapper. `stretch` makes the terminal and
+   dashboard equal height so they read as one two-panel console rather than
+   two mismatched blocks. The terminal is the hero (~70-75% of the row); the
+   dashboard trails it as a narrower companion. `position: relative` gives the
+   beam layer and the "Knowledge Graph Built" flash a positioning root. */
 .rx-pi-live {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr minmax(200px, 264px);
-  gap: clamp(28px, 3vw, 48px);
-  align-items: start;
-  opacity: 1;
-  transition: opacity 0.32s ease;
-}
-.rx-pi-live.is-fading {
-  opacity: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 320px);
+  gap: clamp(20px, 2vw, 30px);
+  align-items: stretch;
 }
 
-/* -------------------- MIDDLE: upload + tree + result -------------------- */
-.rx-pi-scene {
-  min-height: 360px;
+/* "Knowledge Graph Built" — a one-shot pill that appears above the terminal
+   right after the typing sequence finishes: fades/lifts in, holds briefly,
+   fades/lifts out, then is removed from the DOM for good (see
+   onAnimationEnd in Home.tsx — it is never re-rendered after that). */
+.rx-pi-flash {
+  position: absolute;
+  top: -38px;
+  left: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--rx-white);
+  background: rgba(255, 106, 0, 0.12);
+  border: 1px solid rgba(255, 159, 252, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: piFlashInOut 1.05s ease forwards;
+}
+.rx-pi-flash svg {
+  width: 13px;
+  height: 13px;
+  color: var(--rx-orange);
+}
+@keyframes piFlashInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+    box-shadow: 0 0 0 rgba(255, 159, 252, 0);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0);
+    box-shadow: 0 0 22px rgba(255, 159, 252, 0.25);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(0);
+    box-shadow: 0 0 22px rgba(255, 159, 252, 0.25);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 rgba(255, 159, 252, 0);
+  }
+}
+
+/* Thin one-shot beams from the terminal's right edge to each dashboard card,
+   positioned in JS (measured against .rx-pi-live) so they land correctly at
+   any viewport width. A small bright dot travels the line once; the line
+   itself fades in, holds, and fades out — never a continuous loop. */
+.rx-pi-wire {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.rx-pi-beam {
+  position: absolute;
+  height: 1px;
+  transform: translateY(-50%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 159, 252, 0),
+    rgba(255, 159, 252, 0.55) 55%,
+    rgba(255, 159, 252, 0)
+  );
+  opacity: 0;
+  animation: piBeamShow 1.1s ease forwards;
+}
+.rx-pi-beam::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 999px;
+  background: #ff9ffc;
+  box-shadow: 0 0 8px rgba(255, 159, 252, 0.8);
+  animation: piBeamDot 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes piBeamShow {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes piBeamDot {
+  from {
+    left: 0;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* ==================== SHARED CONSOLE PANEL CHROME ====================
+   The terminal (left) and dashboard (right) share this skin so the two read as
+   one cohesive console: matching corner radius, hairline border, dark fill and
+   layered shadow depth. NOTE: no backdrop-filter — the scroll-reveal wrapper
+   (.rx-pi-inner) carries a `filter: blur()` during its entrance, and an ancestor
+   filter disables backdrop-filter on descendants; so depth comes from an opaque
+   dark fill + box-shadow instead. */
+.rx-pi-panel {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid var(--rx-hairline);
+  background: linear-gradient(
+    180deg,
+    rgba(24, 24, 28, 0.72),
+    rgba(12, 12, 15, 0.72)
+  );
+  box-shadow: 0 30px 70px -32px rgba(0, 0, 0, 0.9),
+    0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+/* Panel title bar — a slightly lifted strip separated by a hairline. Shared by
+   both panels so their headers align and match in height. */
+.rx-pi-panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border-bottom: 1px solid var(--rx-hairline);
+}
+.rx-pi-panel-body {
+  flex: 1;
+  padding: 20px 20px 22px;
+  min-height: 336px;
+}
+
+/* -------------------- LEFT: terminal window -------------------- */
+.rx-pi-term-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+/* Window-control dots, tinted to the brand palette (red / orange / pink) rather
+   than the generic mac traffic lights, so the terminal still feels like Rejox. */
+.rx-pi-term-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+}
+.rx-pi-term-dot:nth-child(1) {
+  background: var(--rx-red);
+}
+.rx-pi-term-dot:nth-child(2) {
+  background: var(--rx-orange);
+}
+.rx-pi-term-dot:nth-child(3) {
+  background: #ff9ffc;
+}
+.rx-pi-term-title {
+  margin-left: 4px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--rx-light-silver);
+}
+.rx-pi-term-tag {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff9ffc;
+  opacity: 0.85;
+}
+/* The whole terminal body is monospace — the "code editor" face. */
+.rx-pi-term-body {
+  font-family: var(--font-mono);
 }
 
 /* Upload row — a labelled progress track (0.45s fill) that resolves to a
    check the instant the tree starts building. */
 .rx-pi-upload {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   font-size: 13px;
   font-weight: 500;
   color: var(--rx-light-silver);
@@ -767,190 +960,130 @@
   height: 12px;
 }
 
-/* The file tree — the ONLY place that uses the mono face, for a terminal /
-   live-analysis feel. Rows mount one at a time (each is conditionally rendered
-   as its timeline event fires), so the reveal keyframe below plays per row. */
+/* The file tree — monospace terminal output (inherits mono from .rx-pi-term-body).
+   Rows mount one at a time (each conditionally rendered as its timeline event
+   fires) so the reveal keyframe plays per row. Two-color "syntax": directory
+   names in pink, counts in orange, connectors dimmed like punctuation. */
 .rx-pi-tree {
-  font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.15;
 }
 .rx-pi-node {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 0;
+  padding: 4px 0;
   color: var(--rx-white);
   animation: piNodeIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .rx-pi-node-root {
   font-weight: 600;
+  padding-bottom: 2px;
 }
 .rx-pi-node:not(.rx-pi-node-root) {
-  padding-left: 6px;
+  padding-left: 4px;
 }
 .rx-pi-branch {
   color: var(--rx-light-silver);
-  opacity: 0.55;
+  opacity: 0.4;
   white-space: pre;
 }
-.rx-pi-folder {
-  display: inline-flex;
-  width: 17px;
-  height: 17px;
-  align-items: center;
-  justify-content: center;
-  color: var(--rx-light-silver);
-}
-.rx-pi-folder svg {
-  width: 17px;
-  height: 17px;
-}
-/* Nodes whose detection triggers a right-side stat glow warm (orange->pink). */
-.rx-pi-folder.is-detected {
-  color: #ff9ffc;
-}
+/* Directory names — first "syntax" accent (pink); trailing slash marks a folder,
+   dimmed so the name reads first. Root stays white as the top-level. */
 .rx-pi-node-label {
   letter-spacing: 0.01em;
+  color: #ff9ffc;
 }
-.rx-pi-node-badge {
-  margin-left: 4px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
+.rx-pi-node-root .rx-pi-node-label {
   color: var(--rx-white);
-  background: linear-gradient(
-    130deg,
-    rgba(255, 106, 0, 0.9),
-    rgba(255, 159, 252, 0.85)
-  );
+}
+.rx-pi-dir::after {
+  content: '/';
+  margin-left: 1px;
+  color: var(--rx-light-silver);
+  opacity: 0.45;
+}
+/* Detected dirs (those that trigger a right-panel stat) get a soft pink glow,
+   making the causal link to the dashboard legible. */
+.rx-pi-node-label.is-detected {
+  text-shadow: 0 0 10px rgba(255, 159, 252, 0.55);
+}
+/* Counts — second "syntax" accent (orange). */
+.rx-pi-node-count {
+  margin-left: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rx-orange);
   animation: piBadgeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
-.rx-pi-complete {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 22px;
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--rx-white);
-  background: rgba(255, 106, 0, 0.1);
-  border: 1px solid rgba(255, 159, 252, 0.32);
-  animation: piPopIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+/* Blinking block cursor on the actively-typing line. */
+.rx-pi-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  margin-left: 4px;
+  border-radius: 1px;
+  background: #ff9ffc;
+  box-shadow: 0 0 8px rgba(255, 159, 252, 0.7);
+  animation: piBlink 1s steps(2, start) infinite;
 }
-.rx-pi-complete-check {
+
+/* Terminal output lines — "Complete" and the warning — as monospace log rows
+   with a leading status glyph. */
+.rx-pi-termline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  animation: piNodeIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rx-pi-line-ok {
+  margin-top: 16px;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-pi-line-warn {
+  margin-top: 10px;
+  color: var(--rx-light-silver);
+}
+.rx-pi-line-glyph {
   display: inline-flex;
-  width: 18px;
-  height: 18px;
   align-items: center;
   justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+.rx-pi-line-ok .rx-pi-line-glyph {
   border-radius: 999px;
   color: #050505;
   background: linear-gradient(140deg, var(--rx-orange), #ff9ffc);
 }
-.rx-pi-complete-check svg {
-  width: 11px;
-  height: 11px;
+.rx-pi-line-ok .rx-pi-line-glyph svg {
+  width: 10px;
+  height: 10px;
+}
+.rx-pi-line-warn .rx-pi-line-glyph {
+  color: var(--rx-orange);
+  font-weight: 700;
 }
 
-/* Readiness — a circular gauge that fills to 96% right after completion. */
+/* Readiness — a monospace headline percentage + a slim brand-gradient progress
+   bar (replaces the old circular gauge, which read as a dashboard widget rather
+   than terminal output). */
 .rx-pi-readiness {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 20px;
+  margin-top: 16px;
   animation: piFadeIn 0.4s ease both;
 }
-.rx-pi-gauge {
-  position: relative;
-  width: 74px;
-  height: 74px;
-  flex: 0 0 auto;
-}
-.rx-pi-gauge svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-.rx-pi-gauge-track {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 6;
-}
-/* Geometry is fixed (r=36): circumference C = 2*pi*36 = 226.195; the arc fills
-   to 96%, i.e. 4% of C = 9.048 remaining offset. These literals are hardcoded
-   (rather than passed as CSS custom properties) so stroke-dashoffset tweens
-   SMOOTHLY: unregistered custom properties don't interpolate inside keyframes,
-   which made the ring snap empty->full instead of sweeping. */
-.rx-pi-gauge-arc {
-  fill: none;
-  stroke: #ff9ffc;
-  stroke-width: 6;
-  stroke-linecap: round;
-  stroke-dasharray: 226.195;
-  stroke-dashoffset: 226.195;
-  animation: piGaugeFill 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-.rx-pi-gauge.no-anim .rx-pi-gauge-arc {
-  animation: none;
-  stroke-dashoffset: 9.048;
-}
-.rx-pi-gauge-num {
-  position: absolute;
-  inset: 0;
+.rx-pi-readiness-top {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--rx-white);
+  align-items: baseline;
+  gap: 10px;
 }
-.rx-pi-readiness-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.rx-pi-readiness-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rx-white);
-}
-.rx-pi-readiness-note {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--rx-light-silver);
-}
-
-/* -------------------- RIGHT: lighter stat pills/cards --------------------
-   A deliberately lighter visual language than the hero's BorderGlow cards —
-   flat hairline-bordered pills — appropriate to this full-width content
-   section. Each mounts (and so pops in) exactly as its tree category is
-   detected, one step after the corresponding node. */
-.rx-pi-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.rx-pi-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--rx-hairline);
-  animation: piPopIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.rx-pi-stat-value {
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 1;
+.rx-pi-readiness-pct {
+  font-size: 22px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   background: linear-gradient(120deg, #ffffff, #ff9ffc);
   -webkit-background-clip: text;
@@ -958,12 +1091,145 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
-.rx-pi-stat-label {
-  font-size: 11px;
+.rx-pi-readiness-label {
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--rx-light-silver);
+}
+.rx-pi-readiness-bar {
+  margin: 9px 0 4px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.rx-pi-readiness-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--rx-orange), #ff9ffc);
+  transform: scaleX(0);
+}
+.rx-pi-readiness-bar.no-anim .rx-pi-readiness-fill {
+  transform: scaleX(0.96);
+}
+
+/* -------------------- RIGHT: dashboard panel --------------------
+   Same panel chrome as the terminal; a Clash Display stat grid inside. Two
+   big-number cards (37 / 142) lead the hierarchy; framework + libraries are
+   full-width secondary rows. Each card mounts (pops in) exactly as its tree
+   category is detected, one step after the corresponding node. */
+.rx-pi-dash-title {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+.rx-pi-dash-body {
+  font-family: var(--font-sans);
+}
+.rx-pi-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+/* "Awaiting data" placeholder for the brief empty frame at the start of each
+   loop, before the first card is detected — so the panel never reads as a
+   broken empty box. */
+.rx-pi-stats:empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Fill most of the panel body so the placeholder reads as a centered "waiting"
+     state rather than a small label floating above a void. */
+  min-height: 272px;
+}
+.rx-pi-stats:empty::before {
+  content: 'Awaiting analysis…';
+  font-size: 12.5px;
+  letter-spacing: 0.03em;
+  color: var(--rx-light-silver);
+  opacity: 0.5;
+}
+/* Depth recipe (all four subtle, per spec): an inner shadow for a pressed-in
+   feel, a pink->orange gradient border (double-background trick — one layer
+   painted into the padding-box for the fill, one into the border-box for the
+   ring), a faint noise texture on ::after, and a glow that flashes once on
+   piCardGlow as the card first mounts, then settles to nothing. */
+.rx-pi-stat {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 15px 16px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.014)),
+    linear-gradient(135deg, rgba(255, 106, 0, 0.55), rgba(255, 159, 252, 0.4));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  animation: piPopIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
+    piCardGlow 1s ease-out both;
+}
+/* Big-number cards: a faint warm glow bleeds from the top-left corner to tie
+   them to the brand accent, without the heavy hero BorderGlow treatment. */
+.rx-pi-stat:not(.rx-pi-stat-wide)::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: -30%;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(255, 106, 0, 0.16), transparent 70%);
+  pointer-events: none;
+}
+/* Very subtle noise texture — a tiny fractal-noise SVG tiled at low opacity,
+   blended with overlay so it reads as grain rather than a visible pattern. */
+.rx-pi-stat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.rx-pi-stat-value {
+  position: relative;
+  font-size: clamp(30px, 3.4vw, 40px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(120deg, #ffffff, #ff9ffc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.rx-pi-stat-label {
+  position: relative;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+/* Full-width secondary rows (Framework, Libraries). */
+.rx-pi-stat-wide {
+  grid-column: 1 / -1;
+}
+.rx-pi-stat-fw {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--rx-white);
 }
 .rx-pi-stat-libs {
   gap: 10px;
@@ -1023,34 +1289,51 @@
     transform: translateY(0) scale(1);
   }
 }
-@keyframes piGaugeFill {
-  from {
-    stroke-dashoffset: 226.195;
+/* Dashboard card depth: a persistent subtle inner shadow, plus a brand-glow
+   that blooms once on mount and settles back to the resting inner shadow —
+   never a persistent glow, just the arrival moment. */
+@keyframes piCardGlow {
+  0% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -14px 22px -18px rgba(0, 0, 0, 0.6), 0 0 0 rgba(255, 159, 252, 0);
   }
-  to {
-    stroke-dashoffset: 9.048;
+  35% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -14px 22px -18px rgba(0, 0, 0, 0.6),
+      0 0 28px 3px rgba(255, 159, 252, 0.38);
+  }
+  100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -14px 22px -18px rgba(0, 0, 0, 0.6), 0 0 0 rgba(255, 159, 252, 0);
   }
 }
-
+/* Blinking terminal cursor. */
+@keyframes piBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
 /* Collapse the whole scene to its finished frame with no motion. */
 @media (prefers-reduced-motion: reduce) {
   .rx-pi-live-dot,
   .rx-pi-node,
-  .rx-pi-node-badge,
-  .rx-pi-complete,
+  .rx-pi-node-count,
+  .rx-pi-termline,
   .rx-pi-readiness,
   .rx-pi-stat,
   .rx-pi-pill,
   .rx-pi-upload-done,
-  .rx-pi-gauge-arc {
+  .rx-pi-cursor {
     animation: none;
-  }
-  .rx-pi-gauge-arc {
-    stroke-dashoffset: 9.048;
   }
 }
 
-/* Single column on narrow viewports. */
+/* Single column on narrow viewports — panels stack; the dashboard stat grid
+   keeps its two big-number columns. */
 @media (max-width: 900px) {
   .rx-pi-inner {
     grid-template-columns: 1fr;
@@ -1059,7 +1342,7 @@
   .rx-pi-live {
     grid-template-columns: 1fr;
   }
-  .rx-pi-scene {
+  .rx-pi-panel-body {
     min-height: 0;
   }
 }
