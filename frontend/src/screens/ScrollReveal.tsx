@@ -97,17 +97,12 @@ const ScrollReveal = ({
     }
 
     // ---- TOP-EXIT: once the element scrolls up to ~20vh from the top, animate
-    //      it back out toward the top (fade + blur + rotate away). Uses `.to()`
-    //      with immediateRender:false so it records the fully-revealed state as
-    //      its start and never fights the entrance in the visible/hold zone. ----
+    //      it back out toward the top. Fade + blur only — NO rotation on exit,
+    //      so the text stays upright while it fades/blurs straight out. Uses
+    //      `.to()` with immediateRender:false so it records the fully-revealed
+    //      state as its start and never fights the entrance in the hold zone. ----
     if (enableExit) {
       const exitTrigger = { trigger: el, scroller, start: exitStart, end: exitEnd, scrub: true }
-      gsap.to(el, {
-        ease: 'none',
-        rotate: -baseRotation,
-        immediateRender: false,
-        scrollTrigger: exitTrigger,
-      })
       gsap.to(wordElements, {
         ease: 'none',
         opacity: baseOpacity,
