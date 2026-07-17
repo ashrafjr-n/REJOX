@@ -520,10 +520,16 @@
 }
 .rx-pi {
   display: flex;
-  align-items: center;
+  /* Top-align (was center) so the live-analysis content sits near the top of its
+     100vh section instead of floating in its vertical middle. Combined with the
+     reduced top padding below, this closes most of the empty band between the
+     intro copy above and this section — they now read as connected. The section
+     still grows past 100vh when the tree/dashboard expand (min-height), so
+     nothing is clipped. */
+  align-items: flex-start;
   color: var(--rx-white);
   font-family: var(--font-sans);
-  padding: clamp(80px, 12vh, 150px) var(--rx-frame-inset);
+  padding: clamp(48px, 7vh, 88px) var(--rx-frame-inset) clamp(80px, 12vh, 150px);
 }
 .rx-pi-inner {
   width: 100%;
@@ -580,8 +586,37 @@
   max-width: 1180px;
   margin: 0 auto;
 }
-.rx-piIntro-inner .rx-eyebrow {
-  margin-bottom: clamp(22px, 3.4vh, 38px);
+/* Eyebrow label as a ScrollReveal instance (see Home.tsx). Keeps the original
+   12px / 600 / uppercase / 0.18em label look — these unlayered rules win over
+   ScrollReveal's layered Tailwind utilities on the same <p>. */
+.rx-piIntro-eyebrow {
+  margin: 0 0 clamp(22px, 3.4vh, 38px);
+}
+.rx-piIntro-eyebrow-p {
+  padding-left: 46px; /* room for the rule (34px) + 12px gap, matches original */
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rx-white);
+}
+/* position:relative on the word (no offsets — nothing moves) guarantees the
+   ::before's containing block is the word span itself, so the rule always fades
+   AND blurs in lockstep with the label, independent of the blur filter. */
+.rx-piIntro-eyebrow-p .word {
+  position: relative;
+}
+.rx-piIntro-eyebrow-p .word:first-of-type::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  margin-right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--rx-red), #ff9ffc);
 }
 
 /* ScrollReveal renders <h2 class="my-5 …"><p class="text-[clamp(1.6rem,4vw,3rem)]

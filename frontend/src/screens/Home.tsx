@@ -279,10 +279,21 @@ function ProjectIntelligence() {
           base shows through, untouched. */}
       <section className="rx-piIntro" aria-label="Project Intelligence">
         <div className="rx-piIntro-inner">
-          <div className="rx-eyebrow">
-            <span className="rx-rule" />
-            <span className="rx-label">Project Intelligence</span>
-          </div>
+          {/* Eyebrow label — now rides the SAME ScrollReveal entrance/exit as the
+              headline + paragraph below (tilt-in entrance, straight fade/blur
+              exit). The decorative rule is a ::before on the first word so it
+              fades/blurs in perfect sync with the label rather than sitting
+              static. See .rx-piIntro-eyebrow* in Home.css. */}
+          <ScrollReveal
+            containerClassName="rx-piIntro-reveal rx-piIntro-eyebrow"
+            textClassName="rx-piIntro-eyebrow-p"
+            baseOpacity={0}
+            baseRotation={4}
+            blurStrength={10}
+            enableBlur
+          >
+            Project Intelligence
+          </ScrollReveal>
           {/* Headline + paragraph reveal word-by-word (blur/opacity/rotation)
               as this section scrolls into view — see ScrollReveal, used exactly
               as provided. Sized up (Clash Display, hero-weight) to override
