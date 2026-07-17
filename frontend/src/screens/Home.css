@@ -504,14 +504,1125 @@
   text-stroke: 1.5px rgba(255, 255, 255, 0.92);
 }
 
-/* ============================ Section 02 ============================ */
-/* Flows normally below the hero in document order. Transparent, so the fixed
-   light-pillar layer behind it shows through: by the time Section 02 fills the
-   screen the pillar has settled to flat black (matching --rx-black, the page's
-   base), which is what reads here — the animated hero background resolves into
-   this section's dark background instead of cutting off at a seam. */
+/* ================= Section 02 — Project Intelligence ================= */
+/* The live, looping "watch Rejox analyze" scene. Flows normally below the hero
+   in document order. Transparent, so the fixed light-pillar layer behind it
+   shows through: by the time this section fills the screen the pillar has
+   settled to flat black (matching --rx-black, the page's base), which is what
+   reads here — the animated hero background resolves into this section's dark
+   background instead of cutting off at a seam. Everything below stays in the
+   hero's palette (orange -> red -> pink) and Clash Display; only the file tree
+   opts into --font-mono for a deliberate "terminal / live analysis" feel. */
 .rx-section2 {
   position: relative;
   min-height: 100vh;
   background: transparent;
+}
+.rx-pi {
+  display: flex;
+  align-items: center;
+  color: var(--rx-white);
+  font-family: var(--font-sans);
+  padding: clamp(80px, 12vh, 150px) var(--rx-frame-inset);
+}
+.rx-pi-inner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  /* The intro (formerly the left column) now lives in its own section above,
+     so this container holds only the live-analysis block (.rx-pi-live) and
+     spans full width. */
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+/* -------------------- LEFT: static headline -------------------- */
+.rx-pi-left {
+  padding-top: 6px;
+}
+.rx-pi-title {
+  margin: 0 0 18px;
+  font-size: clamp(30px, 3vw, 44px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+.rx-pi-lead {
+  margin: 0 0 26px;
+  max-width: 40ch;
+  font-size: clamp(14px, 1.05vw, 16px);
+  line-height: 1.55;
+  color: var(--rx-light-silver);
+}
+
+/* ---------- Standalone Project Intelligence intro section ----------
+   Its own full-viewport moment, scrolled BEFORE the live-analysis section.
+   Background is left transparent so the page's pure-black base shows through
+   (untouched). Clash Display at hero-weight scale. */
+.rx-piIntro {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  color: var(--rx-white);
+  font-family: var(--font-sans);
+  padding: clamp(80px, 12vh, 140px) var(--rx-frame-inset);
+  /* The big copy scroll-rotates from baseRotation to 0; clip any transient
+     horizontal sweep so it never spills into a page-level horizontal scroll.
+     (Vertical scroll and the reveal itself are unaffected.) */
+  overflow-x: clip;
+}
+.rx-piIntro-inner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.rx-piIntro-inner .rx-eyebrow {
+  margin-bottom: clamp(22px, 3.4vh, 38px);
+}
+
+/* ScrollReveal renders <h2 class="my-5 …"><p class="text-[clamp(1.6rem,4vw,3rem)]
+   leading-[1.5] font-semibold …">. These unlayered rules win over ScrollReveal's
+   layered Tailwind utilities on the same <p>, scaling the reveal to a dedicated,
+   hero-weight moment in Clash Display. */
+.rx-piIntro-reveal {
+  margin: 0; /* cancel the component's my-5 */
+  font-family: var(--font-sans);
+}
+.rx-piIntro-reveal .word {
+  will-change: opacity, filter;
+}
+/* Headline AND paragraph share ONE class, so they are IDENTICAL in size and
+   weight (they must not differ). Size is doubled from the ScrollReveal
+   component's own default clamp(1.6rem,4vw,3rem) to clamp(3.2rem,8vw,6rem),
+   font-semibold with generous leading — the provided component's design at 2x.
+   Together the two blocks fill the section as one large scroll-revealed
+   statement, spanning the full content width. */
+.rx-piIntro-copy {
+  margin: 0 0 clamp(22px, 3vh, 44px);
+  max-width: none;
+}
+.rx-piIntro-copy-p {
+  max-width: none;
+  font-size: clamp(2.08rem, 5.2vw, 3.9rem);
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--rx-white);
+}
+/* Keep the first sentence ("Upload your React project.") on a single line. */
+.rx-piIntro-oneline {
+  white-space: nowrap;
+}
+.rx-piIntro-status {
+  font-size: clamp(14px, 1.15vw, 18px);
+}
+.rx-pi-analyzing {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--rx-light-silver);
+}
+.rx-pi-project {
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-pi-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--rx-orange);
+  box-shadow: 0 0 0 0 rgba(255, 106, 0, 0.55);
+  animation: piPulse 1.6s ease-out infinite;
+}
+@keyframes piPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 106, 0, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(255, 106, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 106, 0, 0);
+  }
+}
+
+/* MIDDLE + RIGHT share one wrapper so they fade out together before a reset,
+   turning the loop restart into a soft crossfade rather than a hard cut. */
+.rx-pi-live {
+  display: grid;
+  grid-template-columns: 1fr minmax(200px, 264px);
+  gap: clamp(28px, 3vw, 48px);
+  align-items: start;
+  opacity: 1;
+  transition: opacity 0.32s ease;
+}
+.rx-pi-live.is-fading {
+  opacity: 0;
+}
+
+/* -------------------- MIDDLE: upload + tree + result -------------------- */
+.rx-pi-scene {
+  min-height: 360px;
+}
+
+/* Upload row — a labelled progress track (0.45s fill) that resolves to a
+   check the instant the tree starts building. */
+.rx-pi-upload {
+  margin-bottom: 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rx-light-silver);
+}
+.rx-pi-upload-label {
+  display: block;
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+.rx-pi-upload-track {
+  display: block;
+  width: min(280px, 100%);
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.rx-pi-upload-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--rx-orange), #ff9ffc);
+  animation: piUpload 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes piUpload {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+.rx-pi-upload-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--rx-white);
+  font-weight: 500;
+  animation: piFadeIn 0.3s ease both;
+}
+.rx-pi-upload-check {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--rx-orange);
+}
+.rx-pi-upload-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* The file tree — the ONLY place that uses the mono face, for a terminal /
+   live-analysis feel. Rows mount one at a time (each is conditionally rendered
+   as its timeline event fires), so the reveal keyframe below plays per row. */
+.rx-pi-tree {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.15;
+}
+.rx-pi-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  color: var(--rx-white);
+  animation: piNodeIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rx-pi-node-root {
+  font-weight: 600;
+}
+.rx-pi-node:not(.rx-pi-node-root) {
+  padding-left: 6px;
+}
+.rx-pi-branch {
+  color: var(--rx-light-silver);
+  opacity: 0.55;
+  white-space: pre;
+}
+.rx-pi-folder {
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  align-items: center;
+  justify-content: center;
+  color: var(--rx-light-silver);
+}
+.rx-pi-folder svg {
+  width: 17px;
+  height: 17px;
+}
+/* Nodes whose detection triggers a right-side stat glow warm (orange->pink). */
+.rx-pi-folder.is-detected {
+  color: #ff9ffc;
+}
+.rx-pi-node-label {
+  letter-spacing: 0.01em;
+}
+.rx-pi-node-badge {
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rx-white);
+  background: linear-gradient(
+    130deg,
+    rgba(255, 106, 0, 0.9),
+    rgba(255, 159, 252, 0.85)
+  );
+  animation: piBadgeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rx-pi-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 22px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--rx-white);
+  background: rgba(255, 106, 0, 0.1);
+  border: 1px solid rgba(255, 159, 252, 0.32);
+  animation: piPopIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rx-pi-complete-check {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #050505;
+  background: linear-gradient(140deg, var(--rx-orange), #ff9ffc);
+}
+.rx-pi-complete-check svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Readiness — a circular gauge that fills to 96% right after completion. */
+.rx-pi-readiness {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  animation: piFadeIn 0.4s ease both;
+}
+.rx-pi-gauge {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  flex: 0 0 auto;
+}
+.rx-pi-gauge svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.rx-pi-gauge-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 6;
+}
+/* Geometry is fixed (r=36): circumference C = 2*pi*36 = 226.195; the arc fills
+   to 96%, i.e. 4% of C = 9.048 remaining offset. These literals are hardcoded
+   (rather than passed as CSS custom properties) so stroke-dashoffset tweens
+   SMOOTHLY: unregistered custom properties don't interpolate inside keyframes,
+   which made the ring snap empty->full instead of sweeping. */
+.rx-pi-gauge-arc {
+  fill: none;
+  stroke: #ff9ffc;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 226.195;
+  stroke-dashoffset: 226.195;
+  animation: piGaugeFill 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.rx-pi-gauge.no-anim .rx-pi-gauge-arc {
+  animation: none;
+  stroke-dashoffset: 9.048;
+}
+.rx-pi-gauge-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-pi-readiness-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.rx-pi-readiness-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-pi-readiness-note {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--rx-light-silver);
+}
+
+/* -------------------- RIGHT: lighter stat pills/cards --------------------
+   A deliberately lighter visual language than the hero's BorderGlow cards —
+   flat hairline-bordered pills — appropriate to this full-width content
+   section. Each mounts (and so pops in) exactly as its tree category is
+   detected, one step after the corresponding node. */
+.rx-pi-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rx-pi-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rx-hairline);
+  animation: piPopIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rx-pi-stat-value {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  background: linear-gradient(120deg, #ffffff, #ff9ffc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.rx-pi-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+.rx-pi-stat-libs {
+  gap: 10px;
+}
+.rx-pi-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.rx-pi-pill {
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--rx-white);
+  background: rgba(255, 106, 0, 0.1);
+  border: 1px solid rgba(255, 159, 252, 0.28);
+  animation: piPopIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* -------------------- shared reveal keyframes -------------------- */
+@keyframes piFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes piNodeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes piBadgeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes piPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes piGaugeFill {
+  from {
+    stroke-dashoffset: 226.195;
+  }
+  to {
+    stroke-dashoffset: 9.048;
+  }
+}
+
+/* Collapse the whole scene to its finished frame with no motion. */
+@media (prefers-reduced-motion: reduce) {
+  .rx-pi-live-dot,
+  .rx-pi-node,
+  .rx-pi-node-badge,
+  .rx-pi-complete,
+  .rx-pi-readiness,
+  .rx-pi-stat,
+  .rx-pi-pill,
+  .rx-pi-upload-done,
+  .rx-pi-gauge-arc {
+    animation: none;
+  }
+  .rx-pi-gauge-arc {
+    stroke-dashoffset: 9.048;
+  }
+}
+
+/* Single column on narrow viewports. */
+@media (max-width: 900px) {
+  .rx-pi-inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .rx-pi-live {
+    grid-template-columns: 1fr;
+  }
+  .rx-pi-scene {
+    min-height: 0;
+  }
+}
+
+/* ================= Section 03 — Migration Pipeline ==================== */
+/* A full-width horizontal timeline: a dim brand-gradient line through six
+   stage nodes, with a glowing orange->pink comet travelling continuously
+   along it and looping. Transparent background so the settled pillar (flat
+   black) shows through, continuous with the hero / Project Intelligence.
+   Palette + Clash Display match the rest of the site. */
+.rx-plsec {
+  position: relative;
+  min-height: 78vh;
+  display: flex;
+  align-items: center;
+  color: var(--rx-white);
+  font-family: var(--font-sans);
+  background: transparent;
+  padding: clamp(80px, 12vh, 140px) var(--rx-frame-inset);
+}
+.rx-pl-inner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.rx-pl-head {
+  margin-bottom: clamp(56px, 8vh, 104px);
+  text-align: center;
+}
+.rx-pl-head .rx-eyebrow {
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.rx-pl-title {
+  margin: 0 auto;
+  max-width: 20ch;
+  font-size: clamp(28px, 3vw, 44px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+
+/* --- the rail: relative box holding the line, the pulse track and the
+   6-column stage grid. The line sits at the vertical centre of the fixed-
+   height marker slots (48px), so it passes through every marker centre. --- */
+.rx-pl-rail {
+  position: relative;
+}
+
+/* connecting line — spans the full rail width and extends a touch beyond the
+   end nodes (they sit at 1/12 and 11/12), reading as a pipeline flowing in
+   from and out to the edges. Dim brand gradient; the comet lights it up. */
+.rx-pl-line {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 106, 0, 0) 0%,
+    rgba(255, 106, 0, 0.35) 10%,
+    rgba(255, 159, 252, 0.45) 50%,
+    rgba(255, 106, 0, 0.35) 90%,
+    rgba(255, 106, 0, 0) 100%
+  );
+  z-index: 1;
+}
+
+/* pulse track — same span as the line; establishes a query container so the
+   comet can travel translateX(0 -> 100cqw) responsively and on the GPU. */
+.rx-pl-track {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  height: 0;
+  container-type: inline-size;
+  z-index: 3; /* comet glides in front of the node faces */
+  pointer-events: none;
+}
+.rx-pl-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  /* two synced infinite animations: travel (transform) + fade (opacity). The
+     fade only bites in the 0-5% / 95-100% overshoot margins, so all six nodes
+     get a full-bright pass and the loop-back teleport is invisible. */
+  animation: plTravel 4.2s linear infinite, plFade 4.2s linear infinite;
+  animation-play-state: paused;
+  will-change: transform, opacity;
+}
+.rx-plsec.is-running .rx-pl-pulse {
+  animation-play-state: running;
+}
+/* The glowing comet itself, centred on the (zero-width) travelling wrapper: a
+   bright orange->pink core, a soft halo, and a tail streaming back to the left
+   (the direction it came from). */
+.rx-pl-pulse-core {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, #ffd9b0 0%, #ff8a3d 38%, #ff5fae 72%, rgba(255, 95, 174, 0) 100%);
+  box-shadow: 0 0 10px 3px rgba(255, 138, 61, 0.85),
+    0 0 22px 8px rgba(255, 95, 174, 0.55);
+}
+.rx-pl-pulse-core::before {
+  /* comet tail */
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 50%;
+  width: 64px;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    270deg,
+    rgba(255, 138, 61, 0.9) 0%,
+    rgba(255, 95, 174, 0.4) 45%,
+    rgba(255, 95, 174, 0) 100%
+  );
+}
+@keyframes plTravel {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100cqw);
+  }
+}
+@keyframes plFade {
+  0% {
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* --- the six stages: an even 6-column grid, so node centres land at
+   1/12, 3/12 ... 11/12 of the rail (matching the line/track span). --- */
+.rx-pl-stages {
+  position: relative;
+  z-index: 2;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+.rx-pl-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 6px;
+}
+.rx-pl-index {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--rx-light-silver);
+  opacity: 0.55;
+  margin-bottom: 10px;
+}
+/* fixed-height slot: every marker is vertically centred here (centre = 48px),
+   so markers of different sizes still align on the one connecting line. */
+.rx-pl-slot {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* small (secondary) marker — dark, hairline-outlined, still clearly legible. */
+.rx-pl-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  color: var(--rx-light-silver);
+  background: #100a0e;
+  border: 1px solid rgba(255, 159, 252, 0.35);
+  box-shadow: 0 0 0 4px rgba(5, 5, 5, 0.9); /* opaque moat so the line doesn't slash the face */
+}
+.rx-pl-marker svg {
+  width: 20px;
+  height: 20px;
+}
+/* large (primary) markers — Understand + Convert: the value-carrying stages.
+   Visibly bigger, gradient-filled, warm glow, white glyph. */
+.rx-pl-stage.is-big .rx-pl-marker {
+  width: 74px;
+  height: 74px;
+  color: #ffffff;
+  background: linear-gradient(140deg, var(--rx-orange), #ff9ffc);
+  border: 1px solid rgba(255, 209, 236, 0.6);
+  box-shadow: 0 0 0 5px rgba(5, 5, 5, 0.9),
+    0 10px 30px -8px rgba(255, 106, 0, 0.6), 0 0 26px -2px rgba(255, 95, 174, 0.55);
+}
+.rx-pl-stage.is-big .rx-pl-marker svg {
+  width: 30px;
+  height: 30px;
+}
+.rx-pl-label {
+  margin-top: 18px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--rx-light-silver);
+}
+.rx-pl-stage.is-big .rx-pl-label {
+  font-size: 17px;
+  color: var(--rx-white);
+}
+.rx-pl-desc {
+  margin-top: 5px;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--rx-light-silver);
+  opacity: 0.7;
+}
+.rx-pl-stage.is-big .rx-pl-desc {
+  opacity: 0.92;
+}
+
+/* reduced motion => no comet; light the line fully as a sensible settled
+   state, and give the two primary nodes a calm resting glow. */
+@media (prefers-reduced-motion: reduce) {
+  .rx-pl-pulse {
+    display: none;
+  }
+  .rx-pl-line {
+    background: linear-gradient(90deg, var(--rx-orange), #ff9ffc, var(--rx-orange));
+    height: 2px;
+    opacity: 0.7;
+  }
+}
+.rx-plsec.is-reduced .rx-pl-pulse {
+  display: none;
+}
+.rx-plsec.is-reduced .rx-pl-line {
+  background: linear-gradient(90deg, var(--rx-orange), #ff9ffc, var(--rx-orange));
+  opacity: 0.7;
+}
+
+/* Narrower viewports: let the timeline scroll horizontally rather than crush
+   six nodes; keeps labels legible and the line continuous. */
+@media (max-width: 760px) {
+  .rx-pl-rail {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px;
+  }
+  .rx-pl-line,
+  .rx-pl-track {
+    min-width: 680px;
+  }
+  .rx-pl-stages {
+    min-width: 680px;
+  }
+}
+
+/* ================= Section 04 — Analysis Dashboard ==================== */
+/* Data-dense, scannable. Transparent background (settled pillar = flat black),
+   Clash Display, warm brand palette — continuous with the sections above. A
+   one-shot reveal-on-scroll fills the rings and grows the bars. */
+.rx-adsec {
+  position: relative;
+  min-height: 90vh;
+  display: flex;
+  align-items: center;
+  color: var(--rx-white);
+  font-family: var(--font-sans);
+  background: transparent;
+  padding: clamp(80px, 12vh, 140px) var(--rx-frame-inset);
+}
+.rx-ad-inner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.rx-ad-head {
+  margin-bottom: clamp(32px, 4vh, 48px);
+}
+.rx-ad-head .rx-eyebrow {
+  margin-bottom: 18px;
+}
+.rx-ad-title {
+  margin: 0;
+  max-width: 22ch;
+  font-size: clamp(26px, 2.7vw, 40px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+
+/* shared card surface — lighter than the hero's BorderGlow, appropriate to a
+   full-width content section. */
+.rx-ad-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rx-hairline);
+}
+
+/* --- top row: two metric rings + the prominent LLM stat. `stretch` (the grid
+   default) equalizes the three cards' heights so there's no ragged row. --- */
+.rx-ad-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr;
+  gap: clamp(16px, 1.6vw, 22px);
+  margin-bottom: clamp(16px, 1.6vw, 22px);
+}
+
+/* metric card: ring on the left, name + "what it measures" caption on the
+   right. Coverage and Confidence are deliberately held apart as two separate
+   visualizations with distinct accents — never one merged score. */
+.rx-ad-metric {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 26px 28px;
+}
+.rx-ad-ring {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  flex: 0 0 auto;
+}
+.rx-ad-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.rx-ad-ring-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.09);
+  stroke-width: 9;
+}
+/* r=52 => circumference C = 2*pi*52 = 326.726. The arc renders empty
+   (dashoffset = C) from load and TRANSITIONS to its target offset when the
+   inline style flips on reveal — transitions interpolate the value cleanly. */
+.rx-ad-ring-arc {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-dasharray: 326.726;
+  stroke-dashoffset: 326.726;
+  transition: stroke-dashoffset 1.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rx-ad-ring.no-anim .rx-ad-ring-arc {
+  transition: none;
+}
+.rx-ad-ring-coverage .rx-ad-ring-arc {
+  stroke: #ff8a3d; /* Coverage — orange-leaning */
+}
+.rx-ad-ring-confidence .rx-ad-ring-arc {
+  stroke: #ff9ffc; /* Confidence — pink-leaning */
+}
+.rx-ad-ring-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+.rx-ad-ring-pct {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--rx-light-silver);
+  margin-left: 1px;
+}
+.rx-ad-metric-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rx-ad-metric-name {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-ad-metric-sub {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--rx-light-silver);
+}
+
+/* LLM-calls stat — the differentiator, given real weight: a large gradient
+   number and a supporting line. Accent-tinted card to draw the eye. */
+.rx-ad-llm {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 26px 30px;
+  background: linear-gradient(
+    150deg,
+    rgba(255, 106, 0, 0.12),
+    rgba(255, 159, 252, 0.08)
+  );
+  border-color: rgba(255, 159, 252, 0.32);
+}
+.rx-ad-llm-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff9ffc;
+}
+.rx-ad-llm-num {
+  font-size: clamp(56px, 6vw, 84px);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  margin: 4px 0 10px;
+  background: linear-gradient(120deg, #ffffff 0%, #ff9ffc 65%, #ff6a00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  width: max-content;
+}
+.rx-ad-llm-sub {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rx-light-silver);
+  max-width: 34ch;
+}
+
+/* --- signed score-contribution breakdown --- */
+.rx-ad-break {
+  padding: 26px 30px 22px;
+}
+.rx-ad-break-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.rx-ad-break-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-ad-break-sub {
+  font-size: 12.5px;
+  color: var(--rx-light-silver);
+}
+.rx-ad-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* grid columns: sign badge | label (flexes, wraps) | magnitude bar (fixed) |
+   signed weight (fixed). The fixed bar/weight columns mean a long label wraps
+   inside its own column instead of overlapping the bar. */
+.rx-ad-row {
+  display: grid;
+  grid-template-columns: 26px 1fr clamp(90px, 16vw, 200px) 46px;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.rx-ad-row:first-child {
+  border-top: none;
+}
+.rx-ad-sign {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+.rx-ad-row.is-pos .rx-ad-sign {
+  color: #ff9ffc;
+  background: rgba(255, 159, 252, 0.14);
+}
+.rx-ad-row.is-neg .rx-ad-sign {
+  color: #ff7a6b;
+  background: rgba(197, 51, 34, 0.2);
+}
+.rx-ad-row-label {
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--rx-white);
+}
+.rx-ad-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.rx-ad-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 999px;
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rx-ad-row.is-pos .rx-ad-bar-fill {
+  background: linear-gradient(90deg, var(--rx-orange), #ff9ffc);
+}
+.rx-ad-row.is-neg .rx-ad-bar-fill {
+  background: linear-gradient(90deg, #8f1f1f, var(--rx-red));
+}
+.rx-ad-weight {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rx-ad-row.is-pos .rx-ad-weight {
+  color: #ff9ffc;
+}
+.rx-ad-row.is-neg .rx-ad-weight {
+  color: #ff7a6b;
+}
+
+/* subordinate net footer — intentionally small, NOT a third headline metric. */
+.rx-ad-break-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rx-hairline);
+}
+.rx-ad-net-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+.rx-ad-net-val {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: #ff9ffc;
+  font-variant-numeric: tabular-nums;
+}
+.rx-ad-net-note {
+  font-size: 12px;
+  color: var(--rx-light-silver);
+}
+
+/* Reduced motion: no fills sweeping in — everything renders settled instantly.
+   (The ring also gets `no-anim` from JS; this covers the bars too.) */
+@media (prefers-reduced-motion: reduce) {
+  .rx-ad-ring-arc,
+  .rx-ad-bar-fill {
+    transition: none;
+  }
+}
+
+/* Stack the top row on narrower viewports so nothing crushes. */
+@media (max-width: 880px) {
+  .rx-ad-top {
+    grid-template-columns: 1fr;
+  }
+  .rx-ad-row {
+    grid-template-columns: 24px 1fr 44px;
+  }
+  .rx-ad-bar {
+    display: none; /* drop the bar on small screens; sign + weight still read */
+  }
 }
