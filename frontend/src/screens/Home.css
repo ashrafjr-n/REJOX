@@ -600,28 +600,27 @@
 }
 
 /* ================= Section 03 — Migration Pipeline ==================== */
-/* A full-width horizontal timeline: a dim brand-gradient line through six
-   stage nodes, with a glowing orange->pink comet travelling continuously
-   along it and looping. Transparent background so the settled pillar (flat
-   black) shows through, continuous with the hero / Project Intelligence.
-   Palette + Clash Display match the rest of the site. */
+/* BASE LAYOUT ONLY — a full-width, tall section. A smooth serpentine SVG path
+   snakes down the section between the left and right edges; the six stage
+   nodes sit on the path but are hidden for now (reveal wired up later). No
+   comet / animation / arrow / particle / glow yet. Transparent background so
+   the settled pillar (flat black) shows through, continuous with the rest of
+   the page. */
 .rx-plsec {
   position: relative;
-  min-height: 78vh;
-  display: flex;
-  align-items: center;
+  width: 100%;
+  min-height: 100vh;
   color: var(--rx-white);
   font-family: var(--font-sans);
   background: transparent;
-  padding: clamp(80px, 12vh, 140px) var(--rx-frame-inset);
+  padding: clamp(64px, 9vh, 120px) 0 clamp(72px, 10vh, 140px);
 }
-.rx-pl-inner {
-  width: 100%;
-  max-width: 1180px;
-  margin: 0 auto;
-}
+
+/* heading stays centred + width-constrained, above the path */
 .rx-pl-head {
-  margin-bottom: clamp(56px, 8vh, 104px);
+  max-width: 1180px;
+  margin: 0 auto clamp(32px, 5vh, 64px);
+  padding: 0 var(--rx-frame-inset);
   text-align: center;
 }
 .rx-pl-head .rx-eyebrow {
@@ -638,243 +637,151 @@
   color: var(--rx-white);
 }
 
-/* --- the rail: relative box holding the line, the pulse track and the
-   6-column stage grid. The line sits at the vertical centre of the fixed-
-   height marker slots (48px), so it passes through every marker centre. --- */
-.rx-pl-rail {
+/* --- serpentine path region: full width, deliberately tall so the S-curves
+   read as smooth swoops rather than shallow ripples. The SVG fills it on both
+   axes (preserveAspectRatio="none"); the node layer shares the same box, so
+   node % coordinates map 1:1 onto the SVG viewBox. --- */
+.rx-pl-path {
   position: relative;
+  width: 100%;
+  height: clamp(900px, 122vh, 1500px);
+}
+.rx-pl-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* dim brand-gradient stroke — a plain line, no glow/filter. */
+.rx-pl-curve {
+  opacity: 0.9;
 }
 
-/* connecting line — spans the full rail width and extends a touch beyond the
-   end nodes (they sit at 1/12 and 11/12), reading as a pipeline flowing in
-   from and out to the edges. Dim brand gradient; the comet lights it up. */
-.rx-pl-line {
-  position: absolute;
-  top: 48px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 106, 0, 0) 0%,
-    rgba(255, 106, 0, 0.35) 10%,
-    rgba(255, 159, 252, 0.45) 50%,
-    rgba(255, 106, 0, 0.35) 90%,
-    rgba(255, 106, 0, 0) 100%
-  );
-  z-index: 1;
-}
-
-/* pulse track — same span as the line; establishes a query container so the
-   comet can travel translateX(0 -> 100cqw) responsively and on the GPU. */
-.rx-pl-track {
-  position: absolute;
-  top: 48px;
-  left: 0;
-  right: 0;
-  height: 0;
-  container-type: inline-size;
-  z-index: 3; /* comet glides in front of the node faces */
-  pointer-events: none;
-}
-.rx-pl-pulse {
+/* scroll-driven pointer — sits above the curve; its translate/rotate are set
+   in JS (GSAP) from the scroll position. No glow yet (deferred). */
+.rx-pl-arrow {
   position: absolute;
   top: 0;
   left: 0;
-  width: 0;
-  height: 0;
-  /* two synced infinite animations: travel (transform) + fade (opacity). The
-     fade only bites in the 0-5% / 95-100% overshoot margins, so all six nodes
-     get a full-bright pass and the loop-back teleport is invisible. */
-  animation: plTravel 4.2s linear infinite, plFade 4.2s linear infinite;
-  animation-play-state: paused;
-  will-change: transform, opacity;
+  width: 34px;
+  height: 34px;
+  z-index: 2;
+  will-change: transform;
+  pointer-events: none;
 }
-.rx-plsec.is-running .rx-pl-pulse {
-  animation-play-state: running;
-}
-/* The glowing comet itself, centred on the (zero-width) travelling wrapper: a
-   bright orange->pink core, a soft halo, and a tail streaming back to the left
-   (the direction it came from). */
-.rx-pl-pulse-core {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 16px;
-  height: 16px;
-  transform: translate(-50%, -50%);
-  border-radius: 999px;
-  background: radial-gradient(circle, #ffd9b0 0%, #ff8a3d 38%, #ff5fae 72%, rgba(255, 95, 174, 0) 100%);
-  box-shadow: 0 0 10px 3px rgba(255, 138, 61, 0.85),
-    0 0 22px 8px rgba(255, 95, 174, 0.55);
-}
-.rx-pl-pulse-core::before {
-  /* comet tail */
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 50%;
-  width: 64px;
-  height: 4px;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: linear-gradient(
-    270deg,
-    rgba(255, 138, 61, 0.9) 0%,
-    rgba(255, 95, 174, 0.4) 45%,
-    rgba(255, 95, 174, 0) 100%
-  );
-}
-@keyframes plTravel {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(100cqw);
-  }
-}
-@keyframes plFade {
-  0% {
-    opacity: 0;
-  }
-  5% {
-    opacity: 1;
-  }
-  95% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+.rx-pl-arrow svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-/* --- the six stages: an even 6-column grid, so node centres land at
-   1/12, 3/12 ... 11/12 of the rail (matching the line/track span). --- */
-.rx-pl-stages {
-  position: relative;
-  z-index: 2;
+/* the six stage nodes — each is a zero-size anchor at its path point (the
+   MARKER, text and sparks are positioned relative to that point). Reveal is
+   driven by two per-node CSS vars set from JS: --p (marker glow/scale/opacity)
+   and --pt (text fade/slide). Both default to 0 => node fully invisible until
+   the arrow arrives. */
+.rx-pl-nodes {
+  position: absolute;
+  inset: 0;
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
 }
-.rx-pl-stage {
+.rx-pl-node {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  --p: 0;
+  --pt: 0;
+}
+/* marker — centred exactly on the path point. Blooms in with a subtle scale
+   and a warm brand glow as --p ramps 0 -> 1; stays lit once passed. */
+.rx-pl-node-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%) scale(calc(0.88 + 0.12 * var(--p)));
+  opacity: var(--p);
+  color: #ffffff;
+  background: linear-gradient(140deg, var(--rx-orange), #ff9ffc);
+  border: 1px solid rgba(255, 209, 236, 0.6);
+  box-shadow: 0 0 calc(20px * var(--p)) rgba(255, 138, 61, calc(0.7 * var(--p))),
+    0 0 calc(38px * var(--p)) rgba(255, 95, 174, calc(0.5 * var(--p)));
+  will-change: transform, opacity;
+}
+.rx-pl-node-marker svg {
+  position: relative;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+}
+/* spark burst layer — centred on the path point (marker centre). Sparks sit at
+   the origin at opacity 0 until GSAP animates them outward on arrival. */
+.rx-pl-node-burst {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+.rx-pl-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: radial-gradient(circle, #ffe0bd 0%, #ff8a3d 55%, #ff5fae 100%);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+/* text — below the marker (nodes hug the edges, so a centred stack below the
+   point stays on-screen). Fades + slides up with --pt. */
+.rx-pl-node-text {
+  position: absolute;
+  left: 0;
+  top: 40px;
+  width: 180px;
+  transform: translateX(-50%) translateY(calc(12px * (1 - var(--pt))));
+  opacity: var(--pt);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 0 6px;
+  will-change: transform, opacity;
 }
-.rx-pl-index {
+.rx-pl-node-num {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.12em;
   color: var(--rx-light-silver);
-  opacity: 0.55;
-  margin-bottom: 10px;
+  opacity: 0.6;
+  margin-bottom: 6px;
 }
-/* fixed-height slot: every marker is vertically centred here (centre = 48px),
-   so markers of different sizes still align on the one connecting line. */
-.rx-pl-slot {
-  height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-/* small (secondary) marker — dark, hairline-outlined, still clearly legible. */
-.rx-pl-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  color: var(--rx-light-silver);
-  background: #100a0e;
-  border: 1px solid rgba(255, 159, 252, 0.35);
-  box-shadow: 0 0 0 4px rgba(5, 5, 5, 0.9); /* opaque moat so the line doesn't slash the face */
-}
-.rx-pl-marker svg {
-  width: 20px;
-  height: 20px;
-}
-/* large (primary) markers — Understand + Convert: the value-carrying stages.
-   Visibly bigger, gradient-filled, warm glow, white glyph. */
-.rx-pl-stage.is-big .rx-pl-marker {
-  width: 74px;
-  height: 74px;
-  color: #ffffff;
-  background: linear-gradient(140deg, var(--rx-orange), #ff9ffc);
-  border: 1px solid rgba(255, 209, 236, 0.6);
-  box-shadow: 0 0 0 5px rgba(5, 5, 5, 0.9),
-    0 10px 30px -8px rgba(255, 106, 0, 0.6), 0 0 26px -2px rgba(255, 95, 174, 0.55);
-}
-.rx-pl-stage.is-big .rx-pl-marker svg {
-  width: 30px;
-  height: 30px;
-}
-.rx-pl-label {
-  margin-top: 18px;
-  font-size: 14px;
+.rx-pl-node-title {
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--rx-light-silver);
-}
-.rx-pl-stage.is-big .rx-pl-label {
-  font-size: 17px;
   color: var(--rx-white);
 }
-.rx-pl-desc {
-  margin-top: 5px;
-  font-size: 11.5px;
+.rx-pl-node-desc {
+  margin-top: 4px;
+  font-size: 12px;
   font-weight: 400;
   line-height: 1.35;
   color: var(--rx-light-silver);
-  opacity: 0.7;
-}
-.rx-pl-stage.is-big .rx-pl-desc {
-  opacity: 0.92;
-}
-
-/* reduced motion => no comet; light the line fully as a sensible settled
-   state, and give the two primary nodes a calm resting glow. */
-@media (prefers-reduced-motion: reduce) {
-  .rx-pl-pulse {
-    display: none;
-  }
-  .rx-pl-line {
-    background: linear-gradient(90deg, var(--rx-orange), #ff9ffc, var(--rx-orange));
-    height: 2px;
-    opacity: 0.7;
-  }
-}
-.rx-plsec.is-reduced .rx-pl-pulse {
-  display: none;
-}
-.rx-plsec.is-reduced .rx-pl-line {
-  background: linear-gradient(90deg, var(--rx-orange), #ff9ffc, var(--rx-orange));
-  opacity: 0.7;
-}
-
-/* Narrower viewports: let the timeline scroll horizontally rather than crush
-   six nodes; keeps labels legible and the line continuous. */
-@media (max-width: 760px) {
-  .rx-pl-rail {
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding-bottom: 8px;
-  }
-  .rx-pl-line,
-  .rx-pl-track {
-    min-width: 680px;
-  }
-  .rx-pl-stages {
-    min-width: 680px;
-  }
+  opacity: 0.85;
 }
 
 /* ================= Section 04 — Analysis Dashboard ==================== */

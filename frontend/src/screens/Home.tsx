@@ -167,41 +167,43 @@ function ProjectIntelligence() {
 }
 
 /* ============================================================================
- * Migration Pipeline — a full-width horizontal timeline of the six migration
- * stages (Upload -> Understand -> Plan -> Ask -> Convert -> Validate), with a
- * glowing "energy" comet that travels continuously along the connecting line
- * through every stage and loops.
+ * Migration Pipeline — a full-width, tall section whose six migration stages
+ * (Upload -> Understand -> Plan -> Ask -> Convert -> Validate) sit along a
+ * smooth serpentine SVG path that snakes down the section, weaving between the
+ * left and right edges.
  *
- * Layout — a 6-column grid; each stage is a column whose circular marker is
- * centred inside a fixed-height slot, so all marker CENTRES land on one
- * horizontal line even though Understand/Convert are larger. The connecting
- * line + the pulse track are absolutely positioned at that centre line.
+ * A scroll-linked arrow travels along the path (GSAP ScrollTrigger, scrub —
+ * tied to scroll position, not autoplay). Node lighting / particles / the final
+ * burst are still deferred; the six nodes remain invisible.
  *
- * The pulse — one GPU-only animation: an empty wrapper translated
- * translateX(0 -> 100cqw) across the track (container-query units keep it
- * responsive and composited), with an opacity keyframe that fades it in/out
- * only in the dim overshoot margins (0-5% / 95-100%). The six nodes sit at
- * 1/12..11/12 of the rail, so every node — including the two endpoints — gets a
- * full-bright pass, and the loop-back teleport happens while the comet is
- * invisible in the margin => a seamless continuous loop.
+ * Path geometry — a single SVG <path> of chained cubic Béziers. Each node is
+ * an anchor; between two anchors the two control points share the segment's
+ * y-midpoint (with the endpoints' x), which makes the tangent vertical at
+ * every anchor. Consecutive segments therefore meet with matching vertical
+ * tangents => a G1-continuous curve with no sharp corners. The SVG uses
+ * viewBox 1200x1400 and `preserveAspectRatio="none"` so the curve fills the
+ * (full-width, tall) container on both axes; `vector-effect: non-scaling-
+ * stroke` keeps the stroke crisp despite the non-uniform scale.
  *
- * Hierarchy — Understand and Convert carry Rejox's core value (deterministic
- * understanding + the actual transform), so their markers are visibly larger
- * and gradient-filled; the other four are smaller, dark, hairline-outlined.
- *
- * Performance — the animation is paused (`animation-play-state`) unless the
- * section is in view, via the same IntersectionObserver pattern as Project
- * Intelligence. `prefers-reduced-motion` hides the comet and shows a static,
- * fully-lit brand-gradient line as the settled state.
+ * Nodes — the six anchors are positioned with the SAME percentage coordinates
+ * (x/y below, = anchor / viewBox * 100), so each node centre lands exactly on
+ * its path point. They currently carry their data (number, title, desc) but
+ * are `visibility: hidden` — laid out on the path yet painting nothing. The
+ * reveal animation is wired up in a later step.
  * ==========================================================================*/
 
+/* Six stages, in order. `x`/`y` are the node-centre coordinates as a % of the
+   path container — they equal the SVG anchor points (anchor / viewBox * 100),
+   so nodes and curve share one coordinate space. Anchors alternate left/right
+   (x = 100 or 1100 of 1200) and step evenly down (y = 120,352,584,...,1280 of
+   1400). */
 const PL_STAGES = [
-  { id: 'upload', label: 'Upload', desc: 'Project in', big: false },
-  { id: 'understand', label: 'Understand', desc: 'Knowledge graph', big: true },
-  { id: 'plan', label: 'Plan', desc: 'Ordered plan', big: false },
-  { id: 'ask', label: 'Ask', desc: 'Human decisions', big: false },
-  { id: 'convert', label: 'Convert', desc: 'AST + AI transforms', big: true },
-  { id: 'validate', label: 'Validate', desc: 'tsc + Metro', big: false },
+  { id: 'upload', title: 'Upload', desc: 'Project', x: 8.3333, y: 8.5714 },
+  { id: 'understand', title: 'Understand', desc: 'Knowledge graph', x: 91.6667, y: 25.1429 },
+  { id: 'plan', title: 'Plan', desc: 'Ordered plan', x: 8.3333, y: 41.7143 },
+  { id: 'ask', title: 'Ask', desc: 'Human decisions', x: 91.6667, y: 58.2857 },
+  { id: 'convert', title: 'Convert', desc: 'AST + AI transforms', x: 8.3333, y: 74.8571 },
+  { id: 'validate', title: 'Validate', desc: 'tsc + Metro', x: 91.6667, y: 91.4286 },
 ] as const
 
 /* Stroked 24-grid glyphs, one per stage — matched to the site's icon set. */
@@ -262,75 +264,287 @@ function PipelineIcon({ id }: { id: string }) {
   )
 }
 
+/* Path viewBox — kept in sync with the <svg> below. Node anchors are expressed
+   as a % of this box (see PL_STAGES x/y), so mapping a viewBox point to
+   container pixels is just point * (containerSize / viewBox). */
+const PL_VBW = 1200
+const PL_VBH = 1400
+/* Vertical fractions of the FIRST (Upload) and LAST (Validate) nodes within the
+   path container — the scrub runs between "node1 at viewport centre" and "node6
+   at viewport centre", so the arrow travels the whole path across that scroll. */
+const PL_START_FRAC = PL_STAGES[0].y / 100
+const PL_END_FRAC = PL_STAGES[PL_STAGES.length - 1].y / 100
+/* number of spark spans per node's one-shot activation burst */
+const PL_SPARKS = 10
+
 function MigrationPipeline() {
-  const sectionRef = useRef<HTMLElement | null>(null)
+  const pathRef = useRef<SVGPathElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const arrowRef = useRef<HTMLDivElement | null>(null)
+  const nodeRefs = useRef<(HTMLLIElement | null)[]>([])
   const reduced = usePrefersReducedMotion()
-  const [inView, setInView] = useState(false)
 
-  /* Pause the pulse whenever the section is scrolled out of view. */
+  /* Scroll-linked arrow + node activation, both driven by the SAME scrubbed
+     progress `u` so reveals stay locked to the arrow.
+
+     Arrow: position + rotation are tied directly to scroll (GSAP ScrollTrigger,
+     scrub) — no autoplay. Because the SVG scales non-uniformly
+     (preserveAspectRatio="none"), we sample the path with getPointAtLength in
+     viewBox units, map each sample to CONTAINER PIXELS, and build an arc-length
+     lookup so equal scroll => equal pixel travel (steady visual speed) and
+     rotation is measured in pixel space (true to the rendered curve).
+
+     Nodes: the six anchors are congruent, evenly-stepped segments, so node j
+     sits at pixel-arc-length u = j/5. As `u` sweeps a node's threshold we ramp
+     a per-node CSS var `--p` (glow/scale/opacity) and `--pt` (its text) — pure
+     style writes, no React re-render. Each node fully reveals on forward pass
+     and stays lit (progressive completion); scrolling back cleanly un-reveals
+     (the scrub reverses). A short one-shot particle burst fires once when the
+     arrow ARRIVES at a node (on threshold-cross, not per tick). */
   useEffect(() => {
-    const el = sectionRef.current
-    if (!el) return
-    const io = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      { threshold: 0.15 }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
+    const pathEl = pathRef.current
+    const containerEl = containerRef.current
+    const arrowEl = arrowRef.current
+    if (!pathEl || !containerEl || !arrowEl) return
 
-  const running = inView && !reduced
+    const total = pathEl.getTotalLength()
+    const SAMPLES = 600
+    const LAST = PL_STAGES.length - 1
+    const REVEAL_W = 0.07 // scroll-progress width of a node's reveal ramp
+    let lut: { d: number; x: number; y: number }[] = []
+    let totalPx = 0
+
+    /* Rebuild the pixel-space arc-length table for the current container size. */
+    const buildLUT = () => {
+      const sx = containerEl.clientWidth / PL_VBW
+      const sy = containerEl.clientHeight / PL_VBH
+      lut = []
+      let prevX = 0
+      let prevY = 0
+      let cum = 0
+      for (let i = 0; i <= SAMPLES; i++) {
+        const pt = pathEl.getPointAtLength((i / SAMPLES) * total)
+        const x = pt.x * sx
+        const y = pt.y * sy
+        if (i > 0) cum += Math.hypot(x - prevX, y - prevY)
+        lut.push({ d: cum, x, y })
+        prevX = x
+        prevY = y
+      }
+      totalPx = cum || 1
+    }
+
+    /* Map progress u∈[0,1] (fraction of pixel arc-length) to {x, y, angle}. */
+    const place = (u: number) => {
+      const target = Math.max(0, Math.min(1, u)) * totalPx
+      let lo = 0
+      let hi = lut.length - 1
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1
+        if (lut[mid].d < target) lo = mid + 1
+        else hi = mid
+      }
+      const b = lut[lo]
+      const a = lut[Math.max(0, lo - 1)]
+      const seg = b.d - a.d || 1
+      const t = (target - a.d) / seg
+      const x = a.x + (b.x - a.x) * t
+      const y = a.y + (b.y - a.y) * t
+      /* tangent from neighbouring samples (pixel space) => on-curve rotation */
+      const j0 = lut[Math.max(0, lo - 1)]
+      const j1 = lut[Math.min(lut.length - 1, lo + 1)]
+      const angle = (Math.atan2(j1.y - j0.y, j1.x - j0.x) * 180) / Math.PI
+      gsap.set(arrowEl, { x, y, rotation: angle, xPercent: -50, yPercent: -50 })
+    }
+
+    const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
+    const lastP = new Array(PL_STAGES.length).fill(-1)
+    const fired = new Array(PL_STAGES.length).fill(false)
+    let prevU = 0
+
+    /* One-shot spark burst — animates only transform/opacity on a handful of
+       pre-existing spans, killing any prior tween so it can cleanly replay. */
+    const fireBurst = (j: number) => {
+      const el = nodeRefs.current[j]
+      if (!el) return
+      const sparks = el.querySelectorAll<HTMLElement>('.rx-pl-spark')
+      if (!sparks.length) return
+      const n = sparks.length
+      gsap.killTweensOf(sparks)
+      gsap.fromTo(
+        sparks,
+        { x: 0, y: 0, scale: 1, opacity: 1 },
+        {
+          x: (i: number) => Math.cos((i / n) * Math.PI * 2 + j) * (22 + (i % 3) * 10),
+          y: (i: number) => Math.sin((i / n) * Math.PI * 2 + j) * (22 + (i % 3) * 10),
+          scale: 0.2,
+          opacity: 0,
+          duration: 0.6,
+          ease: 'power2.out',
+          overwrite: true,
+        }
+      )
+    }
+
+    /* Deterministic function of `u`: set each node's reveal vars, and fire the
+       burst exactly once per forward threshold-cross. */
+    const applyReveal = (u: number) => {
+      for (let j = 0; j <= LAST; j++) {
+        const el = nodeRefs.current[j]
+        if (!el) continue
+        // last node reveals over its final approach (no scroll exists past u=1)
+        const start = j === LAST ? 1 - REVEAL_W : j / LAST
+        const p = clamp01((u - start) / REVEAL_W)
+        if (p !== lastP[j]) {
+          el.style.setProperty('--p', p.toFixed(3))
+          el.style.setProperty('--pt', clamp01((p - 0.35) / 0.65).toFixed(3))
+          lastP[j] = p
+        }
+      }
+      if (!reduced) {
+        for (let j = 0; j <= LAST; j++) {
+          const fireAt = j === 0 ? 0.02 : j / LAST // node arrival (u = j/5)
+          if (!fired[j] && prevU < fireAt && u >= fireAt) {
+            fired[j] = true
+            fireBurst(j)
+          } else if (fired[j] && u < fireAt - 0.03) {
+            fired[j] = false // re-arm after scrolling back up past the node
+          }
+        }
+      }
+      prevU = u
+    }
+
+    buildLUT()
+    place(0)
+    applyReveal(0)
+
+    /* reduced-motion: no scrubbing/particles; park the arrow at Upload and show
+       every node in its settled, fully-lit state. */
+    if (reduced) {
+      for (const el of nodeRefs.current) {
+        if (!el) continue
+        el.style.setProperty('--p', '1')
+        el.style.setProperty('--pt', '1')
+      }
+      return
+    }
+
+    const proxy = { u: 0 }
+    const tween = gsap.to(proxy, {
+      u: 1,
+      ease: 'none',
+      onUpdate: () => {
+        place(proxy.u)
+        applyReveal(proxy.u)
+      },
+      scrollTrigger: {
+        trigger: containerEl,
+        start: () => `top+=${containerEl.clientHeight * PL_START_FRAC} center`,
+        end: () => `top+=${containerEl.clientHeight * PL_END_FRAC} center`,
+        scrub: true,
+        invalidateOnRefresh: true,
+        onRefresh: () => {
+          buildLUT()
+          place(proxy.u)
+          applyReveal(proxy.u)
+        },
+      },
+    })
+
+    return () => {
+      tween.scrollTrigger?.kill()
+      tween.kill()
+    }
+  }, [reduced])
 
   return (
-    <section
-      ref={sectionRef}
-      className={
-        'rx-plsec' +
-        (running ? ' is-running' : '') +
-        (reduced ? ' is-reduced' : '')
-      }
-      aria-label="Migration Pipeline"
-    >
-      <div className="rx-pl-inner">
-        <div className="rx-pl-head">
-          <div className="rx-eyebrow">
-            <span className="rx-rule" />
-            <span className="rx-label">Migration Pipeline</span>
-          </div>
-          <h2 className="rx-pl-title">
-            From React to React Native, in six stages.
-          </h2>
+    <section className="rx-plsec" aria-label="Migration Pipeline">
+      <div className="rx-pl-head">
+        <div className="rx-eyebrow">
+          <span className="rx-rule" />
+          <span className="rx-label">Migration Pipeline</span>
+        </div>
+        <h2 className="rx-pl-title">
+          From React to React Native, in six stages.
+        </h2>
+      </div>
+
+      {/* Full-width, tall path region. The serpentine SVG fills it on both
+          axes; the six nodes are absolutely positioned on the same %
+          coordinates as the SVG anchors, so they sit exactly on the curve. */}
+      <div className="rx-pl-path" ref={containerRef}>
+        <svg
+          className="rx-pl-svg"
+          viewBox="0 0 1200 1400"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="rxPlStroke" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ff6a00" />
+              <stop offset="50%" stopColor="#ff9ffc" />
+              <stop offset="100%" stopColor="#ff6a00" />
+            </linearGradient>
+          </defs>
+          <path
+            ref={pathRef}
+            className="rx-pl-curve"
+            d="M 100 120 C 100 236 1100 236 1100 352 C 1100 468 100 468 100 584 C 100 700 1100 700 1100 816 C 1100 932 100 932 100 1048 C 100 1164 1100 1164 1100 1280"
+            fill="none"
+            stroke="url(#rxPlStroke)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+
+        {/* Scroll-driven pointer — positioned/rotated in JS along the path.
+            Points along +x by default; gsap rotation aligns it to the tangent. */}
+        <div className="rx-pl-arrow" ref={arrowRef} aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path
+              d="M3 12h15M12 5l7 7-7 7"
+              stroke="#ff9ffc"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </div>
 
-        <div className="rx-pl-rail">
-          {/* connecting line (dim brand gradient) + the pulse track above it */}
-          <div className="rx-pl-line" aria-hidden="true" />
-          <div className="rx-pl-track" aria-hidden="true">
-            <div className="rx-pl-pulse">
-              <span className="rx-pl-pulse-core" />
-            </div>
-          </div>
-
-          <ol className="rx-pl-stages">
-            {PL_STAGES.map((stage, i) => (
-              <li
-                key={stage.id}
-                className={'rx-pl-stage' + (stage.big ? ' is-big' : '')}
-              >
-                <span className="rx-pl-index" aria-hidden="true">
+        <ol className="rx-pl-nodes">
+          {PL_STAGES.map((stage, i) => (
+            <li
+              key={stage.id}
+              ref={(el) => {
+                nodeRefs.current[i] = el
+              }}
+              className="rx-pl-node"
+              style={{ left: `${stage.x}%`, top: `${stage.y}%` }}
+            >
+              {/* marker centred exactly on the path point; glows/scales via --p */}
+              <div className="rx-pl-node-marker">
+                <PipelineIcon id={stage.id} />
+              </div>
+              {/* one-shot spark burst — sibling of the marker so its opacity is
+                  never gated by the marker's reveal; animated by GSAP on arrival */}
+              <span className="rx-pl-node-burst" aria-hidden="true">
+                {Array.from({ length: PL_SPARKS }).map((_, k) => (
+                  <span key={k} className="rx-pl-spark" />
+                ))}
+              </span>
+              {/* text below the marker; fades + slides in via --pt */}
+              <div className="rx-pl-node-text">
+                <span className="rx-pl-node-num" aria-hidden="true">
                   {String(i + 1).padStart(2, '0')}
                 </span>
-                <div className="rx-pl-slot">
-                  <div className="rx-pl-marker">
-                    <PipelineIcon id={stage.id} />
-                  </div>
-                </div>
-                <span className="rx-pl-label">{stage.label}</span>
-                <span className="rx-pl-desc">{stage.desc}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
+                <span className="rx-pl-node-title">{stage.title}</span>
+                <span className="rx-pl-node-desc">{stage.desc}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   )
