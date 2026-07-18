@@ -141,7 +141,6 @@ export interface BorderGlowProps {
   coneSpread?: number
   animated?: boolean
   colors?: string[]
-  fillOpacity?: number
   /** Glassmorphism extension (not in the original): px blur for backdrop-filter. 0 = off. */
   backdropBlur?: number
 }
@@ -158,9 +157,6 @@ function BorderGlow({
   coneSpread = 25,
   animated = false,
   colors = ['#c084fc', '#f472b6', '#38bdf8'],
-  // `fillOpacity` stays in BorderGlowProps for API/back-compat (callers may still
-  // pass it) but is intentionally NOT destructured/used: the "fill near edges"
-  // layer it drove has been removed entirely (see note by the border layer).
   backdropBlur = 0,
 }: BorderGlowProps) {
   const cardRef = useRef<HTMLDivElement>(null)
@@ -309,7 +305,7 @@ function BorderGlow({
   } as CSSProperties
 
   // NOTE: the original "mesh gradient fill near edges" (padding-box, soft-light,
-  // opacity borderOpacity * fillOpacity) layer has been REMOVED entirely (its
+  // scaled by a fill-opacity factor) layer has been REMOVED entirely (its
   // <div> is gone from the render below, not merely hidden). That layer reflected
   // the mesh across the whole card interior on hover, which — over a translucent
   // glass card — read as the card's own background animating with the pointer.
