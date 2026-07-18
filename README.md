@@ -76,6 +76,33 @@ cd frontend && npm run types:gen
 `src/types/api.generated.ts`. **The backend must be running.** The thin
 `src/types/api.ts` only re-exports readable aliases over that generated schema.
 
+**The showcase data + its type**
+
+The home page reads real benchmark numbers from a committed, static JSON —
+`frontend/src/data/showcase.json` — produced by an actual pipeline run, never
+demo data. Its TypeScript type is likewise **generated**, from the JSON Schema
+the export emits alongside the data (`src/data/showcase.schema.json`) — so the
+frontend imports `src/types/showcase.generated.ts`, never a hand-written mirror.
+
+Regenerate both in one command each (no backend server needed):
+
+```bash
+# 1. re-run the real pipeline on the sample-app benchmark and rewrite
+#    frontend/src/data/showcase.json + showcase.schema.json (real parse →
+#    analyze → plan → migrate → tsc → Metro; AI forced to the offline `fake`
+#    provider so the run is deterministic and byte-reproducible):
+cd backend && source venv/bin/activate && rejox export-showcase
+# 2. regenerate the .d.ts from the emitted schema:
+cd frontend && npm run types:showcase
+```
+
+`rejox export-showcase` is byte-deterministic — `generatedAt` is the git commit
+date of the `test-projects/sample-app` subtree (override with `SOURCE_DATE_EPOCH`),
+not wall-clock. `npm run types:showcase` runs `json2ts` over
+`src/data/showcase.schema.json` → `src/types/showcase.generated.ts`. Both the
+JSON and the generated type are committed, so `npm run build` works on a fresh
+clone with no backend running.
+
 ## CLI quick start
 
 ```bash

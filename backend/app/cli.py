@@ -581,6 +581,138 @@ def migrate(
     )
 
 
+@app.command(name="export-showcase")
+def export_showcase(
+    project_path: Path = typer.Option(
+        None, "--project", help="Project to run (default: the committed sample-app benchmark)."
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Where to write showcase.json (default: frontend/src/data/showcase.json)."
+    ),
+) -> None:
+    """Run the full pipeline on the sample-app benchmark and freeze it into the
+    committed ``frontend/src/data/showcase.json`` (+ its JSON Schema).
+
+    A REAL run: real parse → analyze → plan → migrate → tsc → Metro. It reuses
+    the exact pipeline functions ``rejox migrate`` calls — no parallel logic. The
+    AI provider is forced to the offline ``fake`` so the single navigator-shape
+    reasoning call is deterministic and the export is byte-reproducible.
+    """
+    import importlib.metadata
+    import json
+
+    from app.ai.cache import ResolutionCache
+    from app.pipeline import showcase as sc
+
+    repo_root = Path(__file__).resolve().parents[2]
+    src = (project_path or (repo_root / "test-projects" / "sample-app")).expanduser().resolve()
+    if not src.is_dir():
+        console.print(f"[red]Not a directory:[/] {src}")
+        raise typer.Exit(code=1)
+
+    # Force the deterministic offline provider — reproducibility is the contract.
+    os.environ["REJOX_AI_PROVIDER"] = "fake"
+    os.environ.pop("GEMINI_API_KEY", None)
+
+    console.print(Rule(Text("Rejox — export showcase (real run)", style="bold white"), style="white"))
+
+    # 1. Intelligence + analysis + plan (deterministic).
+    _stage("Intelligence — analyzing the sample project")
+    try:
+        with console.status("[cyan]Building the knowledge graph…[/]", spinner="dots"):
+            kg = build_knowledge_graph(src)
+            report = analyze_graph(kg)
+    except IntelligenceError as exc:
+        console.print(f"[red]Analysis failed:[/] {exc}")
+        raise typer.Exit(code=1)
+    plan = plan_migration(report, kg)
+
+    # 2. Ask — the one genuine reasoning call (navigator shape), auto-accepted.
+    inner, ai_label = _make_provider()
+    if inner is None:
+        console.print("[red]Fake provider unavailable — cannot produce a deterministic export.[/]")
+        raise typer.Exit(code=1)
+    console.print(f"[dim]AI provider:[/] {ai_label}")
+    counter = _CountingProvider(inner)
+    answers: dict[str, str] = {}
+    for qid in _CORE_QUESTION_IDS:
+        q = next((x for x in plan.questions if x.id == qid), None)
+        if q is not None:
+            answers[qid] = _recommended(q) or ""
+    nav_ui = _nav_ui_summary(report, kg)
+    shape_answer, proposal, _ = _ask_navigator_shape(report, kg, inner, counter, auto=True)
+    if shape_answer:
+        answers["navigator-shape"] = shape_answer
+    if proposal is None:
+        console.print("[red]No navigator-shape proposal was produced (no routes?).[/]")
+        raise typer.Exit(code=1)
+
+    # 3. Migrate — emit the RN project into a workspace run dir (never captured).
+    _stage("Migrate — emitting the React Native project")
+    from app.pipeline import workspace
+
+    out_dir = workspace.new_run().output_dir
+    with console.status("[cyan]Transforming files…[/]", spinner="dots"):
+        emission = emit_project(plan, answers, kg, out_dir, report=report, source_root=src)
+    console.print(f"Emitted [bold]{len([f for f in emission.files if f.sourceFile])}[/] files → [dim]{out_dir}[/]")
+
+    # 4. Validate (+ repair loop, exactly as migrate does).
+    _stage("Review — validation (tsc + Metro)")
+    with console.status("[cyan]Validating (npm install · tsc · Metro)…[/]", spinner="dots"):
+        validation = validate_project(out_dir, install=True, run_bundle=True)
+    repair_rounds = 0
+    if not validation.passed:
+        from app.pipeline.repair import repair_project
+
+        with console.status("[cyan]Repairing residue errors with the LLM…[/]", spinner="dots"):
+            repair = repair_project(out_dir, emission, validation, provider=counter, source_root=src)
+        validation = repair.validation or validation
+        repair_rounds = repair.rounds
+    scores = validated_scores(
+        emission, validation,
+        predicted_coverage=report.coverage, predicted_confidence=report.confidence,
+    )
+
+    # 5. Serialize — pure mapping of real artifacts → the contract-checked shape.
+    try:
+        rejox_version = importlib.metadata.version("rejox")
+    except importlib.metadata.PackageNotFoundError:  # pragma: no cover
+        rejox_version = "0.0.0"
+    meta = sc.resolve_meta(
+        source_root=src, repo_root=repo_root, provider_label="fake", rejox_version=rejox_version,
+    )
+    data = sc.build_showcase_data(
+        kg=kg, report=report, plan=plan, proposal=proposal, nav_ui=nav_ui,
+        scores=scores, validation=validation,
+        llm_calls=counter.calls, repair_rounds=repair_rounds, meta=meta,
+    )
+
+    json_path = out.expanduser().resolve() if out else (repo_root / "frontend" / "src" / "data" / "showcase.json")
+    schema_path = json_path.with_name("showcase.schema.json")
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = json.dumps(
+        data.model_dump(mode="json", by_alias=True), indent=2, sort_keys=True, ensure_ascii=False
+    ) + "\n"
+    schema = json.dumps(
+        sc.showcase_json_schema(), indent=2, sort_keys=True, ensure_ascii=False
+    ) + "\n"
+    json_path.write_text(payload, encoding="utf-8")
+    schema_path.write_text(schema, encoding="utf-8")
+
+    _stage("Done — showcase exported")
+    t = Table.grid(padding=(0, 3))
+    t.add_column(style="dim"); t.add_column()
+    t.add_row("Data", f"[bold]{json_path}[/] [dim]({len(payload.encode('utf-8')) / 1024:.1f} KB)[/]")
+    t.add_row("Schema", str(schema_path))
+    t.add_row("AI provider", "fake (offline, deterministic)")
+    t.add_row("LLM calls", f"[bold magenta]{counter.calls}[/]")
+    t.add_row("Validated coverage", _pct(scores.workingCoverage))
+    t.add_row("tsc / Metro", f"{'PASS' if validation.typecheck.passed else 'FAIL'} / "
+                             f"{'PASS' if validation.bundle.passed else ('SKIP' if not validation.bundle.ran else 'FAIL')}")
+    console.print(t)
+
+
 class _NullProvider:
     """Stand-in when AI is disabled — never called (guarded), keeps the counter simple."""
 

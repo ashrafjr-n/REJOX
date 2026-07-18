@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "types:gen": "openapi-typescript http://localhost:8000/openapi.json -o src/types/api.generated.ts"
+    "types:gen": "openapi-typescript http://localhost:8000/openapi.json -o src/types/api.generated.ts",
+    "types:showcase": "json2ts -i src/data/showcase.schema.json -o src/types/showcase.generated.ts --additionalProperties false --no-style.semi"
   },
   "dependencies": {
     "axios": "^1.18.1",
@@ -33,6 +34,7 @@
     "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.2",
+    "json-schema-to-typescript": "^15.0.4",
     "openapi-typescript": "^7.13.0",
     "oxlint": "^1.71.0",
     "postcss": "^8.5.17",
