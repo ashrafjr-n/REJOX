@@ -75,25 +75,30 @@ const ScrollReveal = ({
 
     const wordElements = el.querySelectorAll<HTMLSpanElement>('.word')
 
+    // Tweens created by THIS instance; cleanup kills only these (and their
+    // ScrollTriggers) so unmounting one ScrollReveal never tears down the
+    // triggers other instances/components created.
+    const tweens: gsap.core.Tween[] = []
+
     // ---- ENTRANCE: rise / fade / blur in from the bottom (unchanged in feel,
     //      just scrubbed over a longer, height-independent distance). ----
     const revealTrigger = { trigger: el, scroller, start: revealStart, end: revealEnd, scrub: true }
-    gsap.fromTo(
+    tweens.push(gsap.fromTo(
       el,
       { transformOrigin: '0% 50%', rotate: baseRotation },
       { ease: 'none', rotate: 0, scrollTrigger: revealTrigger }
-    )
-    gsap.fromTo(
+    ))
+    tweens.push(gsap.fromTo(
       wordElements,
       { opacity: baseOpacity },
       { ease: 'none', opacity: 1, stagger, scrollTrigger: revealTrigger }
-    )
+    ))
     if (enableBlur) {
-      gsap.fromTo(
+      tweens.push(gsap.fromTo(
         wordElements,
         { filter: `blur(${blurStrength}px)` },
         { ease: 'none', filter: 'blur(0px)', stagger, scrollTrigger: revealTrigger }
-      )
+      ))
     }
 
     // ---- TOP-EXIT: once the element scrolls up to ~20vh from the top, animate
@@ -103,26 +108,29 @@ const ScrollReveal = ({
     //      state as its start and never fights the entrance in the hold zone. ----
     if (enableExit) {
       const exitTrigger = { trigger: el, scroller, start: exitStart, end: exitEnd, scrub: true }
-      gsap.to(wordElements, {
+      tweens.push(gsap.to(wordElements, {
         ease: 'none',
         opacity: baseOpacity,
         stagger,
         immediateRender: false,
         scrollTrigger: exitTrigger,
-      })
+      }))
       if (enableBlur) {
-        gsap.to(wordElements, {
+        tweens.push(gsap.to(wordElements, {
           ease: 'none',
           filter: `blur(${blurStrength}px)`,
           stagger,
           immediateRender: false,
           scrollTrigger: exitTrigger,
-        })
+        }))
       }
     }
 
     return () => {
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
+      tweens.forEach((t) => {
+        t.scrollTrigger?.kill()
+        t.kill()
+      })
     }
   }, [
     scrollContainerRef,

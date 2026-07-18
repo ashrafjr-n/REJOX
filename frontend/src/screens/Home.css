@@ -16,7 +16,7 @@
 .rx-home {
   /* Own stacking context (isolation) + the page's black base. The fixed
      light-pillar layer (`.rx-pillar-fixed`, z0) screen-blends against this
-     black; the hero and Section 02 are transparent so that one continuous
+     black; the hero and the closing CTA are transparent so that one continuous
      fixed background shows through both — no per-section background seam.
      `isolation` (not transform/filter) is used so the pillar stays fixed to
      the viewport rather than to `.rx-home`. */
@@ -30,7 +30,8 @@
   --rx-black: #050505;
   --rx-orange: #ff6a00;
   --rx-red: #c53322;
-  --rx-blue: #2f6bff;
+  /* Brand pink — the LightPillar's bottomColor, used as the warm accent. */
+  --rx-pink: #ff9ffc;
   --rx-white: #ffffff;
   /* Near-black for the nav capsule CONTAINER's background (see .rx-nav). The
      individual nav-item pills use --rx-nav-item-bg below, a shade lighter, so
@@ -53,8 +54,8 @@
 
 /* Full-viewport, fixed background layer holding the WebGL light pillar. It
    spans the whole viewport (not clipped to the hero), so as the page scrolls
-   from the hero into Section 02 the shader settles in place with no hard seam.
-   Sits below the frame (z1) and header (z50); pointer-events:none. */
+   from the hero into the closing CTA the shader settles in place with no hard
+   seam. Sits below the frame (z1) and header (z50); pointer-events:none. */
 .rx-pillar-fixed {
   position: fixed;
   inset: 0;
@@ -63,8 +64,9 @@
 }
 
 /* The hero is a normal, full-viewport block; the page scrolls naturally past
-   it into Section 02 below. It is transparent so the fixed pillar layer behind
-   it (screen-blended over `.rx-home`'s black base) provides the background. */
+   it into the closing CTA below. It is transparent so the fixed pillar layer
+   behind it (screen-blended over `.rx-home`'s black base) provides the
+   background. */
 .rx-hero {
   position: relative;
   height: 100vh;
@@ -99,7 +101,7 @@
    small fixed offset from the viewport (well above the frame border, which
    starts at --rx-frame-inset-top), while left/right stay aligned to the
    frame's inner content columns (frame inset + 1px border + frame padding).
-   z-index sits above the hero and Section 02, which are its siblings under
+   z-index sits above the hero and the closing CTA, which are its siblings under
    `.rx-home`. */
 .rx-header {
   position: fixed;
@@ -218,7 +220,7 @@
   display: block;
   width: 34px;
   height: 1px;
-  background: linear-gradient(90deg, var(--rx-red), #ff9ffc);
+  background: linear-gradient(90deg, var(--rx-red), var(--rx-pink));
 }
 .rx-eyebrow .rx-label {
   color: var(--rx-white);
@@ -426,7 +428,7 @@
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #ff9ffc;
+  color: var(--rx-pink);
   margin-bottom: 8px;
 }
 .rx-card-title {
@@ -538,13 +540,13 @@
   text-stroke: 1.5px rgba(255, 255, 255, 0.92);
 }
 
-/* ================= Section 02 — Project Intelligence ================= */
+/* ===================== Closing CTA ===================== */
 
-/* ---------- Standalone Project Intelligence intro section ----------
-   Its own full-viewport moment, scrolled BEFORE the live-analysis section.
-   Background is left transparent so the page's pure-black base shows through
-   (untouched). Clash Display at hero-weight scale. */
-.rx-piIntro {
+/* ---------- Standalone closing call-to-action ----------
+   The page's final full-viewport moment. Background is left transparent so the
+   page's pure-black base shows through (untouched). Clash Display at hero-weight
+   scale. */
+.rx-cta {
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -558,7 +560,7 @@
      (Vertical scroll and the reveal itself are unaffected.) */
   overflow-x: clip;
 }
-.rx-piIntro-inner {
+.rx-cta-inner {
   width: 100%;
   max-width: 1180px;
   margin: 0 auto;
@@ -567,16 +569,16 @@
    leading-[1.5] font-semibold …">. These unlayered rules win over ScrollReveal's
    layered Tailwind utilities on the same <p>, scaling the reveal to a dedicated,
    hero-weight moment in Clash Display. */
-.rx-piIntro-reveal {
+.rx-cta-reveal {
   margin: 0; /* cancel the component's my-5 */
   font-family: var(--font-sans);
 }
-.rx-piIntro-reveal .word {
+.rx-cta-reveal .word {
   will-change: opacity, filter;
 }
 /* Closing CTA layout — the four stretched words stacked and centred, with the
-   reused hero button below. `.rx-piIntro` already centres this vertically. */
-.rx-piCta {
+   reused hero button below. `.rx-cta` already centres this vertically. */
+.rx-cta-stack {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -584,7 +586,7 @@
 }
 /* Each word is its own ScrollReveal line. Tight leading so the four words read
    as one stacked block; margin:0 cancels the component's my-5. */
-.rx-piCta-line {
+.rx-cta-line {
   margin: 0;
   line-height: 1;
 }
@@ -594,7 +596,7 @@
    word centred as it stretches. The scaleX lives on the <p> so it never fights
    ScrollReveal's rotate/opacity/blur tweens (which target the <h2> and the inner
    .word spans). */
-.rx-piCta-word {
+.rx-cta-word {
   font-family: var(--font-sans);
   font-size: clamp(2.8rem, 8.5vw, 7rem);
   font-weight: 700;
@@ -607,608 +609,8 @@
 /* Space between the last word and the button. Kept a plain block (not a flex
    container) so the reused inline-flex `.rx-start` pill is NOT blockified — its
    computed display stays byte-identical to the hero button. Centred by the
-   inherited text-align:center from `.rx-piCta`. */
-.rx-piCta-actions {
+   inherited text-align:center from `.rx-cta-stack`. */
+.rx-cta-actions {
   margin-top: clamp(34px, 5vh, 60px);
   text-align: center;
-}
-
-/* ================= Section 03 — Migration Pipeline ==================== */
-/* BASE LAYOUT ONLY — a full-width, tall section. A smooth serpentine SVG path
-   snakes down the section between the left and right edges; the six stage
-   nodes sit on the path but are hidden for now (reveal wired up later). No
-   comet / animation / arrow / particle / glow yet. Transparent background so
-   the settled pillar (flat black) shows through, continuous with the rest of
-   the page. */
-.rx-plsec {
-  position: relative;
-  width: 100%;
-  min-height: 100vh;
-  color: var(--rx-white);
-  font-family: var(--font-sans);
-  background: transparent;
-  /* Top padding trimmed to roughly the header's height (down from up to 120px)
-     so the section isn't needlessly tall/empty at the top. */
-  padding: clamp(56px, 6vh, 84px) 0 clamp(72px, 10vh, 140px);
-}
-
-/* heading stays centred + width-constrained, above the path */
-.rx-pl-head {
-  max-width: 1180px;
-  margin: 0 auto clamp(32px, 5vh, 64px);
-  padding: 0 var(--rx-frame-inset);
-  text-align: center;
-}
-.rx-pl-head .rx-eyebrow {
-  justify-content: center;
-  margin-bottom: 18px;
-}
-.rx-pl-title {
-  margin: 0 auto;
-  max-width: 20ch;
-  font-size: clamp(28px, 3vw, 44px);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-  color: var(--rx-white);
-}
-
-/* --- serpentine path region: full width, deliberately tall so the S-curves
-   read as smooth swoops rather than shallow ripples. The SVG fills it on both
-   axes (preserveAspectRatio="none"); the node layer shares the same box, so
-   node % coordinates map 1:1 onto the SVG viewBox. --- */
-.rx-pl-path {
-  position: relative;
-  /* Horizontal breathing room — inset the whole path region from the screen
-     edges with a MARGIN (not padding: absolutely-positioned children resolve
-     against the padding box, so padding wouldn't move them). The margin narrows
-     the container itself, so the SVG (inset:0), the % nodes, AND the JS arrow —
-     whose LUT samples `containerEl.clientWidth` — all inset uniformly and stay
-     perfectly aligned. */
-  width: auto;
-  margin-inline: clamp(48px, 6vw, 120px);
-  height: clamp(900px, 122vh, 1500px);
-}
-.rx-pl-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-/* white trail — a premium luminous line with a soft white glow. Hidden by a
-   huge dash offset until JS sets the exact length; it then draws itself in
-   progressively (stroke-dashoffset synced to scroll). */
-.rx-pl-curve {
-  stroke-dasharray: 100000;
-  stroke-dashoffset: 100000;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.45))
-    drop-shadow(0 0 11px rgba(255, 255, 255, 0.18));
-}
-
-/* glowing head of the trail — NOT a shaped element, just an intensified radial
-   bloom pinned in JS (GSAP translate/opacity) to the exact point where the
-   drawn stroke currently ends. Because it shares the stroke's leading-edge
-   coordinate, it can never drift ahead of / behind the line. Centred on that
-   point via xPercent/yPercent -50 (set once in JS). Hidden at rest so it never
-   flashes before the scrub starts. */
-.rx-pl-tip {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  z-index: 2;
-  opacity: 0;
-  will-change: transform, opacity;
-  pointer-events: none;
-  background: radial-gradient(
-    circle at center,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(255, 255, 255, 0.9) 25%,
-    rgba(255, 245, 250, 0.4) 55%,
-    rgba(255, 255, 255, 0) 78%
-  );
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.75))
-    drop-shadow(0 0 12px rgba(255, 255, 255, 0.4));
-}
-
-/* the six stage nodes — each is a zero-size anchor at its path point (the
-   MARKER, text and sparks are positioned relative to that point). Reveal is
-   driven by two per-node CSS vars set from JS: --p (marker glow/scale/opacity)
-   and --pt (text fade/slide). Both default to 0 => node fully invisible until
-   the arrow arrives. */
-.rx-pl-nodes {
-  position: absolute;
-  inset: 0;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.rx-pl-node {
-  position: absolute;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  --p: 0;
-  --pt: 0;
-}
-/* marker — centred exactly on the path point. Blooms in with a subtle scale
-   and a warm brand glow as --p ramps 0 -> 1; stays lit once passed. */
-.rx-pl-node-marker {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 62px;
-  height: 62px;
-  border-radius: 999px;
-  transform: translate(-50%, -50%) scale(calc(0.88 + 0.12 * var(--p)));
-  opacity: var(--p);
-  color: #ffffff;
-  background: radial-gradient(circle at 50% 32%, #23232c, #0c0c11);
-  border: 1.5px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 calc(20px * var(--p)) rgba(255, 255, 255, calc(0.5 * var(--p))),
-    0 0 calc(40px * var(--p)) rgba(255, 255, 255, calc(0.22 * var(--p)));
-  will-change: transform, opacity;
-}
-.rx-pl-node-marker svg {
-  position: relative;
-  z-index: 1;
-  width: 26px;
-  height: 26px;
-}
-/* spark burst layer — centred on the path point (marker centre). Sparks sit at
-   the origin at opacity 0 until GSAP animates them outward on arrival. */
-.rx-pl-node-burst {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-}
-.rx-pl-spark {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
-  border-radius: 999px;
-  background: radial-gradient(circle, #ffffff 0%, rgba(255, 255, 255, 0.85) 45%, rgba(255, 255, 255, 0) 100%);
-  opacity: 0;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-/* text — below the marker (nodes hug the edges, so a centred stack below the
-   point stays on-screen). Fades + slides up with --pt. */
-.rx-pl-node-text {
-  position: absolute;
-  left: 0;
-  top: 52px;
-  width: 320px;
-  transform: translateX(-50%) translateY(calc(12px * (1 - var(--pt))));
-  opacity: var(--pt);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  will-change: transform, opacity;
-}
-/* the ONE pink accent per node — a small magenta stage number; everything else
-   in the node treatment is white. */
-.rx-pl-node-num {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  color: #ff8fe0;
-  opacity: 0.95;
-  margin-bottom: 8px;
-}
-.rx-pl-node-title {
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.1;
-  color: var(--rx-white);
-}
-.rx-pl-node-desc {
-  margin-top: 6px;
-  font-size: 24px;
-  font-weight: 400;
-  line-height: 1.3;
-  color: var(--rx-light-silver);
-  opacity: 0.85;
-}
-
-/* soft completion ring — only on the Validate node; centred on the path point.
-   Sits at opacity 0 until GSAP expands + fades it once on arrival. A single
-   restrained accent (not fireworks). */
-.rx-pl-node-ring {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 82px;
-  height: 82px;
-  margin: -41px 0 0 -41px;
-  border-radius: 999px;
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  opacity: 0;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-
-/* Finale text — the completion moment, above/near the Validate endpoint.
-   Right-anchored so it never overflows the edge the node hugs. Fades + slides
-   up with --pf; stays revealed once passed, un-reveals cleanly on scroll-back. */
-.rx-pl-finale {
-  --pf: 0;
-  position: absolute;
-  right: 5%;
-  top: 81.5%;
-  width: min(300px, 40%);
-  text-align: right;
-  opacity: var(--pf);
-  transform: translateY(calc(16px * (1 - var(--pf))));
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-.rx-pl-finale-title {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  font-size: clamp(18px, 1.5vw, 22px);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--rx-white);
-}
-/* white badge with a magenta check — the finale's single pink accent. */
-.rx-pl-finale-check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  color: #ff5fae;
-  background: #ffffff;
-  box-shadow: 0 0 16px -2px rgba(255, 255, 255, 0.5);
-}
-.rx-pl-finale-check svg {
-  width: 15px;
-  height: 15px;
-}
-.rx-pl-finale-sub {
-  display: block;
-  margin-top: 7px;
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  color: var(--rx-light-silver);
-  opacity: 0.85;
-}
-
-/* ================= Section 04 — Analysis Dashboard ==================== */
-/* Data-dense, scannable. Transparent background (settled pillar = flat black),
-   Clash Display, warm brand palette — continuous with the sections above. A
-   one-shot reveal-on-scroll fills the rings and grows the bars. */
-.rx-adsec {
-  position: relative;
-  min-height: 90vh;
-  display: flex;
-  align-items: center;
-  color: var(--rx-white);
-  font-family: var(--font-sans);
-  background: transparent;
-  padding: clamp(80px, 12vh, 140px) var(--rx-frame-inset);
-}
-.rx-ad-inner {
-  width: 100%;
-  max-width: 1180px;
-  margin: 0 auto;
-}
-.rx-ad-head {
-  margin-bottom: clamp(32px, 4vh, 48px);
-}
-.rx-ad-head .rx-eyebrow {
-  margin-bottom: 18px;
-}
-.rx-ad-title {
-  margin: 0;
-  max-width: 22ch;
-  font-size: clamp(26px, 2.7vw, 40px);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-  color: var(--rx-white);
-}
-
-/* shared card surface — lighter than the hero's BorderGlow, appropriate to a
-   full-width content section. */
-.rx-ad-card {
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--rx-hairline);
-}
-
-/* --- top row: two metric rings + the prominent LLM stat. `stretch` (the grid
-   default) equalizes the three cards' heights so there's no ragged row. --- */
-.rx-ad-top {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.15fr;
-  gap: clamp(16px, 1.6vw, 22px);
-  margin-bottom: clamp(16px, 1.6vw, 22px);
-}
-
-/* metric card: ring on the left, name + "what it measures" caption on the
-   right. Coverage and Confidence are deliberately held apart as two separate
-   visualizations with distinct accents — never one merged score. */
-.rx-ad-metric {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 26px 28px;
-}
-.rx-ad-ring {
-  position: relative;
-  width: 108px;
-  height: 108px;
-  flex: 0 0 auto;
-}
-.rx-ad-ring svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-.rx-ad-ring-track {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.09);
-  stroke-width: 9;
-}
-/* r=52 => circumference C = 2*pi*52 = 326.726. The arc renders empty
-   (dashoffset = C) from load and TRANSITIONS to its target offset when the
-   inline style flips on reveal — transitions interpolate the value cleanly. */
-.rx-ad-ring-arc {
-  fill: none;
-  stroke-width: 9;
-  stroke-linecap: round;
-  stroke-dasharray: 326.726;
-  stroke-dashoffset: 326.726;
-  transition: stroke-dashoffset 1.15s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.rx-ad-ring.no-anim .rx-ad-ring-arc {
-  transition: none;
-}
-.rx-ad-ring-coverage .rx-ad-ring-arc {
-  stroke: #ff8a3d; /* Coverage — orange-leaning */
-}
-.rx-ad-ring-confidence .rx-ad-ring-arc {
-  stroke: #ff9ffc; /* Confidence — pink-leaning */
-}
-.rx-ad-ring-num {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 30px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--rx-white);
-}
-.rx-ad-ring-pct {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--rx-light-silver);
-  margin-left: 1px;
-}
-.rx-ad-metric-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.rx-ad-metric-name {
-  font-size: 19px;
-  font-weight: 600;
-  color: var(--rx-white);
-}
-.rx-ad-metric-sub {
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: var(--rx-light-silver);
-}
-
-/* LLM-calls stat — the differentiator, given real weight: a large gradient
-   number and a supporting line. Accent-tinted card to draw the eye. */
-.rx-ad-llm {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 26px 30px;
-  background: linear-gradient(
-    150deg,
-    rgba(255, 106, 0, 0.12),
-    rgba(255, 159, 252, 0.08)
-  );
-  border-color: rgba(255, 159, 252, 0.32);
-}
-.rx-ad-llm-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #ff9ffc;
-}
-.rx-ad-llm-num {
-  font-size: clamp(56px, 6vw, 84px);
-  font-weight: 600;
-  line-height: 0.95;
-  letter-spacing: -0.02em;
-  margin: 4px 0 10px;
-  background: linear-gradient(120deg, #ffffff 0%, #ff9ffc 65%, #ff6a00 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  width: max-content;
-}
-.rx-ad-llm-sub {
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--rx-light-silver);
-  max-width: 34ch;
-}
-
-/* --- signed score-contribution breakdown --- */
-.rx-ad-break {
-  padding: 26px 30px 22px;
-}
-.rx-ad-break-head {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-.rx-ad-break-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--rx-white);
-}
-.rx-ad-break-sub {
-  font-size: 12.5px;
-  color: var(--rx-light-silver);
-}
-.rx-ad-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-/* grid columns: sign badge | label (flexes, wraps) | magnitude bar (fixed) |
-   signed weight (fixed). The fixed bar/weight columns mean a long label wraps
-   inside its own column instead of overlapping the bar. */
-.rx-ad-row {
-  display: grid;
-  grid-template-columns: 26px 1fr clamp(90px, 16vw, 200px) 46px;
-  align-items: center;
-  gap: 14px;
-  padding: 11px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-.rx-ad-row:first-child {
-  border-top: none;
-}
-.rx-ad-sign {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1;
-}
-.rx-ad-row.is-pos .rx-ad-sign {
-  color: #ff9ffc;
-  background: rgba(255, 159, 252, 0.14);
-}
-.rx-ad-row.is-neg .rx-ad-sign {
-  color: #ff7a6b;
-  background: rgba(197, 51, 34, 0.2);
-}
-.rx-ad-row-label {
-  font-size: 14px;
-  line-height: 1.35;
-  color: var(--rx-white);
-}
-.rx-ad-bar {
-  position: relative;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  overflow: hidden;
-}
-.rx-ad-bar-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  border-radius: 999px;
-  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.rx-ad-row.is-pos .rx-ad-bar-fill {
-  background: linear-gradient(90deg, var(--rx-orange), #ff9ffc);
-}
-.rx-ad-row.is-neg .rx-ad-bar-fill {
-  background: linear-gradient(90deg, #8f1f1f, var(--rx-red));
-}
-.rx-ad-weight {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.rx-ad-row.is-pos .rx-ad-weight {
-  color: #ff9ffc;
-}
-.rx-ad-row.is-neg .rx-ad-weight {
-  color: #ff7a6b;
-}
-
-/* subordinate net footer — intentionally small, NOT a third headline metric. */
-.rx-ad-break-foot {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rx-hairline);
-}
-.rx-ad-net-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--rx-light-silver);
-}
-.rx-ad-net-val {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 700;
-  color: #ff9ffc;
-  font-variant-numeric: tabular-nums;
-}
-.rx-ad-net-note {
-  font-size: 12px;
-  color: var(--rx-light-silver);
-}
-
-/* Reduced motion: no fills sweeping in — everything renders settled instantly.
-   (The ring also gets `no-anim` from JS; this covers the bars too.) */
-@media (prefers-reduced-motion: reduce) {
-  .rx-ad-ring-arc,
-  .rx-ad-bar-fill {
-    transition: none;
-  }
-}
-
-/* Stack the top row on narrower viewports so nothing crushes. */
-@media (max-width: 880px) {
-  .rx-ad-top {
-    grid-template-columns: 1fr;
-  }
-  .rx-ad-row {
-    grid-template-columns: 24px 1fr 44px;
-  }
-  .rx-ad-bar {
-    display: none; /* drop the bar on small screens; sign + weight still read */
-  }
 }
