@@ -128,47 +128,35 @@ function ProjectIntelligence() {
           scrolled FIRST, before the live-analysis (terminal/tree/dashboard)
           section below. Background is left transparent so the page's pure-black
           base shows through, untouched. */}
-      <section className="rx-piIntro" aria-label="Project Intelligence">
-        <div className="rx-piIntro-inner">
-          {/* Eyebrow label — now rides the SAME ScrollReveal entrance/exit as the
-              headline + paragraph below (tilt-in entrance, straight fade/blur
-              exit). The decorative rule is a ::before on the first word so it
-              fades/blurs in perfect sync with the label rather than sitting
-              static. See .rx-piIntro-eyebrow* in Home.css. */}
-          <ScrollReveal
-            containerClassName="rx-piIntro-reveal rx-piIntro-eyebrow"
-            textClassName="rx-piIntro-eyebrow-p"
-            baseOpacity={0}
-            baseRotation={4}
-            blurStrength={10}
-            enableBlur
-          >
-            Project Intelligence
-          </ScrollReveal>
-          {/* Headline + paragraph reveal word-by-word (blur/opacity/rotation)
-              as this section scrolls into view — see ScrollReveal, used exactly
-              as provided. Sized up (Clash Display, hero-weight) to override
-              ScrollReveal's small default clamp. */}
-          <ScrollReveal
-            containerClassName="rx-piIntro-reveal rx-piIntro-copy"
-            textClassName="rx-piIntro-copy-p rx-piIntro-oneline"
-            baseOpacity={0}
-            baseRotation={4}
-            blurStrength={10}
-            enableBlur
-          >
-            Upload your React project.
-          </ScrollReveal>
-          <ScrollReveal
-            containerClassName="rx-piIntro-reveal rx-piIntro-copy"
-            textClassName="rx-piIntro-copy-p"
-            baseOpacity={0}
-            baseRotation={3}
-            blurStrength={10}
-            enableBlur
-          >
-            Rejox builds a deterministic knowledge graph of your codebase — every page, component, hook and dependency — before a single line is migrated.
-          </ScrollReveal>
+      <section className="rx-piIntro" aria-label="Upload. Wait. Review. Ship.">
+        <div className="rx-piIntro-inner rx-piCta">
+          {/* Four-word summary of the whole flow — one word per line, each its
+              own ScrollReveal so the section keeps its signature word-by-word
+              blur/opacity/tilt reveal. Widened horizontally (scaleX, echoing the
+              REJOX wordmark) rather than by font-size alone. */}
+          {['Upload.', 'Wait.', 'Review.', 'Ship.'].map((word) => (
+            <ScrollReveal
+              key={word}
+              containerClassName="rx-piIntro-reveal rx-piCta-line"
+              textClassName="rx-piCta-word"
+              baseOpacity={0}
+              baseRotation={4}
+              blurStrength={10}
+              enableBlur
+            >
+              {word}
+            </ScrollReveal>
+          ))}
+          {/* Closing CTA — the SAME button as the hero's "Start migration"
+              (identical markup, classes and icon-chip), centered below. */}
+          <div className="rx-piCta-actions">
+            <button type="button" className="rx-start">
+              <span className="rx-start-label">Start migration</span>
+              <span className="rx-start-chip" aria-hidden="true">
+                <ArrowRight />
+              </span>
+            </button>
+          </div>
         </div>
       </section>
     </>
@@ -1009,15 +997,15 @@ export function Home() {
         </div>
       </div>
 
-      {/* Section 02 — the live, looping Project Intelligence scene, flowing
-          normally below the hero. */}
-      <ProjectIntelligence />
-
-      {/* Section 03 — the Migration Pipeline horizontal timeline. */}
+      {/* Section 02 — the Migration Pipeline horizontal timeline. */}
       <MigrationPipeline />
 
-      {/* Section 04 — the Analysis Dashboard (Coverage/Confidence/LLM + scoring). */}
+      {/* Section 03 — the Analysis Dashboard (Coverage/Confidence/LLM + scoring). */}
       <AnalysisDashboard />
+
+      {/* Section 04 (LAST) — Project Intelligence, now the page's closing
+          call-to-action: a four-word summary of the flow + START MIGRATION. */}
+      <ProjectIntelligence />
     </div>
   )
 }
