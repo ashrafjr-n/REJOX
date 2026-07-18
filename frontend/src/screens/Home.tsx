@@ -4,6 +4,7 @@ import './Home.css'
 import BorderGlow from './BorderGlow'
 import LightPillar from './LightPillar'
 import ScrollReveal from './ScrollReveal'
+import Understanding from './Understanding'
 import rejoxLogo from '../assets/rejox-logo.svg'
 
 /**
@@ -306,6 +307,11 @@ export function Home() {
           </motion.div>
         </div>
       </div>
+
+      {/* Scene 01 — "Understanding": the first scroll-driven section below the
+          hero. Pinned; drives a beat index over three placeholder slots wired to
+          real showcase.json figures. Sits between the hero and the closing CTA. */}
+      <Understanding />
 
       {/* Closing CTA — the last thing on the page: a four-word summary of the
           flow + START MIGRATION. */}

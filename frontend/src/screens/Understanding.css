@@ -1,0 +1,163 @@
+/* ------------------------------------------------------------------ *
+ * Scene 01 — "Understanding". The first scroll-driven section below the
+ * hero. An INSTRUMENT, not a cinematic moment: white / near-white / greys
+ * on black, with --rx-pink permitted on exactly one heading word and
+ * nowhere else. No orange, no gradients, no glow — that treatment belongs
+ * to the hero alone. Numbers and identifiers are mono with tabular
+ * numerals; prose is the site sans. That split is the section's whole
+ * visual signature.
+ *
+ * Background is TRANSPARENT so the page's fixed pillar layer (settled to
+ * flat black by the time we reach it) shows through — no per-section
+ * background seam. Desktop only this session.
+ * ------------------------------------------------------------------ */
+
+.rx-understanding {
+  /* Own tokens, scoped to the section. Greys are derived from the existing
+     --rx-white / --rx-light-silver ladder; no new brand colours. */
+  --rx-u-dim: rgba(255, 255, 255, 0.4);
+  --rx-u-line: rgba(255, 255, 255, 0.14);
+  --rx-u-line-active: rgba(255, 255, 255, 0.7);
+  --rx-u-slot-min-h: 200px;
+  /* Top padding clears the fixed header capsule (top: 20px + ~42px logo, plus
+     breathing room) when the section is pinned to the top of the viewport. */
+  --rx-u-pad-top: 132px;
+
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  /* When pinned, the section is exactly one viewport tall and fills the screen;
+     the pin-spacer GSAP inserts provides the scroll distance. */
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  background: transparent;
+  color: var(--rx-white);
+  font-family: var(--font-sans);
+  padding: var(--rx-u-pad-top) var(--rx-frame-inset) clamp(48px, 8vh, 96px);
+  -webkit-font-smoothing: antialiased;
+}
+
+.rx-understanding-inner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+/* --- eyebrow: reuses the hero's .rx-eyebrow rule/label pattern. The hero's
+   rule is an orange→pink gradient; here the palette is strict, so the rule is
+   a plain near-white hairline. --- */
+.rx-u-eyebrow {
+  margin-bottom: 26px;
+}
+.rx-u-eyebrow .rx-rule {
+  background: var(--rx-u-line-active);
+}
+
+/* --- heading: site sans, large but restrained. Exactly one accent word. --- */
+.rx-u-heading {
+  margin: 0 0 44px;
+  max-width: 20ch;
+  font-family: var(--font-sans);
+  font-size: clamp(30px, 3.4vw, 52px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+/* The single permitted --rx-pink accent in this section. */
+.rx-u-accent {
+  color: var(--rx-pink);
+}
+
+/* --- three placeholder slots, side by side. Outlined boxes with a caption;
+   deliberate stand-ins so the pin + beat transitions are verifiable before any
+   real visuals exist. --- */
+.rx-u-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 40px;
+}
+.rx-u-slot {
+  display: flex;
+  align-items: flex-end;
+  min-height: var(--rx-u-slot-min-h);
+  padding: 18px 20px;
+  border: 1px solid var(--rx-u-line);
+  border-radius: 12px;
+  background: transparent;
+  /* Beat-driven emphasis: inactive slots are dimmed, the active one lifts to
+     full contrast. Transition both so the beat change reads as a state move. */
+  opacity: 0.4;
+  transition: opacity 0.35s ease, border-color 0.35s ease;
+}
+.rx-u-slot.is-active {
+  opacity: 1;
+  border-color: var(--rx-u-line-active);
+}
+.rx-u-slot-caption {
+  /* An identifier-like caption → mono, matching the readout. */
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--rx-light-silver);
+}
+
+/* --- readout strip: mono, tabular numerals. The instrument's dial. --- */
+.rx-u-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 40px;
+  margin: 0 0 26px;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--rx-u-line);
+}
+.rx-u-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rx-u-metric-value {
+  font-family: var(--font-mono);
+  font-size: clamp(26px, 2.4vw, 34px);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--rx-white);
+}
+.rx-u-metric-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-u-dim);
+}
+
+/* --- attribution: quiet prose, with the identifier in mono. --- */
+.rx-u-attribution {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rx-u-dim);
+}
+.rx-u-attribution .tnum {
+  font-family: var(--font-mono);
+  color: var(--rx-light-silver);
+}
+
+/* ============================ reduced motion ============================ */
+/* No pin, no scrub: a normal-height block with every slot equally prominent and
+   the full readout visible — nothing needs scrolling to be seen. The component
+   already omits the `is-active` beat class in this mode; here we neutralise the
+   dim so all three slots read equally, and let height be natural. */
+.rx-understanding.is-reduced {
+  min-height: auto;
+}
+.rx-understanding.is-reduced .rx-u-slot {
+  opacity: 1;
+  border-color: var(--rx-u-line);
+}
