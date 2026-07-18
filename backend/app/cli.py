@@ -616,24 +616,35 @@ def export_showcase(
 
     console.print(Rule(Text("Rejox — export showcase (real run)", style="bold white"), style="white"))
 
-    # 1. Intelligence + analysis + plan (deterministic).
-    _stage("Intelligence — analyzing the sample project")
-    try:
-        with console.status("[cyan]Building the knowledge graph…[/]", spinner="dots"):
-            kg = build_knowledge_graph(src)
-            report = analyze_graph(kg)
-    except IntelligenceError as exc:
-        console.print(f"[red]Analysis failed:[/] {exc}")
-        raise typer.Exit(code=1)
-    plan = plan_migration(report, kg)
-
-    # 2. Ask — the one genuine reasoning call (navigator shape), auto-accepted.
+    # The provider + its call counter are created UP FRONT so we can attribute
+    # LLM calls to each phase by snapshotting the SAME real counter at every phase
+    # boundary. Every per-phase figure below is an observed delta — never derived,
+    # assumed, or hard-coded (including the zeros: a phase that made no call is
+    # confirmed by counter-before == counter-after, not by writing 0).
     inner, ai_label = _make_provider()
     if inner is None:
         console.print("[red]Fake provider unavailable — cannot produce a deterministic export.[/]")
         raise typer.Exit(code=1)
     console.print(f"[dim]AI provider:[/] {ai_label}")
     counter = _CountingProvider(inner)
+    c_start = counter.calls
+
+    # 1. Intelligence + analysis + plan (deterministic — no provider passed, so
+    #    these phases cannot touch the counter; the snapshots confirm it).
+    _stage("Intelligence — analyzing the sample project")
+    try:
+        with console.status("[cyan]Building the knowledge graph…[/]", spinner="dots"):
+            kg = build_knowledge_graph(src)
+            c_intel = counter.calls
+            report = analyze_graph(kg)
+            c_analyze = counter.calls
+    except IntelligenceError as exc:
+        console.print(f"[red]Analysis failed:[/] {exc}")
+        raise typer.Exit(code=1)
+    plan = plan_migration(report, kg)
+    c_plan = counter.calls
+
+    # 2. Ask — the one genuine reasoning call (navigator shape), auto-accepted.
     answers: dict[str, str] = {}
     for qid in _CORE_QUESTION_IDS:
         q = next((x for x in plan.questions if x.id == qid), None)
@@ -655,6 +666,9 @@ def export_showcase(
     with console.status("[cyan]Transforming files…[/]", spinner="dots"):
         emission = emit_project(plan, answers, kg, out_dir, report=report, source_root=src)
     console.print(f"Emitted [bold]{len([f for f in emission.files if f.sourceFile])}[/] files → [dim]{out_dir}[/]")
+    # The navigator-shape reasoning call (made in the Ask step above) and any
+    # emit-time provider calls fall in the "migrate" window.
+    c_migrate = counter.calls
 
     # 4. Validate (+ repair loop, exactly as migrate does).
     _stage("Review — validation (tsc + Metro)")
@@ -668,6 +682,16 @@ def export_showcase(
             repair = repair_project(out_dir, emission, validation, provider=counter, source_root=src)
         validation = repair.validation or validation
         repair_rounds = repair.rounds
+    c_repair = counter.calls
+
+    # Per-phase LLM calls — measured deltas of the real counter at each boundary.
+    llm_by_phase = [
+        sc.PhaseLlmCount(phase="intelligence", calls=c_intel - c_start),
+        sc.PhaseLlmCount(phase="analyze", calls=c_analyze - c_intel),
+        sc.PhaseLlmCount(phase="plan", calls=c_plan - c_analyze),
+        sc.PhaseLlmCount(phase="migrate", calls=c_migrate - c_plan),
+        sc.PhaseLlmCount(phase="repair", calls=c_repair - c_migrate),
+    ]
     scores = validated_scores(
         emission, validation,
         predicted_coverage=report.coverage, predicted_confidence=report.confidence,
@@ -684,7 +708,8 @@ def export_showcase(
     data = sc.build_showcase_data(
         kg=kg, report=report, plan=plan, proposal=proposal, nav_ui=nav_ui,
         scores=scores, validation=validation,
-        llm_calls=counter.calls, repair_rounds=repair_rounds, meta=meta,
+        llm_calls=counter.calls, llm_by_phase=llm_by_phase,
+        repair_rounds=repair_rounds, meta=meta,
     )
 
     json_path = out.expanduser().resolve() if out else (repo_root / "frontend" / "src" / "data" / "showcase.json")

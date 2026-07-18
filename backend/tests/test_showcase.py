@@ -80,12 +80,19 @@ def _live_run(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("REJOX_AI_PROVIDER", "fake")
 
-    kg = build_knowledge_graph(SAMPLE)
-    report = analyze_graph(kg)
-    plan = plan_migration(report, kg)
-
+    # Counter up front + boundary snapshots, mirroring the export command exactly,
+    # so the per-phase deltas re-observed here can be compared to the exported ones.
     inner, _ = _make_provider()
     counter = _CountingProvider(inner)
+    c_start = counter.calls
+
+    kg = build_knowledge_graph(SAMPLE)
+    c_intel = counter.calls
+    report = analyze_graph(kg)
+    c_analyze = counter.calls
+    plan = plan_migration(report, kg)
+    c_plan = counter.calls
+
     answers: dict[str, str] = {}
     for qid in _CORE_QUESTION_IDS:
         q = next((x for x in plan.questions if x.id == qid), None)
@@ -98,18 +105,27 @@ def _live_run(monkeypatch):
     if out.exists():
         shutil.rmtree(out)
     emission = emit_project(plan, answers, kg, out, report=report, source_root=SAMPLE)
+    c_migrate = counter.calls
     validation = validate_project(out, install=True, run_bundle=True)
+    c_repair = counter.calls  # no repair path here; sample-app validates clean
     scores = validated_scores(
         emission, validation,
         predicted_coverage=report.coverage, predicted_confidence=report.confidence,
     )
-    return report, scores, validation, counter
+    phase_calls = {
+        "intelligence": c_intel - c_start,
+        "analyze": c_analyze - c_intel,
+        "plan": c_plan - c_analyze,
+        "migrate": c_migrate - c_plan,
+        "repair": c_repair - c_migrate,
+    }
+    return report, scores, validation, counter, phase_calls
 
 
 def test_exported_values_equal_the_live_engine(tmp_path, monkeypatch) -> None:
     if not _tools_available():
         pytest.skip("node/npm not on PATH.")
-    report, scores, validation, counter = _live_run(monkeypatch)
+    report, scores, validation, counter, phase_calls = _live_run(monkeypatch)
 
     data = json.loads(COMMITTED.read_text(encoding="utf-8"))
     r = data["results"]
@@ -124,6 +140,15 @@ def test_exported_values_equal_the_live_engine(tmp_path, monkeypatch) -> None:
     assert r["metroRan"] == validation.bundle.ran
     # The thesis number: the single genuine reasoning call.
     assert r["llmCalls"] == counter.calls == 1
+    # Per-phase LLM counts equal the independently re-observed deltas, and the
+    # exported phases sum to the whole-run count.
+    exported_phases = {p["phase"]: p["calls"] for p in r["llmCallsByPhase"]}
+    assert exported_phases == phase_calls
+    assert sum(exported_phases.values()) == r["llmCalls"]
+    # The understanding phases (deterministic reading) genuinely made zero calls.
+    assert exported_phases["intelligence"] == 0
+    assert exported_phases["analyze"] == 0
+    assert exported_phases["plan"] == 0
     # Predicted scores from the analyzer.
     assert r["predictedCoverage"] == report.coverage
     assert r["predictedConfidence"] == report.confidence

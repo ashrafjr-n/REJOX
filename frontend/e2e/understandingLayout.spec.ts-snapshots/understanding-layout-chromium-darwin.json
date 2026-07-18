@@ -1,0 +1,1782 @@
+{
+  "nodes": [
+    {
+      "id": "src/App.tsx#App",
+      "label": "App",
+      "kind": "component",
+      "sourceFile": "src/App.tsx",
+      "x": 717.1,
+      "y": 307.97,
+      "originX": 4.61,
+      "originY": 315.54,
+      "degree": 5,
+      "wave": 6,
+      "waveX": 788.44,
+      "waveY": 239
+    },
+    {
+      "id": "src/components/Button.tsx#Button",
+      "label": "Button",
+      "kind": "component",
+      "sourceFile": "src/components/Button.tsx",
+      "x": 655.34,
+      "y": 321.74,
+      "originX": 12.21,
+      "originY": 395.03,
+      "degree": 4,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 127
+    },
+    {
+      "id": "src/components/CartBadge.tsx#CartBadge",
+      "label": "CartBadge",
+      "kind": "component",
+      "sourceFile": "src/components/CartBadge.tsx",
+      "x": 367.23,
+      "y": 378.37,
+      "originX": -1.56,
+      "originY": 410.22,
+      "degree": 2,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 155
+    },
+    {
+      "id": "src/components/CartItem.tsx#CartItem",
+      "label": "CartItem",
+      "kind": "component",
+      "sourceFile": "src/components/CartItem.tsx",
+      "x": 484.35,
+      "y": 360.82,
+      "originX": 369.93,
+      "originY": 24.19,
+      "degree": 3,
+      "wave": 3,
+      "waveX": 445.78,
+      "waveY": 239
+    },
+    {
+      "id": "src/components/CartSummary.tsx#CartSummary",
+      "label": "CartSummary",
+      "kind": "component",
+      "sourceFile": "src/components/CartSummary.tsx",
+      "x": 583.04,
+      "y": 341.69,
+      "originX": 379.73,
+      "originY": 56.14,
+      "degree": 4,
+      "wave": 4,
+      "waveX": 560,
+      "waveY": 197
+    },
+    {
+      "id": "src/components/ErrorMessage.tsx#ErrorMessage",
+      "label": "ErrorMessage",
+      "kind": "component",
+      "sourceFile": "src/components/ErrorMessage.tsx",
+      "x": 914,
+      "y": 266.04,
+      "originX": 381.57,
+      "originY": 80.37,
+      "degree": 2,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 183
+    },
+    {
+      "id": "src/components/FeatureCard.tsx#FeatureCard",
+      "label": "FeatureCard",
+      "kind": "component",
+      "sourceFile": "src/components/FeatureCard.tsx",
+      "x": 878.27,
+      "y": 199.17,
+      "originX": 390.89,
+      "originY": 111.15,
+      "degree": 1,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 267
+    },
+    {
+      "id": "src/components/Footer.tsx#Footer",
+      "label": "Footer",
+      "kind": "component",
+      "sourceFile": "src/components/Footer.tsx",
+      "x": 314.14,
+      "y": 306.33,
+      "originX": 371.79,
+      "originY": 138.95,
+      "degree": 1,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 295
+    },
+    {
+      "id": "src/components/Hero.tsx#Hero",
+      "label": "Hero",
+      "kind": "component",
+      "sourceFile": "src/components/Hero.tsx",
+      "x": 719.37,
+      "y": 271.46,
+      "originX": 375.62,
+      "originY": 183.4,
+      "degree": 2,
+      "wave": 3,
+      "waveX": 445.78,
+      "waveY": 267
+    },
+    {
+      "id": "src/components/Layout.tsx#Layout",
+      "label": "Layout",
+      "kind": "component",
+      "sourceFile": "src/components/Layout.tsx",
+      "x": 464.39,
+      "y": 316.08,
+      "originX": 373.94,
+      "originY": 208.91,
+      "degree": 3,
+      "wave": 4,
+      "waveX": 560,
+      "waveY": 225
+    },
+    {
+      "id": "src/components/Navbar.tsx#Navbar",
+      "label": "Navbar",
+      "kind": "component",
+      "sourceFile": "src/components/Navbar.tsx",
+      "x": 330.6,
+      "y": 346.7,
+      "originX": 392.3,
+      "originY": 241.21,
+      "degree": 2,
+      "wave": 3,
+      "waveX": 445.78,
+      "waveY": 295
+    },
+    {
+      "id": "src/components/ProductCard.tsx#ProductCard",
+      "label": "ProductCard",
+      "kind": "component",
+      "sourceFile": "src/components/ProductCard.tsx",
+      "x": 759.96,
+      "y": 351.68,
+      "originX": 388.84,
+      "originY": 304.57,
+      "degree": 4,
+      "wave": 3,
+      "waveX": 445.78,
+      "waveY": 211
+    },
+    {
+      "id": "src/components/ProductGrid.tsx#ProductGrid",
+      "label": "ProductGrid",
+      "kind": "component",
+      "sourceFile": "src/components/ProductGrid.tsx",
+      "x": 900.24,
+      "y": 342.38,
+      "originX": 390.68,
+      "originY": 325.71,
+      "degree": 2,
+      "wave": 4,
+      "waveX": 560,
+      "waveY": 281
+    },
+    {
+      "id": "src/components/QuantityStepper.tsx#QuantityStepper",
+      "label": "QuantityStepper",
+      "kind": "component",
+      "sourceFile": "src/components/QuantityStepper.tsx",
+      "x": 392.32,
+      "y": 407.39,
+      "originX": 375.39,
+      "originY": 350.72,
+      "degree": 1,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 323
+    },
+    {
+      "id": "src/components/Rating.tsx#Rating",
+      "label": "Rating",
+      "kind": "component",
+      "sourceFile": "src/components/Rating.tsx",
+      "x": 849.77,
+      "y": 366.82,
+      "originX": 392.89,
+      "originY": 388.68,
+      "degree": 2,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 211
+    },
+    {
+      "id": "src/components/SettingToggle.tsx#SettingToggle",
+      "label": "SettingToggle",
+      "kind": "component",
+      "sourceFile": "src/components/SettingToggle.tsx",
+      "x": 659.79,
+      "y": 424,
+      "originX": 389.72,
+      "originY": 420.95,
+      "degree": 1,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 351
+    },
+    {
+      "id": "src/components/Spinner.tsx#Spinner",
+      "label": "Spinner",
+      "kind": "component",
+      "sourceFile": "src/components/Spinner.tsx",
+      "x": 1074,
+      "y": 281.53,
+      "originX": 754.48,
+      "originY": 16.63,
+      "degree": 2,
+      "wave": 2,
+      "waveX": 331.56,
+      "waveY": 239
+    },
+    {
+      "id": "src/pages/HomePage.tsx#HomePage",
+      "label": "HomePage",
+      "kind": "component",
+      "sourceFile": "src/pages/HomePage.tsx",
+      "x": 848.32,
+      "y": 249.39,
+      "originX": 760.54,
+      "originY": 164.17,
+      "degree": 3,
+      "wave": 4,
+      "waveX": 560,
+      "waveY": 253
+    },
+    {
+      "id": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "label": "ProductDetailPage",
+      "kind": "component",
+      "sourceFile": "src/pages/ProductDetailPage.tsx",
+      "x": 869.93,
+      "y": 310.42,
+      "originX": 751.17,
+      "originY": 212.71,
+      "degree": 7,
+      "wave": 3,
+      "waveX": 445.78,
+      "waveY": 183
+    },
+    {
+      "id": "src/pages/ProductsPage.tsx#ProductsPage",
+      "label": "ProductsPage",
+      "kind": "component",
+      "sourceFile": "src/pages/ProductsPage.tsx",
+      "x": 965.47,
+      "y": 298.31,
+      "originX": 766.19,
+      "originY": 242.68,
+      "degree": 5,
+      "wave": 5,
+      "waveX": 674.22,
+      "waveY": 225
+    },
+    {
+      "id": "src/pages/SettingsPage.tsx#SettingsPage",
+      "label": "SettingsPage",
+      "kind": "component",
+      "sourceFile": "src/pages/SettingsPage.tsx",
+      "x": 726.55,
+      "y": 371.77,
+      "originX": 744.39,
+      "originY": 262.34,
+      "degree": 3,
+      "wave": 5,
+      "waveX": 674.22,
+      "waveY": 253
+    },
+    {
+      "id": "src/hooks/useFetch.ts#useFetch",
+      "label": "useFetch",
+      "kind": "hook",
+      "sourceFile": "src/hooks/useFetch.ts",
+      "x": 1040.8,
+      "y": 265.25,
+      "originX": 749.06,
+      "originY": 58.16,
+      "degree": 2,
+      "wave": null,
+      "waveX": 895.22,
+      "waveY": 448
+    },
+    {
+      "id": "src/store/cartStore.ts#useCartStore",
+      "label": "useCartStore",
+      "kind": "store",
+      "sourceFile": "src/store/cartStore.ts",
+      "x": 642.63,
+      "y": 357.4,
+      "originX": 743.72,
+      "originY": 305.73,
+      "degree": 5,
+      "wave": null,
+      "waveX": 1074,
+      "waveY": 448
+    },
+    {
+      "id": "src/App.tsx",
+      "label": "App.tsx",
+      "kind": "component",
+      "sourceFile": "src/App.tsx",
+      "x": 535.19,
+      "y": 132.81,
+      "originX": 4.66,
+      "originY": 316.69,
+      "degree": 6,
+      "wave": null,
+      "waveX": 46,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/Layout.tsx",
+      "label": "Layout.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/Layout.tsx",
+      "x": 282.73,
+      "y": 119.61,
+      "originX": 383.88,
+      "originY": 209.19,
+      "degree": 3,
+      "wave": null,
+      "waveX": 448.26,
+      "waveY": 448
+    },
+    {
+      "id": "src/pages/HomePage.tsx",
+      "label": "HomePage.tsx",
+      "kind": "component",
+      "sourceFile": "src/pages/HomePage.tsx",
+      "x": 601.04,
+      "y": 86.02,
+      "originX": 757.61,
+      "originY": 167.32,
+      "degree": 3,
+      "wave": 1,
+      "waveX": 217.33,
+      "waveY": 267
+    },
+    {
+      "id": "src/pages/ProductsPage.tsx",
+      "label": "ProductsPage.tsx",
+      "kind": "component",
+      "sourceFile": "src/pages/ProductsPage.tsx",
+      "x": 531.04,
+      "y": 160.67,
+      "originX": 762.44,
+      "originY": 235.26,
+      "degree": 6,
+      "wave": 1,
+      "waveX": 217.33,
+      "waveY": 183
+    },
+    {
+      "id": "src/pages/ProductDetailPage.tsx",
+      "label": "ProductDetailPage.tsx",
+      "kind": "component",
+      "sourceFile": "src/pages/ProductDetailPage.tsx",
+      "x": 475.24,
+      "y": 168.17,
+      "originX": 746.65,
+      "originY": 204.46,
+      "degree": 8,
+      "wave": 1,
+      "waveX": 217.33,
+      "waveY": 155
+    },
+    {
+      "id": "src/pages/SettingsPage.tsx",
+      "label": "SettingsPage.tsx",
+      "kind": "component",
+      "sourceFile": "src/pages/SettingsPage.tsx",
+      "x": 607.67,
+      "y": 187.56,
+      "originX": 766.56,
+      "originY": 258.81,
+      "degree": 3,
+      "wave": 1,
+      "waveX": 217.33,
+      "waveY": 295
+    },
+    {
+      "id": "src/api/products.ts",
+      "label": "products.ts",
+      "kind": "api",
+      "sourceFile": "src/api/products.ts",
+      "x": 239.69,
+      "y": 176.65,
+      "originX": -0.67,
+      "originY": 306.51,
+      "degree": 5,
+      "wave": 1,
+      "waveX": 217.33,
+      "waveY": 239
+    },
+    {
+      "id": "src/api/client.ts",
+      "label": "client.ts",
+      "kind": "api",
+      "sourceFile": "src/api/client.ts",
+      "x": 46,
+      "y": 182.14,
+      "originX": 16.15,
+      "originY": 276.4,
+      "degree": 2,
+      "wave": 1,
+      "waveX": 217.33,
+      "waveY": 323
+    },
+    {
+      "id": "src/lib/types.ts",
+      "label": "types.ts",
+      "kind": "other",
+      "sourceFile": "src/lib/types.ts",
+      "x": 368.5,
+      "y": 200.24,
+      "originX": 747.5,
+      "originY": 113.92,
+      "degree": 5,
+      "wave": null,
+      "waveX": 984.61,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/CartBadge.tsx",
+      "label": "CartBadge.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/CartBadge.tsx",
+      "x": 52.43,
+      "y": 211.42,
+      "originX": -0.96,
+      "originY": 417.09,
+      "degree": 2,
+      "wave": null,
+      "waveX": 135.39,
+      "waveY": 448
+    },
+    {
+      "id": "src/store/cartStore.ts",
+      "label": "cartStore.ts",
+      "kind": "store",
+      "sourceFile": "src/store/cartStore.ts",
+      "x": 306.85,
+      "y": 203.28,
+      "originX": 764.88,
+      "originY": 286.82,
+      "degree": 6,
+      "wave": 1,
+      "waveX": 217.33,
+      "waveY": 211
+    },
+    {
+      "id": "src/components/CartItem.tsx",
+      "label": "CartItem.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/CartItem.tsx",
+      "x": 217.89,
+      "y": 204.46,
+      "originX": 374.4,
+      "originY": 18.02,
+      "degree": 4,
+      "wave": null,
+      "waveX": 180.09,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/QuantityStepper.tsx",
+      "label": "QuantityStepper.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/QuantityStepper.tsx",
+      "x": 98.36,
+      "y": 255.75,
+      "originX": 391.53,
+      "originY": 354.79,
+      "degree": 1,
+      "wave": null,
+      "waveX": 671.74,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/CartSummary.tsx",
+      "label": "CartSummary.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/CartSummary.tsx",
+      "x": 381.83,
+      "y": 174.54,
+      "originX": 389.33,
+      "originY": 44.79,
+      "degree": 4,
+      "wave": null,
+      "waveX": 224.78,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/Button.tsx",
+      "label": "Button.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/Button.tsx",
+      "x": 294.54,
+      "y": 166.17,
+      "originX": 0.05,
+      "originY": 378.2,
+      "degree": 4,
+      "wave": null,
+      "waveX": 90.7,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/Hero.tsx",
+      "label": "Hero.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/Hero.tsx",
+      "x": 406.76,
+      "y": 105.02,
+      "originX": 379.16,
+      "originY": 165.65,
+      "degree": 2,
+      "wave": null,
+      "waveX": 403.57,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/Navbar.tsx",
+      "label": "Navbar.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/Navbar.tsx",
+      "x": 112.07,
+      "y": 155.56,
+      "originX": 377.42,
+      "originY": 232.64,
+      "degree": 2,
+      "wave": null,
+      "waveX": 492.96,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/Footer.tsx",
+      "label": "Footer.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/Footer.tsx",
+      "x": 200.84,
+      "y": 82.6,
+      "originX": 380.91,
+      "originY": 141.47,
+      "degree": 1,
+      "wave": null,
+      "waveX": 358.87,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/ProductCard.tsx",
+      "label": "ProductCard.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/ProductCard.tsx",
+      "x": 300.23,
+      "y": 229.74,
+      "originX": 384.08,
+      "originY": 283.06,
+      "degree": 6,
+      "wave": null,
+      "waveX": 582.35,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/Rating.tsx",
+      "label": "Rating.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/Rating.tsx",
+      "x": 406.24,
+      "y": 236.47,
+      "originX": 371.66,
+      "originY": 388.55,
+      "degree": 2,
+      "wave": null,
+      "waveX": 716.43,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/ProductCard.module.css",
+      "label": "ProductCard.module.css",
+      "kind": "style",
+      "sourceFile": "src/components/ProductCard.module.css",
+      "x": 193.09,
+      "y": 274.72,
+      "originX": 387.94,
+      "originY": 274.18,
+      "degree": 1,
+      "wave": null,
+      "waveX": 537.65,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/ProductGrid.tsx",
+      "label": "ProductGrid.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/ProductGrid.tsx",
+      "x": 443.87,
+      "y": 213.02,
+      "originX": 380.86,
+      "originY": 319.02,
+      "degree": 3,
+      "wave": null,
+      "waveX": 627.04,
+      "waveY": 448
+    },
+    {
+      "id": "src/main.tsx",
+      "label": "main.tsx",
+      "kind": "other",
+      "sourceFile": "src/main.tsx",
+      "x": 830.11,
+      "y": 114.32,
+      "originX": 751.5,
+      "originY": 149.15,
+      "degree": 2,
+      "wave": null,
+      "waveX": 1029.3,
+      "waveY": 448
+    },
+    {
+      "id": "src/index.css",
+      "label": "index.css",
+      "kind": "style",
+      "sourceFile": "src/index.css",
+      "x": 1017.86,
+      "y": 103.59,
+      "originX": 756.98,
+      "originY": 94.85,
+      "degree": 1,
+      "wave": null,
+      "waveX": 939.91,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/FeatureCard.tsx",
+      "label": "FeatureCard.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/FeatureCard.tsx",
+      "x": 573.8,
+      "y": 46,
+      "originX": 386.36,
+      "originY": 121.99,
+      "degree": 1,
+      "wave": null,
+      "waveX": 314.17,
+      "waveY": 448
+    },
+    {
+      "id": "src/hooks/useFetch.ts",
+      "label": "useFetch.ts",
+      "kind": "hook",
+      "sourceFile": "src/hooks/useFetch.ts",
+      "x": 659.46,
+      "y": 131.63,
+      "originX": 748.06,
+      "originY": 52.57,
+      "degree": 2,
+      "wave": null,
+      "waveX": 850.52,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/Spinner.tsx",
+      "label": "Spinner.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/Spinner.tsx",
+      "x": 685.08,
+      "y": 149.22,
+      "originX": 748.36,
+      "originY": 32.77,
+      "degree": 2,
+      "wave": null,
+      "waveX": 805.83,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/ErrorMessage.tsx",
+      "label": "ErrorMessage.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/ErrorMessage.tsx",
+      "x": 477.29,
+      "y": 120.87,
+      "originX": 388.2,
+      "originY": 81.07,
+      "degree": 2,
+      "wave": null,
+      "waveX": 269.48,
+      "waveY": 448
+    },
+    {
+      "id": "src/components/SettingToggle.tsx",
+      "label": "SettingToggle.tsx",
+      "kind": "component",
+      "sourceFile": "src/components/SettingToggle.tsx",
+      "x": 601.73,
+      "y": 241.08,
+      "originX": 376.17,
+      "originY": 420.55,
+      "degree": 1,
+      "wave": null,
+      "waveX": 761.13,
+      "waveY": 448
+    }
+  ],
+  "edges": [
+    {
+      "from": "src/App.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports",
+      "x1": 535.19,
+      "y1": 132.81,
+      "x2": 282.73,
+      "y2": 119.61
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/HomePage.tsx",
+      "kind": "imports",
+      "x1": 535.19,
+      "y1": 132.81,
+      "x2": 601.04,
+      "y2": 86.02
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/ProductsPage.tsx",
+      "kind": "imports",
+      "x1": 535.19,
+      "y1": 132.81,
+      "x2": 531.04,
+      "y2": 160.67
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/ProductDetailPage.tsx",
+      "kind": "imports",
+      "x1": 535.19,
+      "y1": 132.81,
+      "x2": 475.24,
+      "y2": 168.17
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/SettingsPage.tsx",
+      "kind": "imports",
+      "x1": 535.19,
+      "y1": 132.81,
+      "x2": 607.67,
+      "y2": 187.56
+    },
+    {
+      "from": "src/api/products.ts",
+      "to": "src/api/client.ts",
+      "kind": "imports",
+      "x1": 239.69,
+      "y1": 176.65,
+      "x2": 46,
+      "y2": 182.14
+    },
+    {
+      "from": "src/api/products.ts",
+      "to": "src/lib/types.ts",
+      "kind": "imports",
+      "x1": 239.69,
+      "y1": 176.65,
+      "x2": 368.5,
+      "y2": 200.24
+    },
+    {
+      "from": "src/components/CartBadge.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports",
+      "x1": 52.43,
+      "y1": 211.42,
+      "x2": 306.85,
+      "y2": 203.28
+    },
+    {
+      "from": "src/components/CartItem.tsx",
+      "to": "src/lib/types.ts",
+      "kind": "imports",
+      "x1": 217.89,
+      "y1": 204.46,
+      "x2": 368.5,
+      "y2": 200.24
+    },
+    {
+      "from": "src/components/CartItem.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports",
+      "x1": 217.89,
+      "y1": 204.46,
+      "x2": 306.85,
+      "y2": 203.28
+    },
+    {
+      "from": "src/components/CartItem.tsx",
+      "to": "src/components/QuantityStepper.tsx",
+      "kind": "imports",
+      "x1": 217.89,
+      "y1": 204.46,
+      "x2": 98.36,
+      "y2": 255.75
+    },
+    {
+      "from": "src/components/CartSummary.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports",
+      "x1": 381.83,
+      "y1": 174.54,
+      "x2": 306.85,
+      "y2": 203.28
+    },
+    {
+      "from": "src/components/CartSummary.tsx",
+      "to": "src/components/CartItem.tsx",
+      "kind": "imports",
+      "x1": 381.83,
+      "y1": 174.54,
+      "x2": 217.89,
+      "y2": 204.46
+    },
+    {
+      "from": "src/components/CartSummary.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports",
+      "x1": 381.83,
+      "y1": 174.54,
+      "x2": 294.54,
+      "y2": 166.17
+    },
+    {
+      "from": "src/components/Hero.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports",
+      "x1": 406.76,
+      "y1": 105.02,
+      "x2": 294.54,
+      "y2": 166.17
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/Navbar.tsx",
+      "kind": "imports",
+      "x1": 282.73,
+      "y1": 119.61,
+      "x2": 112.07,
+      "y2": 155.56
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/Footer.tsx",
+      "kind": "imports",
+      "x1": 282.73,
+      "y1": 119.61,
+      "x2": 200.84,
+      "y2": 82.6
+    },
+    {
+      "from": "src/components/Navbar.tsx",
+      "to": "src/components/CartBadge.tsx",
+      "kind": "imports",
+      "x1": 112.07,
+      "y1": 155.56,
+      "x2": 52.43,
+      "y2": 211.42
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/lib/types.ts",
+      "kind": "imports",
+      "x1": 300.23,
+      "y1": 229.74,
+      "x2": 368.5,
+      "y2": 200.24
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports",
+      "x1": 300.23,
+      "y1": 229.74,
+      "x2": 306.85,
+      "y2": 203.28
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/components/Rating.tsx",
+      "kind": "imports",
+      "x1": 300.23,
+      "y1": 229.74,
+      "x2": 406.24,
+      "y2": 236.47
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports",
+      "x1": 300.23,
+      "y1": 229.74,
+      "x2": 294.54,
+      "y2": 166.17
+    },
+    {
+      "from": "src/components/ProductCard.tsx",
+      "to": "src/components/ProductCard.module.css",
+      "kind": "imports",
+      "x1": 300.23,
+      "y1": 229.74,
+      "x2": 193.09,
+      "y2": 274.72
+    },
+    {
+      "from": "src/components/ProductGrid.tsx",
+      "to": "src/lib/types.ts",
+      "kind": "imports",
+      "x1": 443.87,
+      "y1": 213.02,
+      "x2": 368.5,
+      "y2": 200.24
+    },
+    {
+      "from": "src/components/ProductGrid.tsx",
+      "to": "src/components/ProductCard.tsx",
+      "kind": "imports",
+      "x1": 443.87,
+      "y1": 213.02,
+      "x2": 300.23,
+      "y2": 229.74
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/index.css",
+      "kind": "imports",
+      "x1": 830.11,
+      "y1": 114.32,
+      "x2": 1017.86,
+      "y2": 103.59
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/App.tsx",
+      "kind": "imports",
+      "x1": 830.11,
+      "y1": 114.32,
+      "x2": 535.19,
+      "y2": 132.81
+    },
+    {
+      "from": "src/pages/HomePage.tsx",
+      "to": "src/components/Hero.tsx",
+      "kind": "imports",
+      "x1": 601.04,
+      "y1": 86.02,
+      "x2": 406.76,
+      "y2": 105.02
+    },
+    {
+      "from": "src/pages/HomePage.tsx",
+      "to": "src/components/FeatureCard.tsx",
+      "kind": "imports",
+      "x1": 601.04,
+      "y1": 86.02,
+      "x2": 573.8,
+      "y2": 46
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/api/products.ts",
+      "kind": "imports",
+      "x1": 475.24,
+      "y1": 168.17,
+      "x2": 239.69,
+      "y2": 176.65
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/hooks/useFetch.ts",
+      "kind": "imports",
+      "x1": 475.24,
+      "y1": 168.17,
+      "x2": 659.46,
+      "y2": 131.63
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/store/cartStore.ts",
+      "kind": "imports",
+      "x1": 475.24,
+      "y1": 168.17,
+      "x2": 306.85,
+      "y2": 203.28
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/Spinner.tsx",
+      "kind": "imports",
+      "x1": 475.24,
+      "y1": 168.17,
+      "x2": 685.08,
+      "y2": 149.22
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/ErrorMessage.tsx",
+      "kind": "imports",
+      "x1": 475.24,
+      "y1": 168.17,
+      "x2": 477.29,
+      "y2": 120.87
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/Rating.tsx",
+      "kind": "imports",
+      "x1": 475.24,
+      "y1": 168.17,
+      "x2": 406.24,
+      "y2": 236.47
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx",
+      "to": "src/components/Button.tsx",
+      "kind": "imports",
+      "x1": 475.24,
+      "y1": 168.17,
+      "x2": 294.54,
+      "y2": 166.17
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/api/products.ts",
+      "kind": "imports",
+      "x1": 531.04,
+      "y1": 160.67,
+      "x2": 239.69,
+      "y2": 176.65
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/hooks/useFetch.ts",
+      "kind": "imports",
+      "x1": 531.04,
+      "y1": 160.67,
+      "x2": 659.46,
+      "y2": 131.63
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/components/ProductGrid.tsx",
+      "kind": "imports",
+      "x1": 531.04,
+      "y1": 160.67,
+      "x2": 443.87,
+      "y2": 213.02
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/components/Spinner.tsx",
+      "kind": "imports",
+      "x1": 531.04,
+      "y1": 160.67,
+      "x2": 685.08,
+      "y2": 149.22
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx",
+      "to": "src/components/ErrorMessage.tsx",
+      "kind": "imports",
+      "x1": 531.04,
+      "y1": 160.67,
+      "x2": 477.29,
+      "y2": 120.87
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx",
+      "to": "src/components/SettingToggle.tsx",
+      "kind": "imports",
+      "x1": 607.67,
+      "y1": 187.56,
+      "x2": 601.73,
+      "y2": 241.08
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx",
+      "to": "src/components/CartSummary.tsx",
+      "kind": "imports",
+      "x1": 607.67,
+      "y1": 187.56,
+      "x2": 381.83,
+      "y2": 174.54
+    },
+    {
+      "from": "src/store/cartStore.ts",
+      "to": "src/lib/types.ts",
+      "kind": "imports",
+      "x1": 306.85,
+      "y1": 203.28,
+      "x2": 368.5,
+      "y2": 200.24
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/HomePage.tsx#HomePage",
+      "kind": "renders",
+      "x1": 717.1,
+      "y1": 307.97,
+      "x2": 848.32,
+      "y2": 249.39
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/components/Layout.tsx#Layout",
+      "kind": "renders",
+      "x1": 717.1,
+      "y1": 307.97,
+      "x2": 464.39,
+      "y2": 316.08
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "kind": "renders",
+      "x1": 717.1,
+      "y1": 307.97,
+      "x2": 869.93,
+      "y2": 310.42
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/ProductsPage.tsx#ProductsPage",
+      "kind": "renders",
+      "x1": 717.1,
+      "y1": 307.97,
+      "x2": 965.47,
+      "y2": 298.31
+    },
+    {
+      "from": "src/App.tsx#App",
+      "to": "src/pages/SettingsPage.tsx#SettingsPage",
+      "kind": "renders",
+      "x1": 717.1,
+      "y1": 307.97,
+      "x2": 726.55,
+      "y2": 371.77
+    },
+    {
+      "from": "src/components/CartBadge.tsx#CartBadge",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store",
+      "x1": 367.23,
+      "y1": 378.37,
+      "x2": 642.63,
+      "y2": 357.4
+    },
+    {
+      "from": "src/components/CartItem.tsx#CartItem",
+      "to": "src/components/QuantityStepper.tsx#QuantityStepper",
+      "kind": "renders",
+      "x1": 484.35,
+      "y1": 360.82,
+      "x2": 392.32,
+      "y2": 407.39
+    },
+    {
+      "from": "src/components/CartItem.tsx#CartItem",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store",
+      "x1": 484.35,
+      "y1": 360.82,
+      "x2": 642.63,
+      "y2": 357.4
+    },
+    {
+      "from": "src/components/CartSummary.tsx#CartSummary",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders",
+      "x1": 583.04,
+      "y1": 341.69,
+      "x2": 655.34,
+      "y2": 321.74
+    },
+    {
+      "from": "src/components/CartSummary.tsx#CartSummary",
+      "to": "src/components/CartItem.tsx#CartItem",
+      "kind": "renders",
+      "x1": 583.04,
+      "y1": 341.69,
+      "x2": 484.35,
+      "y2": 360.82
+    },
+    {
+      "from": "src/components/CartSummary.tsx#CartSummary",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store",
+      "x1": 583.04,
+      "y1": 341.69,
+      "x2": 642.63,
+      "y2": 357.4
+    },
+    {
+      "from": "src/components/Hero.tsx#Hero",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders",
+      "x1": 719.37,
+      "y1": 271.46,
+      "x2": 655.34,
+      "y2": 321.74
+    },
+    {
+      "from": "src/components/Layout.tsx#Layout",
+      "to": "src/components/Footer.tsx#Footer",
+      "kind": "renders",
+      "x1": 464.39,
+      "y1": 316.08,
+      "x2": 314.14,
+      "y2": 306.33
+    },
+    {
+      "from": "src/components/Layout.tsx#Layout",
+      "to": "src/components/Navbar.tsx#Navbar",
+      "kind": "renders",
+      "x1": 464.39,
+      "y1": 316.08,
+      "x2": 330.6,
+      "y2": 346.7
+    },
+    {
+      "from": "src/components/Navbar.tsx#Navbar",
+      "to": "src/components/CartBadge.tsx#CartBadge",
+      "kind": "renders",
+      "x1": 330.6,
+      "y1": 346.7,
+      "x2": 367.23,
+      "y2": 378.37
+    },
+    {
+      "from": "src/components/ProductCard.tsx#ProductCard",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders",
+      "x1": 759.96,
+      "y1": 351.68,
+      "x2": 655.34,
+      "y2": 321.74
+    },
+    {
+      "from": "src/components/ProductCard.tsx#ProductCard",
+      "to": "src/components/Rating.tsx#Rating",
+      "kind": "renders",
+      "x1": 759.96,
+      "y1": 351.68,
+      "x2": 849.77,
+      "y2": 366.82
+    },
+    {
+      "from": "src/components/ProductCard.tsx#ProductCard",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store",
+      "x1": 759.96,
+      "y1": 351.68,
+      "x2": 642.63,
+      "y2": 357.4
+    },
+    {
+      "from": "src/components/ProductGrid.tsx#ProductGrid",
+      "to": "src/components/ProductCard.tsx#ProductCard",
+      "kind": "renders",
+      "x1": 900.24,
+      "y1": 342.38,
+      "x2": 759.96,
+      "y2": 351.68
+    },
+    {
+      "from": "src/pages/HomePage.tsx#HomePage",
+      "to": "src/components/FeatureCard.tsx#FeatureCard",
+      "kind": "renders",
+      "x1": 848.32,
+      "y1": 249.39,
+      "x2": 878.27,
+      "y2": 199.17
+    },
+    {
+      "from": "src/pages/HomePage.tsx#HomePage",
+      "to": "src/components/Hero.tsx#Hero",
+      "kind": "renders",
+      "x1": 848.32,
+      "y1": 249.39,
+      "x2": 719.37,
+      "y2": 271.46
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/Button.tsx#Button",
+      "kind": "renders",
+      "x1": 869.93,
+      "y1": 310.42,
+      "x2": 655.34,
+      "y2": 321.74
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/ErrorMessage.tsx#ErrorMessage",
+      "kind": "renders",
+      "x1": 869.93,
+      "y1": 310.42,
+      "x2": 914,
+      "y2": 266.04
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/Rating.tsx#Rating",
+      "kind": "renders",
+      "x1": 869.93,
+      "y1": 310.42,
+      "x2": 849.77,
+      "y2": 366.82
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/components/Spinner.tsx#Spinner",
+      "kind": "renders",
+      "x1": 869.93,
+      "y1": 310.42,
+      "x2": 1074,
+      "y2": 281.53
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/store/cartStore.ts#useCartStore",
+      "kind": "uses-store",
+      "x1": 869.93,
+      "y1": 310.42,
+      "x2": 642.63,
+      "y2": 357.4
+    },
+    {
+      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "to": "src/hooks/useFetch.ts#useFetch",
+      "kind": "uses-hook",
+      "x1": 869.93,
+      "y1": 310.42,
+      "x2": 1040.8,
+      "y2": 265.25
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/components/ErrorMessage.tsx#ErrorMessage",
+      "kind": "renders",
+      "x1": 965.47,
+      "y1": 298.31,
+      "x2": 914,
+      "y2": 266.04
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/components/ProductGrid.tsx#ProductGrid",
+      "kind": "renders",
+      "x1": 965.47,
+      "y1": 298.31,
+      "x2": 900.24,
+      "y2": 342.38
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/components/Spinner.tsx#Spinner",
+      "kind": "renders",
+      "x1": 965.47,
+      "y1": 298.31,
+      "x2": 1074,
+      "y2": 281.53
+    },
+    {
+      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "to": "src/hooks/useFetch.ts#useFetch",
+      "kind": "uses-hook",
+      "x1": 965.47,
+      "y1": 298.31,
+      "x2": 1040.8,
+      "y2": 265.25
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx#SettingsPage",
+      "to": "src/components/CartSummary.tsx#CartSummary",
+      "kind": "renders",
+      "x1": 726.55,
+      "y1": 371.77,
+      "x2": 583.04,
+      "y2": 341.69
+    },
+    {
+      "from": "src/pages/SettingsPage.tsx#SettingsPage",
+      "to": "src/components/SettingToggle.tsx#SettingToggle",
+      "kind": "renders",
+      "x1": 726.55,
+      "y1": 371.77,
+      "x2": 659.79,
+      "y2": 424
+    },
+    {
+      "from": "src/api/products.ts",
+      "to": "src/api/client.ts",
+      "kind": "calls-api",
+      "x1": 239.69,
+      "y1": 176.65,
+      "x2": 46,
+      "y2": 182.14
+    }
+  ],
+  "fileRows": [
+    {
+      "path": ".gitignore",
+      "x": 8,
+      "y": 25,
+      "hasNode": false
+    },
+    {
+      "path": ".oxlintrc.json",
+      "x": 8,
+      "y": 55,
+      "hasNode": false
+    },
+    {
+      "path": "index.html",
+      "x": 8,
+      "y": 85,
+      "hasNode": false
+    },
+    {
+      "path": "package-lock.json",
+      "x": 8,
+      "y": 115,
+      "hasNode": false
+    },
+    {
+      "path": "package.json",
+      "x": 8,
+      "y": 145,
+      "hasNode": false
+    },
+    {
+      "path": "public/favicon.svg",
+      "x": 8,
+      "y": 175,
+      "hasNode": false
+    },
+    {
+      "path": "public/icons.svg",
+      "x": 8,
+      "y": 205,
+      "hasNode": false
+    },
+    {
+      "path": "README.md",
+      "x": 8,
+      "y": 235,
+      "hasNode": false
+    },
+    {
+      "path": "src/api/client.ts",
+      "x": 8,
+      "y": 265,
+      "hasNode": true
+    },
+    {
+      "path": "src/api/products.ts",
+      "x": 8,
+      "y": 295,
+      "hasNode": true
+    },
+    {
+      "path": "src/App.tsx",
+      "x": 8,
+      "y": 325,
+      "hasNode": true
+    },
+    {
+      "path": "src/assets/rejox-logo.svg",
+      "x": 8,
+      "y": 355,
+      "hasNode": false
+    },
+    {
+      "path": "src/components/Button.tsx",
+      "x": 8,
+      "y": 385,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/CartBadge.tsx",
+      "x": 8,
+      "y": 415,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/CartItem.tsx",
+      "x": 381.33,
+      "y": 25,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/CartSummary.tsx",
+      "x": 381.33,
+      "y": 55,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/ErrorMessage.tsx",
+      "x": 381.33,
+      "y": 85,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/FeatureCard.tsx",
+      "x": 381.33,
+      "y": 115,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/Footer.tsx",
+      "x": 381.33,
+      "y": 145,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/Hero.tsx",
+      "x": 381.33,
+      "y": 175,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/Layout.tsx",
+      "x": 381.33,
+      "y": 205,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/Navbar.tsx",
+      "x": 381.33,
+      "y": 235,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/ProductCard.module.css",
+      "x": 381.33,
+      "y": 265,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/ProductCard.tsx",
+      "x": 381.33,
+      "y": 295,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/ProductGrid.tsx",
+      "x": 381.33,
+      "y": 325,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/QuantityStepper.tsx",
+      "x": 381.33,
+      "y": 355,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/Rating.tsx",
+      "x": 381.33,
+      "y": 385,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/SettingToggle.tsx",
+      "x": 381.33,
+      "y": 415,
+      "hasNode": true
+    },
+    {
+      "path": "src/components/Spinner.tsx",
+      "x": 754.67,
+      "y": 25,
+      "hasNode": true
+    },
+    {
+      "path": "src/hooks/useFetch.ts",
+      "x": 754.67,
+      "y": 55,
+      "hasNode": true
+    },
+    {
+      "path": "src/index.css",
+      "x": 754.67,
+      "y": 85,
+      "hasNode": true
+    },
+    {
+      "path": "src/lib/types.ts",
+      "x": 754.67,
+      "y": 115,
+      "hasNode": true
+    },
+    {
+      "path": "src/main.tsx",
+      "x": 754.67,
+      "y": 145,
+      "hasNode": true
+    },
+    {
+      "path": "src/pages/HomePage.tsx",
+      "x": 754.67,
+      "y": 175,
+      "hasNode": true
+    },
+    {
+      "path": "src/pages/ProductDetailPage.tsx",
+      "x": 754.67,
+      "y": 205,
+      "hasNode": true
+    },
+    {
+      "path": "src/pages/ProductsPage.tsx",
+      "x": 754.67,
+      "y": 235,
+      "hasNode": true
+    },
+    {
+      "path": "src/pages/SettingsPage.tsx",
+      "x": 754.67,
+      "y": 265,
+      "hasNode": true
+    },
+    {
+      "path": "src/store/cartStore.ts",
+      "x": 754.67,
+      "y": 295,
+      "hasNode": true
+    },
+    {
+      "path": "tsconfig.app.json",
+      "x": 754.67,
+      "y": 325,
+      "hasNode": false
+    },
+    {
+      "path": "tsconfig.json",
+      "x": 754.67,
+      "y": 355,
+      "hasNode": false
+    },
+    {
+      "path": "tsconfig.node.json",
+      "x": 754.67,
+      "y": 385,
+      "hasNode": false
+    },
+    {
+      "path": "vite.config.ts",
+      "x": 754.67,
+      "y": 415,
+      "hasNode": false
+    }
+  ],
+  "width": 1120,
+  "height": 470,
+  "filesWithoutNode": 13,
+  "waveColumns": [
+    {
+      "wave": 0,
+      "label": "W1",
+      "kinds": [
+        "setup"
+      ],
+      "x": 103.11,
+      "nodeCount": 0
+    },
+    {
+      "wave": 1,
+      "label": "W2",
+      "kinds": [
+        "routing",
+        "state",
+        "api",
+        "assets"
+      ],
+      "x": 217.33,
+      "nodeCount": 7
+    },
+    {
+      "wave": 2,
+      "label": "W3",
+      "kinds": [
+        "components"
+      ],
+      "x": 331.56,
+      "nodeCount": 9
+    },
+    {
+      "wave": 3,
+      "label": "W4",
+      "kinds": [
+        "components"
+      ],
+      "x": 445.78,
+      "nodeCount": 5
+    },
+    {
+      "wave": 4,
+      "label": "W5",
+      "kinds": [
+        "components"
+      ],
+      "x": 560,
+      "nodeCount": 4
+    },
+    {
+      "wave": 5,
+      "label": "W6",
+      "kinds": [
+        "components"
+      ],
+      "x": 674.22,
+      "nodeCount": 2
+    },
+    {
+      "wave": 6,
+      "label": "W7",
+      "kinds": [
+        "components"
+      ],
+      "x": 788.44,
+      "nodeCount": 1
+    },
+    {
+      "wave": 7,
+      "label": "W8",
+      "kinds": [
+        "styling",
+        "navigation"
+      ],
+      "x": 902.67,
+      "nodeCount": 0
+    },
+    {
+      "wave": 8,
+      "label": "W9",
+      "kinds": [
+        "validation"
+      ],
+      "x": 1016.89,
+      "nodeCount": 0
+    }
+  ],
+  "nodesInWaves": 28,
+  "nodesOutsideWaves": 24
+}

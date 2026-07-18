@@ -88,6 +88,7 @@ export interface ShowcaseQuestionOption {
 export interface ShowcaseResults {
   contributions?: ShowcaseContribution[]
   llmCalls: number
+  llmCallsByPhase?: PhaseLlmCount[]
   metroPassed: boolean
   metroRan: boolean
   predictedConfidence: number
@@ -104,6 +105,18 @@ export interface ShowcaseContribution {
   evidence: string
   label: string
   reason: string
+}
+/**
+ * LLM calls attributed to one pipeline phase.
+ *
+ * ``calls`` is a MEASURED delta of the run's own call counter across the phase's
+ * boundary — never derived, assumed, or written as a literal (including the
+ * zeros). A phase whose count cannot be observed is omitted from the list, not
+ * reported as zero.
+ */
+export interface PhaseLlmCount {
+  calls: number
+  phase: string
 }
 /**
  * One plan step, carrying the engine's OWN ``wave`` field (not a

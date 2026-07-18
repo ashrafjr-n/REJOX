@@ -166,6 +166,19 @@ class ShowcaseContribution(ShowcaseBase):
     evidence: str
 
 
+class PhaseLlmCount(ShowcaseBase):
+    """LLM calls attributed to one pipeline phase.
+
+    ``calls`` is a MEASURED delta of the run's own call counter across the phase's
+    boundary — never derived, assumed, or written as a literal (including the
+    zeros). A phase whose count cannot be observed is omitted from the list, not
+    reported as zero.
+    """
+
+    phase: str
+    calls: int
+
+
 class ShowcaseResults(ShowcaseBase):
     # Analyzer prediction (pre-migration).
     predictedCoverage: float
@@ -181,6 +194,10 @@ class ShowcaseResults(ShowcaseBase):
     metroPassed: bool
     metroRan: bool
     llmCalls: int
+    # Per-phase breakdown of ``llmCalls``, each a measured counter delta. The
+    # phases whose calls could be observed sum to ``llmCalls``; the reading phases
+    # (intelligence/analyze/plan) are the deterministic-understanding evidence.
+    llmCallsByPhase: list[PhaseLlmCount] = Field(default_factory=list)
     repairRounds: int
     # The signed rows that sum to ``predictedCoverage``.
     contributions: list[ShowcaseContribution] = Field(default_factory=list)
@@ -283,6 +300,7 @@ def _build_results(
     validation: ValidationResult,
     *,
     llm_calls: int,
+    llm_by_phase: list[PhaseLlmCount],
     repair_rounds: int,
 ) -> ShowcaseResults:
     return ShowcaseResults(
@@ -296,6 +314,7 @@ def _build_results(
         metroPassed=validation.bundle.passed,
         metroRan=validation.bundle.ran,
         llmCalls=llm_calls,
+        llmCallsByPhase=list(llm_by_phase),
         repairRounds=repair_rounds,
         contributions=[
             ShowcaseContribution(
@@ -343,6 +362,7 @@ def build_showcase_data(
     scores: ValidatedScores,
     validation: ValidationResult,
     llm_calls: int,
+    llm_by_phase: list[PhaseLlmCount],
     repair_rounds: int,
     meta: ShowcaseMeta,
 ) -> ShowcaseData:
@@ -369,7 +389,7 @@ def build_showcase_data(
         question=_build_question(proposal, nav_ui),
         results=_build_results(
             report, scores, validation,
-            llm_calls=llm_calls, repair_rounds=repair_rounds,
+            llm_calls=llm_calls, llm_by_phase=llm_by_phase, repair_rounds=repair_rounds,
         ),
     )
 
