@@ -974,6 +974,28 @@
       }
     ],
     "llmCalls": 1,
+    "llmCallsByPhase": [
+      {
+        "calls": 0,
+        "phase": "intelligence"
+      },
+      {
+        "calls": 0,
+        "phase": "analyze"
+      },
+      {
+        "calls": 0,
+        "phase": "plan"
+      },
+      {
+        "calls": 1,
+        "phase": "migrate"
+      },
+      {
+        "calls": 0,
+        "phase": "repair"
+      }
+    ],
     "metroPassed": true,
     "metroRan": true,
     "predictedConfidence": 97.7,

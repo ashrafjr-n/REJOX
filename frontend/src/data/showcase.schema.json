@@ -1,5 +1,23 @@
 {
   "$defs": {
+    "PhaseLlmCount": {
+      "additionalProperties": false,
+      "description": "LLM calls attributed to one pipeline phase.\n\n``calls`` is a MEASURED delta of the run's own call counter across the phase's\nboundary — never derived, assumed, or written as a literal (including the\nzeros). A phase whose count cannot be observed is omitted from the list, not\nreported as zero.",
+      "properties": {
+        "calls": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "calls"
+      ],
+      "title": "PhaseLlmCount",
+      "type": "object"
+    },
     "ShowcaseContribution": {
       "additionalProperties": false,
       "properties": {
@@ -299,6 +317,12 @@
         },
         "llmCalls": {
           "type": "integer"
+        },
+        "llmCallsByPhase": {
+          "items": {
+            "$ref": "#/$defs/PhaseLlmCount"
+          },
+          "type": "array"
         },
         "metroPassed": {
           "type": "boolean"
