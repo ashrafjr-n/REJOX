@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import {
+  Upload,
+  Network,
+  ListChecks,
+  MessageCircleQuestion,
+  RefreshCw,
+  ShieldCheck,
+  type LucideIcon,
+} from 'lucide-react'
 
 import './Home.css'
 import BorderGlow from './BorderGlow'
@@ -172,9 +181,9 @@ function ProjectIntelligence() {
  * smooth serpentine SVG path that snakes down the section, weaving between the
  * left and right edges.
  *
- * A scroll-linked arrow travels along the path (GSAP ScrollTrigger, scrub —
- * tied to scroll position, not autoplay). Node lighting / particles / the final
- * burst are still deferred; the six nodes remain invisible.
+ * The path draws itself in as you scroll (GSAP ScrollTrigger, scrub — tied to
+ * scroll position, not autoplay), a soft glow marking its leading edge. Node
+ * lighting / particles / the final burst ride the same scrubbed progress.
  *
  * Path geometry — a single SVG <path> of chained cubic Béziers. Each node is
  * an anchor; between two anchors the two control points share the segment's
@@ -206,62 +215,21 @@ const PL_STAGES = [
   { id: 'validate', title: 'Validate', desc: 'tsc + Metro', x: 91.6667, y: 91.4286 },
 ] as const
 
-/* Stroked 24-grid glyphs, one per stage — matched to the site's icon set. */
+/* One lucide-react icon per stage, keyed by stage id. Size/colour come from the
+   `.rx-pl-node-marker svg` rule so the circle/ring/glow container is unchanged;
+   only the glyph inside swaps to a proper icon-library component. */
+const PIPELINE_ICONS: Record<string, LucideIcon> = {
+  upload: Upload, // 01 Upload
+  understand: Network, // 02 Understand — knowledge-graph / network
+  plan: ListChecks, // 03 Plan — checklist
+  ask: MessageCircleQuestion, // 04 Ask — question / message
+  convert: RefreshCw, // 05 Convert — transform / refresh
+  validate: ShieldCheck, // 06 Validate — shield-check
+}
+
 function PipelineIcon({ id }: { id: string }) {
-  const paths: Record<string, React.ReactNode> = {
-    upload: (
-      <>
-        <path d="M12 15V4" />
-        <path d="M8 8l4-4 4 4" />
-        <path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />
-      </>
-    ),
-    understand: (
-      <>
-        <circle cx="12" cy="6" r="2.1" />
-        <circle cx="6" cy="17" r="2.1" />
-        <circle cx="18" cy="17" r="2.1" />
-        <path d="M11 7.6 7 15.2M13 7.6 17 15.2M8 17h8" />
-      </>
-    ),
-    plan: (
-      <>
-        <path d="M9 6h11M9 12h11M9 18h11" />
-        <path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
-      </>
-    ),
-    ask: (
-      <>
-        <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
-        <path d="M10.2 9.4a1.9 1.9 0 0 1 3.4 1.2c0 1.3-1.9 1.6-1.9 2.9M11.7 15.2h.01" />
-      </>
-    ),
-    convert: (
-      <>
-        <path d="M4 9h13l-3.2-3.2" />
-        <path d="M20 15H7l3.2 3.2" />
-      </>
-    ),
-    validate: (
-      <>
-        <path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6l7-3z" />
-        <path d="M8.8 12l2.2 2.2 4-4.4" />
-      </>
-    ),
-  }
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {paths[id]}
-    </svg>
-  )
+  const Icon = PIPELINE_ICONS[id]
+  return <Icon strokeWidth={1.7} aria-hidden="true" />
 }
 
 /* Path viewBox — kept in sync with the <svg> below. Node anchors are expressed
@@ -271,28 +239,38 @@ const PL_VBW = 1200
 const PL_VBH = 1400
 /* Vertical fractions of the FIRST (Upload) and LAST (Validate) nodes within the
    path container — the scrub runs between "node1 at viewport centre" and "node6
-   at viewport centre", so the arrow travels the whole path across that scroll. */
+   at viewport centre", so the trail draws across the whole path over that scroll. */
 const PL_START_FRAC = PL_STAGES[0].y / 100
 const PL_END_FRAC = PL_STAGES[PL_STAGES.length - 1].y / 100
-/* number of spark spans per node's one-shot activation burst */
+/* number of spark spans per node's one-shot activation burst; the final
+   (Validate) node gets a slightly larger burst for the completion moment. */
 const PL_SPARKS = 10
+const PL_SPARKS_FINALE = 14
+/* extra scroll — as a fraction of the path-container height — reserved AFTER
+   the trail reaches Validate, over which the "Production Ready" finale text
+   fades/slides in (a separate scrubbed trigger, so the trail/node math is
+   untouched). */
+const PL_FINALE_FRAC = 0.11
 
 function MigrationPipeline() {
   const pathRef = useRef<SVGPathElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const arrowRef = useRef<HTMLDivElement | null>(null)
+  const tipRef = useRef<HTMLDivElement | null>(null)
   const nodeRefs = useRef<(HTMLLIElement | null)[]>([])
+  const finaleRef = useRef<HTMLDivElement | null>(null)
   const reduced = usePrefersReducedMotion()
 
-  /* Scroll-linked arrow + node activation, both driven by the SAME scrubbed
-     progress `u` so reveals stay locked to the arrow.
+  /* Scroll-linked trail reveal + node activation, both driven by the SAME
+     scrubbed progress `u` so reveals stay locked to the trail's leading edge.
 
-     Arrow: position + rotation are tied directly to scroll (GSAP ScrollTrigger,
-     scrub) — no autoplay. Because the SVG scales non-uniformly
-     (preserveAspectRatio="none"), we sample the path with getPointAtLength in
-     viewBox units, map each sample to CONTAINER PIXELS, and build an arc-length
-     lookup so equal scroll => equal pixel travel (steady visual speed) and
-     rotation is measured in pixel space (true to the rendered curve).
+     Trail: the path draws itself in via stroke-dashoffset, tied directly to
+     scroll (GSAP ScrollTrigger, scrub) — no autoplay. Because the SVG scales
+     non-uniformly (preserveAspectRatio="none"), we sample the path with
+     getPointAtLength in viewBox units, map each sample to CONTAINER PIXELS, and
+     build an arc-length lookup so equal scroll => equal pixel travel (steady
+     visual speed). A soft glow head is pinned to the stroke's leading edge (the
+     same getPointAtLength point that defines where the reveal ends), so the tip
+     of the line reads as a glowing head with nothing to drift out of sync.
 
      Nodes: the six anchors are congruent, evenly-stepped segments, so node j
      sits at pixel-arc-length u = j/5. As `u` sweeps a node's threshold we ramp
@@ -300,24 +278,34 @@ function MigrationPipeline() {
      style writes, no React re-render. Each node fully reveals on forward pass
      and stays lit (progressive completion); scrolling back cleanly un-reveals
      (the scrub reverses). A short one-shot particle burst fires once when the
-     arrow ARRIVES at a node (on threshold-cross, not per tick). */
+     trail's head ARRIVES at a node (on threshold-cross, not per tick).
+
+     Finale: at Validate (the last node) the burst is a touch larger and adds a
+     single soft ring pulse; a separate scrubbed trigger then slides in the
+     "Production Ready" text over reserved tail scroll, and reverses cleanly. */
   useEffect(() => {
     const pathEl = pathRef.current
     const containerEl = containerRef.current
-    const arrowEl = arrowRef.current
-    if (!pathEl || !containerEl || !arrowEl) return
+    const tipEl = tipRef.current
+    if (!pathEl || !containerEl || !tipEl) return
 
     const total = pathEl.getTotalLength()
+    // start fully hidden: the trail draws itself in as its head advances
+    // (stroke-dashoffset reveal, synced to the same progress `u`).
+    pathEl.style.strokeDasharray = String(total)
+    pathEl.style.strokeDashoffset = String(total)
     const SAMPLES = 600
     const LAST = PL_STAGES.length - 1
     const REVEAL_W = 0.07 // scroll-progress width of a node's reveal ramp
-    let lut: { d: number; x: number; y: number }[] = []
+    let lut: { d: number; x: number; y: number; s: number }[] = []
     let totalPx = 0
+    let sx = 1
+    let sy = 1
 
     /* Rebuild the pixel-space arc-length table for the current container size. */
     const buildLUT = () => {
-      const sx = containerEl.clientWidth / PL_VBW
-      const sy = containerEl.clientHeight / PL_VBH
+      sx = containerEl.clientWidth / PL_VBW
+      sy = containerEl.clientHeight / PL_VBH
       lut = []
       let prevX = 0
       let prevY = 0
@@ -327,14 +315,15 @@ function MigrationPipeline() {
         const x = pt.x * sx
         const y = pt.y * sy
         if (i > 0) cum += Math.hypot(x - prevX, y - prevY)
-        lut.push({ d: cum, x, y })
+        lut.push({ d: cum, x, y, s: (i / SAMPLES) * total })
         prevX = x
         prevY = y
       }
       totalPx = cum || 1
     }
 
-    /* Map progress u∈[0,1] (fraction of pixel arc-length) to {x, y, angle}. */
+    /* Map progress u∈[0,1] (fraction of pixel arc-length) to the leading edge,
+       and drive BOTH the trail reveal and the glowing head from it. */
     const place = (u: number) => {
       const target = Math.max(0, Math.min(1, u)) * totalPx
       let lo = 0
@@ -348,13 +337,24 @@ function MigrationPipeline() {
       const a = lut[Math.max(0, lo - 1)]
       const seg = b.d - a.d || 1
       const t = (target - a.d) / seg
-      const x = a.x + (b.x - a.x) * t
-      const y = a.y + (b.y - a.y) * t
-      /* tangent from neighbouring samples (pixel space) => on-curve rotation */
-      const j0 = lut[Math.max(0, lo - 1)]
-      const j1 = lut[Math.min(lut.length - 1, lo + 1)]
-      const angle = (Math.atan2(j1.y - j0.y, j1.x - j0.x) * 180) / Math.PI
-      gsap.set(arrowEl, { x, y, rotation: angle, xPercent: -50, yPercent: -50 })
+      // `vbLen` — the user-unit arc length of the leading edge — is the SINGLE
+      // value that drives everything below. There is no separate arrow element
+      // any more: the revealed stroke is the only moving visual, and its glowing
+      // head is pinned to the exact point the stroke currently ends at, so a
+      // desync between "tip" and "trail" is structurally impossible.
+      const vbLen = a.s + (b.s - a.s) * t
+      // trail: reveal the path up to the leading edge (stroke-dashoffset).
+      pathEl.style.strokeDashoffset = String(total - vbLen)
+      // glow head: the SAME getPointAtLength(vbLen) that defines where the drawn
+      // stroke ends, mapped to container pixels — glow-centre ≡ stroke-end by
+      // construction. Centred on the point (xPercent/yPercent -50 below).
+      const tip = pathEl.getPointAtLength(vbLen)
+      gsap.set(tipEl, {
+        x: tip.x * sx,
+        y: tip.y * sy,
+        // stays hidden until motion begins; fades in over the first sliver.
+        opacity: Math.min(1, Math.max(0, u / 0.02)),
+      })
     }
 
     const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
@@ -363,27 +363,42 @@ function MigrationPipeline() {
     let prevU = 0
 
     /* One-shot spark burst — animates only transform/opacity on a handful of
-       pre-existing spans, killing any prior tween so it can cleanly replay. */
+       pre-existing spans, killing any prior tween so it can cleanly replay. The
+       final (Validate) node gets a modestly larger burst plus ONE soft ring
+       pulse — a restrained "completion" accent, not fireworks. */
     const fireBurst = (j: number) => {
       const el = nodeRefs.current[j]
       if (!el) return
+      const finale = j === LAST
       const sparks = el.querySelectorAll<HTMLElement>('.rx-pl-spark')
       if (!sparks.length) return
       const n = sparks.length
+      const radius = finale ? 30 : 22
       gsap.killTweensOf(sparks)
       gsap.fromTo(
         sparks,
         { x: 0, y: 0, scale: 1, opacity: 1 },
         {
-          x: (i: number) => Math.cos((i / n) * Math.PI * 2 + j) * (22 + (i % 3) * 10),
-          y: (i: number) => Math.sin((i / n) * Math.PI * 2 + j) * (22 + (i % 3) * 10),
+          x: (i: number) => Math.cos((i / n) * Math.PI * 2 + j) * (radius + (i % 3) * 10),
+          y: (i: number) => Math.sin((i / n) * Math.PI * 2 + j) * (radius + (i % 3) * 10),
           scale: 0.2,
           opacity: 0,
-          duration: 0.6,
+          duration: finale ? 0.72 : 0.6,
           ease: 'power2.out',
           overwrite: true,
         }
       )
+      if (finale) {
+        const ring = el.querySelector<HTMLElement>('.rx-pl-node-ring')
+        if (ring) {
+          gsap.killTweensOf(ring)
+          gsap.fromTo(
+            ring,
+            { scale: 0.5, opacity: 0.5 },
+            { scale: 1.5, opacity: 0, duration: 0.85, ease: 'power2.out', overwrite: true }
+          )
+        }
+      }
     }
 
     /* Deterministic function of `u`: set each node's reveal vars, and fire the
@@ -415,18 +430,38 @@ function MigrationPipeline() {
       prevU = u
     }
 
+    /* Finale text ("Production Ready") — driven by --pf on a SEPARATE scrubbed
+       trigger that begins exactly where the trail reaches Validate (node6 at
+       centre) and runs across the reserved tail scroll, so the text slides in
+       just after Validate's completion burst and un-reveals cleanly in reverse.
+       The trail/node math above is left completely untouched. */
+    const setFinale = (f: number) => {
+      finaleRef.current?.style.setProperty('--pf', clamp01(f).toFixed(3))
+    }
+
+    // Centre the glow head on its placement point, once. The x/y set in place()
+    // is the stroke's leading-edge coordinate, so offsetting the element by half
+    // its own box (xPercent/yPercent -50) makes the glow's centre sit exactly on
+    // the point where the drawn stroke ends.
+    gsap.set(tipEl, { xPercent: -50, yPercent: -50 })
+
     buildLUT()
     place(0)
     applyReveal(0)
+    setFinale(0)
 
-    /* reduced-motion: no scrubbing/particles; park the arrow at Upload and show
-       every node in its settled, fully-lit state. */
+    /* reduced-motion: no scrubbing/particles; hide the glow head and show
+       every node — and the finale — in the settled, fully-revealed state. */
     if (reduced) {
       for (const el of nodeRefs.current) {
         if (!el) continue
         el.style.setProperty('--p', '1')
         el.style.setProperty('--pt', '1')
       }
+      setFinale(1)
+      // settled state: draw the whole path, no travelling glow head
+      pathEl.style.strokeDashoffset = '0'
+      gsap.set(tipEl, { opacity: 0 })
       return
     }
 
@@ -442,7 +477,9 @@ function MigrationPipeline() {
         trigger: containerEl,
         start: () => `top+=${containerEl.clientHeight * PL_START_FRAC} center`,
         end: () => `top+=${containerEl.clientHeight * PL_END_FRAC} center`,
-        scrub: true,
+        // small scrub number (not `true`) => a touch of easing lag that smooths
+        // the trail travel without decoupling it from scroll position.
+        scrub: 0.6,
         invalidateOnRefresh: true,
         onRefresh: () => {
           buildLUT()
@@ -452,9 +489,27 @@ function MigrationPipeline() {
       },
     })
 
+    const finaleProxy = { f: 0 }
+    const finaleTween = gsap.to(finaleProxy, {
+      f: 1,
+      ease: 'none',
+      onUpdate: () => setFinale(finaleProxy.f),
+      scrollTrigger: {
+        trigger: containerEl,
+        start: () => `top+=${containerEl.clientHeight * PL_END_FRAC} center`,
+        end: () =>
+          `top+=${containerEl.clientHeight * (PL_END_FRAC + PL_FINALE_FRAC)} center`,
+        scrub: 0.6,
+        invalidateOnRefresh: true,
+        onRefresh: () => setFinale(finaleProxy.f),
+      },
+    })
+
     return () => {
       tween.scrollTrigger?.kill()
       tween.kill()
+      finaleTween.scrollTrigger?.kill()
+      finaleTween.kill()
     }
   }, [reduced])
 
@@ -482,9 +537,10 @@ function MigrationPipeline() {
         >
           <defs>
             <linearGradient id="rxPlStroke" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ff6a00" />
-              <stop offset="50%" stopColor="#ff9ffc" />
-              <stop offset="100%" stopColor="#ff6a00" />
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="48%" stopColor="#eef2ff" />
+              <stop offset="52%" stopColor="#ffffff" />
+              <stop offset="100%" stopColor="#e9edf7" />
             </linearGradient>
           </defs>
           <path
@@ -495,56 +551,74 @@ function MigrationPipeline() {
             stroke="url(#rxPlStroke)"
             strokeWidth="2"
             strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
           />
         </svg>
 
-        {/* Scroll-driven pointer — positioned/rotated in JS along the path.
-            Points along +x by default; gsap rotation aligns it to the tangent. */}
-        <div className="rx-pl-arrow" ref={arrowRef} aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path
-              d="M3 12h15M12 5l7 7-7 7"
-              stroke="#ff9ffc"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
+        {/* Glowing head of the trail — a soft radial glow pinned in JS to the
+            exact point where the revealed stroke currently ends. Not a separate
+            shape: it just brightens the tip of the one moving line, so it can
+            never drift ahead of / behind the trail. */}
+        <div className="rx-pl-tip" ref={tipRef} aria-hidden="true" />
 
         <ol className="rx-pl-nodes">
-          {PL_STAGES.map((stage, i) => (
-            <li
-              key={stage.id}
-              ref={(el) => {
-                nodeRefs.current[i] = el
-              }}
-              className="rx-pl-node"
-              style={{ left: `${stage.x}%`, top: `${stage.y}%` }}
-            >
-              {/* marker centred exactly on the path point; glows/scales via --p */}
-              <div className="rx-pl-node-marker">
-                <PipelineIcon id={stage.id} />
-              </div>
-              {/* one-shot spark burst — sibling of the marker so its opacity is
-                  never gated by the marker's reveal; animated by GSAP on arrival */}
-              <span className="rx-pl-node-burst" aria-hidden="true">
-                {Array.from({ length: PL_SPARKS }).map((_, k) => (
-                  <span key={k} className="rx-pl-spark" />
-                ))}
-              </span>
-              {/* text below the marker; fades + slides in via --pt */}
-              <div className="rx-pl-node-text">
-                <span className="rx-pl-node-num" aria-hidden="true">
-                  {String(i + 1).padStart(2, '0')}
+          {PL_STAGES.map((stage, i) => {
+            const isLast = i === PL_STAGES.length - 1
+            return (
+              <li
+                key={stage.id}
+                ref={(el) => {
+                  nodeRefs.current[i] = el
+                }}
+                className="rx-pl-node"
+                style={{ left: `${stage.x}%`, top: `${stage.y}%` }}
+              >
+                {/* soft one-shot ring pulse — only on the final (Validate) node */}
+                {isLast && <span className="rx-pl-node-ring" aria-hidden="true" />}
+                {/* marker centred exactly on the path point; glows/scales via --p */}
+                <div className="rx-pl-node-marker">
+                  <PipelineIcon id={stage.id} />
+                </div>
+                {/* one-shot spark burst — sibling of the marker so its opacity is
+                    never gated by the marker's reveal; animated by GSAP on arrival */}
+                <span className="rx-pl-node-burst" aria-hidden="true">
+                  {Array.from({ length: isLast ? PL_SPARKS_FINALE : PL_SPARKS }).map(
+                    (_, k) => (
+                      <span key={k} className="rx-pl-spark" />
+                    )
+                  )}
                 </span>
-                <span className="rx-pl-node-title">{stage.title}</span>
-                <span className="rx-pl-node-desc">{stage.desc}</span>
-              </div>
-            </li>
-          ))}
+                {/* text below the marker; fades + slides in via --pt */}
+                <div className="rx-pl-node-text">
+                  <span className="rx-pl-node-num" aria-hidden="true">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="rx-pl-node-title">{stage.title}</span>
+                  <span className="rx-pl-node-desc">{stage.desc}</span>
+                </div>
+              </li>
+            )
+          })}
         </ol>
+
+        {/* Finale — the completion moment, above/near the Validate endpoint.
+            Fades + slides in via --pf (driven by the separate finale trigger). */}
+        <div className="rx-pl-finale" ref={finaleRef}>
+          <span className="rx-pl-finale-title">
+            <span className="rx-pl-finale-check" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M5 12.5 10 17.5 19.5 6.5"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            Production Ready
+          </span>
+          <span className="rx-pl-finale-sub">React Native Project Generated</span>
+        </div>
       </div>
     </section>
   )
