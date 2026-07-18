@@ -200,12 +200,13 @@
   max-width: 560px;
   /* Task 3: slight rightward nudge of the whole left-content block. */
   margin-left: 40px;
-  /* Task 4 (+ later nudge): raise the block (label + paragraph + button) so the
-     gap between the START MIGRATION button and the REJOX wordmark below widens.
-     Nudged further up (was -56px) to open the gap slightly more. Using a
+  /* Raise the whole block (label + paragraph + button + feature labels) to
+     tighten the vertical rhythm and keep it clear of the REJOX wordmark below.
+     Nudged further up (was -80px) now that the three feature labels add height
+     beneath the button, so the block stays visually anchored high. Using a
      transform keeps this purely visual — the wordmark and the flex sizing of
      `.rx-mid` are untouched. */
-  transform: translateY(-80px);
+  transform: translateY(-116px);
 }
 .rx-eyebrow {
   display: flex;
@@ -298,6 +299,39 @@
 }
 .rx-start:hover .rx-start-chip svg {
   transform: translateX(3px) rotate(0deg);
+}
+
+/* Three proof-point labels under the START button — a muted, inline row in the
+   site font (Clash Display), well below heading weight so they read as quiet
+   supporting text. A subtle dot separates each; it's inserted before every
+   item except the first, so spacing stays even and there's no trailing dot. */
+.rx-hero-feats {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-sans);
+  color: rgba(201, 201, 206, 0.62);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.rx-hero-feats li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
+}
+.rx-hero-feats li + li::before {
+  content: '';
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.75;
 }
 
 /* ==================== right-side frosted glow cards ==================== */

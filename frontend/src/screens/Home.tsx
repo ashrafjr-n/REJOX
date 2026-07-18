@@ -912,8 +912,9 @@ export function Home() {
                 <span className="rx-label">AI Migration Engineer</span>
               </div>
               <p className="rx-sentence">
-                Upload your React application and receive production-ready React
-                Native architecture, powered by AI.
+                Upload your React project. Rejox analyzes, plans, and migrates it
+                into React Native with deterministic transforms and targeted AI
+                assistance.
               </p>
               <button type="button" className="rx-start">
                 <span className="rx-start-label">Start migration</span>
@@ -921,6 +922,13 @@ export function Home() {
                   <ArrowRight />
                 </span>
               </button>
+              {/* three succinct proof points under the button — muted, divider-
+                  separated, sized well below the heading so they never compete. */}
+              <ul className="rx-hero-feats" aria-label="What Rejox is">
+                <li>Deterministic</li>
+                <li>AI-assisted</li>
+                <li>Production-ready</li>
+              </ul>
             </motion.div>
           </div>
 
