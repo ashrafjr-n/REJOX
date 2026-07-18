@@ -563,39 +563,6 @@
   max-width: 1180px;
   margin: 0 auto;
 }
-/* Eyebrow label as a ScrollReveal instance (see Home.tsx). Keeps the original
-   12px / 600 / uppercase / 0.18em label look — these unlayered rules win over
-   ScrollReveal's layered Tailwind utilities on the same <p>. */
-.rx-piIntro-eyebrow {
-  margin: 0 0 clamp(22px, 3.4vh, 38px);
-}
-.rx-piIntro-eyebrow-p {
-  padding-left: 46px; /* room for the rule (34px) + 12px gap, matches original */
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--rx-white);
-}
-/* position:relative on the word (no offsets — nothing moves) guarantees the
-   ::before's containing block is the word span itself, so the rule always fades
-   AND blurs in lockstep with the label, independent of the blur filter. */
-.rx-piIntro-eyebrow-p .word {
-  position: relative;
-}
-.rx-piIntro-eyebrow-p .word:first-of-type::before {
-  content: '';
-  position: absolute;
-  right: 100%;
-  margin-right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 34px;
-  height: 1px;
-  background: linear-gradient(90deg, var(--rx-red), #ff9ffc);
-}
-
 /* ScrollReveal renders <h2 class="my-5 …"><p class="text-[clamp(1.6rem,4vw,3rem)]
    leading-[1.5] font-semibold …">. These unlayered rules win over ScrollReveal's
    layered Tailwind utilities on the same <p>, scaling the reveal to a dedicated,
@@ -607,30 +574,43 @@
 .rx-piIntro-reveal .word {
   will-change: opacity, filter;
 }
-/* Headline AND paragraph share ONE class, so they are IDENTICAL in size and
-   weight (they must not differ). Size is doubled from the ScrollReveal
-   component's own default clamp(1.6rem,4vw,3rem) to clamp(3.2rem,8vw,6rem),
-   font-semibold with generous leading — the provided component's design at 2x.
-   Together the two blocks fill the section as one large scroll-revealed
-   statement, spanning the full content width. */
-.rx-piIntro-copy {
-  margin: 0 0 clamp(22px, 3vh, 44px);
-  max-width: none;
+/* Closing CTA layout — the four stretched words stacked and centred, with the
+   reused hero button below. `.rx-piIntro` already centres this vertically. */
+.rx-piCta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
-.rx-piIntro-copy-p {
-  max-width: none;
-  font-size: clamp(2.08rem, 5.2vw, 3.9rem);
-  line-height: 1.4;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+/* Each word is its own ScrollReveal line. Tight leading so the four words read
+   as one stacked block; margin:0 cancels the component's my-5. */
+.rx-piCta-line {
+  margin: 0;
+  line-height: 1;
+}
+/* Large, bold, and WIDENED horizontally via scaleX (echoing the REJOX
+   wordmark's width-emphasis, which likewise widens by scale rather than by
+   font-size alone) plus a touch of tracking. Centre transform-origin keeps each
+   word centred as it stretches. The scaleX lives on the <p> so it never fights
+   ScrollReveal's rotate/opacity/blur tweens (which target the <h2> and the inner
+   .word spans). */
+.rx-piCta-word {
+  font-family: var(--font-sans);
+  font-size: clamp(2.8rem, 8.5vw, 7rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: 0.01em;
   color: var(--rx-white);
+  transform: scaleX(1.32);
+  transform-origin: 50% 50%;
 }
-/* Keep the first sentence ("Upload your React project.") on a single line. */
-.rx-piIntro-oneline {
-  white-space: nowrap;
-}
-.rx-piIntro-status {
-  font-size: clamp(14px, 1.15vw, 18px);
+/* Space between the last word and the button. Kept a plain block (not a flex
+   container) so the reused inline-flex `.rx-start` pill is NOT blockified — its
+   computed display stays byte-identical to the hero button. Centred by the
+   inherited text-align:center from `.rx-piCta`. */
+.rx-piCta-actions {
+  margin-top: clamp(34px, 5vh, 60px);
+  text-align: center;
 }
 
 /* ================= Section 03 — Migration Pipeline ==================== */
