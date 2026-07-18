@@ -1,0 +1,416 @@
+{
+  "$defs": {
+    "ShowcaseContribution": {
+      "additionalProperties": false,
+      "properties": {
+        "delta": {
+          "type": "number"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "delta",
+        "reason",
+        "evidence"
+      ],
+      "title": "ShowcaseContribution",
+      "type": "object"
+    },
+    "ShowcaseCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "apiEndpoints": {
+          "type": "integer"
+        },
+        "components": {
+          "type": "integer"
+        },
+        "pages": {
+          "type": "integer"
+        },
+        "routes": {
+          "type": "integer"
+        },
+        "stores": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "components",
+        "pages",
+        "routes",
+        "apiEndpoints",
+        "stores"
+      ],
+      "title": "ShowcaseCounts",
+      "type": "object"
+    },
+    "ShowcaseEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "kind"
+      ],
+      "title": "ShowcaseEdge",
+      "type": "object"
+    },
+    "ShowcaseGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/ShowcaseEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/ShowcaseNode"
+          },
+          "type": "array"
+        }
+      },
+      "title": "ShowcaseGraph",
+      "type": "object"
+    },
+    "ShowcaseMeta": {
+      "additionalProperties": false,
+      "description": "Provenance of the run — enough to reproduce it byte-for-byte.\n\n``generatedAt`` is intentionally NOT wall-clock: it is the commit date of the\nbenchmarked ``sample-app`` subtree (or ``SOURCE_DATE_EPOCH`` when set), so two\nexports of the same inputs are byte-identical.",
+      "properties": {
+        "aiProvider": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "type": "string"
+        },
+        "rejoxVersion": {
+          "type": "string"
+        },
+        "reproduce": {
+          "type": "string"
+        },
+        "sampleProject": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "default": 1,
+          "type": "integer"
+        },
+        "sourceCommit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "generatedAt",
+        "aiProvider",
+        "rejoxVersion",
+        "sampleProject",
+        "reproduce"
+      ],
+      "title": "ShowcaseMeta",
+      "type": "object"
+    },
+    "ShowcaseNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "sourceFile": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "sourceFile",
+        "kind"
+      ],
+      "title": "ShowcaseNode",
+      "type": "object"
+    },
+    "ShowcaseProject": {
+      "additionalProperties": false,
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/ShowcaseCounts"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sourceFiles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "stylingApproaches": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "counts"
+      ],
+      "title": "ShowcaseProject",
+      "type": "object"
+    },
+    "ShowcaseQuestion": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/ShowcaseQuestionEvidence"
+        },
+        "id": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/ShowcaseQuestionOption"
+          },
+          "type": "array"
+        },
+        "recommended": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "context",
+        "evidence"
+      ],
+      "title": "ShowcaseQuestion",
+      "type": "object"
+    },
+    "ShowcaseQuestionEvidence": {
+      "additionalProperties": false,
+      "description": "The genuine justification behind the navigator-shape question.\n\nThis question is an AI *proposal*, not a formal analyzer finding, so there is\nno ``Issue``/``Evidence`` object behind it. What DID justify it is captured\nhere verbatim: the AI's proposed shape + rationale, and the source nav UI\nsummary (the only thing the LLM saw) that the proposal reasoned over.",
+      "properties": {
+        "fellBack": {
+          "type": "boolean"
+        },
+        "navComponent": {
+          "type": "string"
+        },
+        "proposedShape": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "topLevelLinks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "proposedShape",
+        "rationale",
+        "fellBack",
+        "navComponent"
+      ],
+      "title": "ShowcaseQuestionEvidence",
+      "type": "object"
+    },
+    "ShowcaseQuestionOption": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "isRecommended": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "isRecommended"
+      ],
+      "title": "ShowcaseQuestionOption",
+      "type": "object"
+    },
+    "ShowcaseResults": {
+      "additionalProperties": false,
+      "properties": {
+        "contributions": {
+          "items": {
+            "$ref": "#/$defs/ShowcaseContribution"
+          },
+          "type": "array"
+        },
+        "llmCalls": {
+          "type": "integer"
+        },
+        "metroPassed": {
+          "type": "boolean"
+        },
+        "metroRan": {
+          "type": "boolean"
+        },
+        "predictedConfidence": {
+          "type": "number"
+        },
+        "predictedCoverage": {
+          "type": "number"
+        },
+        "repairRounds": {
+          "type": "integer"
+        },
+        "tscErrorCount": {
+          "type": "integer"
+        },
+        "tscPassed": {
+          "type": "boolean"
+        },
+        "validatedConfidence": {
+          "type": "number"
+        },
+        "validatedCoverage": {
+          "type": "number"
+        },
+        "validatedStrictCoverage": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "predictedCoverage",
+        "predictedConfidence",
+        "validatedCoverage",
+        "validatedStrictCoverage",
+        "validatedConfidence",
+        "tscPassed",
+        "tscErrorCount",
+        "metroPassed",
+        "metroRan",
+        "llmCalls",
+        "repairRounds"
+      ],
+      "title": "ShowcaseResults",
+      "type": "object"
+    },
+    "ShowcaseWaveStep": {
+      "additionalProperties": false,
+      "description": "One plan step, carrying the engine's OWN ``wave`` field (not a\nrecomputation) plus title, kind and targets.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "targets": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        },
+        "wave": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "wave",
+        "order",
+        "title",
+        "kind"
+      ],
+      "title": "ShowcaseWaveStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "graph": {
+      "$ref": "#/$defs/ShowcaseGraph"
+    },
+    "meta": {
+      "$ref": "#/$defs/ShowcaseMeta"
+    },
+    "project": {
+      "$ref": "#/$defs/ShowcaseProject"
+    },
+    "question": {
+      "$ref": "#/$defs/ShowcaseQuestion"
+    },
+    "results": {
+      "$ref": "#/$defs/ShowcaseResults"
+    },
+    "waves": {
+      "items": {
+        "$ref": "#/$defs/ShowcaseWaveStep"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "meta",
+    "project",
+    "graph",
+    "question",
+    "results"
+  ],
+  "title": "ShowcaseData",
+  "type": "object"
+}
