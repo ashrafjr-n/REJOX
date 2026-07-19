@@ -109,15 +109,21 @@ export default function Decisions() {
           <span className="rx-label">Scene 02 · Only when needed</span>
         </div>
 
+        {/* Broken deliberately into exactly two lines — the natural split between
+            the two sentences — via an explicit line break, so the shape holds at
+            the reference width rather than depending on where the text happens to
+            wrap. The heading max-width is tuned so neither sentence wraps further. */}
         <h2 className="rx-d-heading rx-d-reveal">
-          It asks you what it can&rsquo;t know. It <span className="rx-d-accent">decides</span>{' '}
-          everything else.
+          It asks you what it can&rsquo;t know.
+          <br className="rx-d-heading-break" />
+          It <span className="rx-d-accent">decides</span> everything else.
         </h2>
 
-        {/* One composition: the single assisted decision (left) and the proof the
-            rest was mechanical (right), joined — not divided — by the hinge line
-            between them. Placed as a grid; each of the three parts stays its own
-            reveal unit so cleanup/reduced-motion behaviour is unchanged. */}
+        {/* One composition on two columns: the single assisted decision (left, the
+            denser panel, given the freed width) and — in the right column — the
+            proof the rest was mechanical with the joining line settled beneath it.
+            Each of the three parts stays its own reveal unit so cleanup /
+            reduced-motion behaviour is unchanged. */}
         <div className="rx-d-stage">
           {/* ---------- LEFT — the decision (an AI proposal, not a finding) ---- */}
           <div className="rx-d-beat rx-d-decision rx-d-reveal">
@@ -202,60 +208,70 @@ export default function Decisions() {
             </ul>
           </div>
 
-          {/* ---------- HINGE — the line that joins the two sides -------------- */}
-          {/* The whole-run cost as a statement, generously isolated. The figure
-              beneath it is read from the data (never the worded "once" above). */}
-          <div className="rx-d-join rx-d-reveal">
-            <p className="rx-d-join-line">AI was needed once.</p>
-            <p className="rx-d-join-cap tnum">
-              {r.llmCalls} LLM call{r.llmCalls === 1 ? '' : 's'} · entire migration
-            </p>
-          </div>
-
-          {/* ---------- RIGHT — the proof the rest was mechanical ------------- */}
-          <div className="rx-d-beat rx-d-proof rx-d-reveal">
-            {/* Headline row — three verdicts: tsc, Metro, and the validated figure. */}
-            <div className="rx-d-proof-row">
-              <div className="rx-d-metric rx-d-verified">
-                <div className="rx-d-metric-value">{tscVerdict}</div>
-                <div className="rx-d-metric-label">tsc typecheck</div>
-              </div>
-              <div className="rx-d-metric rx-d-verified">
-                <div className="rx-d-metric-value">{metroVerdict}</div>
-                <div className="rx-d-metric-label">Metro bundle</div>
-              </div>
-              <div className="rx-d-metric rx-d-verified rx-d-headline">
-                <div className="rx-d-metric-value" data-testid="validated-coverage">
-                  {r.validatedCoverage}%
+          {/* ---------- RIGHT COLUMN — the proof, then the joining line beneath it.
+              The right column holds only what the proof card and the joining line
+              need; the freed middle-column width goes to the denser decision panel
+              on the left. The wrapper is not itself a reveal unit — the proof and
+              the join each keep their own .rx-d-reveal so scroll / reduced-motion
+              behaviour is exactly as before. ---------- */}
+          <div className="rx-d-right-col">
+            {/* ---------- the proof the rest was mechanical ------------- */}
+            <div className="rx-d-beat rx-d-proof rx-d-reveal">
+              {/* Headline row — three verdicts: tsc, Metro, and the validated figure. */}
+              <div className="rx-d-proof-row">
+                <div className="rx-d-metric rx-d-verified">
+                  <div className="rx-d-metric-value">{tscVerdict}</div>
+                  <div className="rx-d-metric-label">tsc typecheck</div>
                 </div>
-                <div className="rx-d-metric-label">
-                  Validated coverage
-                  <span className="rx-d-lens" data-testid="validated-lens">
-                    working · compiles &amp; bundles
-                  </span>
+                <div className="rx-d-metric rx-d-verified">
+                  <div className="rx-d-metric-value">{metroVerdict}</div>
+                  <div className="rx-d-metric-label">Metro bundle</div>
+                </div>
+                <div className="rx-d-metric rx-d-verified rx-d-headline">
+                  <div className="rx-d-metric-value" data-testid="validated-coverage">
+                    {r.validatedCoverage}%
+                  </div>
+                  <div className="rx-d-metric-label">
+                    Validated coverage
+                    <span className="rx-d-lens" data-testid="validated-lens">
+                      working · compiles &amp; bundles
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Secondary treatment — the prediction and the stricter lens both kept
+                  visible (never merged into the headline, never behind a hover). */}
+              <div className="rx-d-proof-secondary">
+                <p className="rx-d-sub">
+                  predicted <span className="tnum" data-testid="predicted-coverage">{r.predictedCoverage}%</span>{' '}
+                  before migrating
+                </p>
+                <p className="rx-d-sub" data-testid="strict-coverage">
+                  strict · no leftover TODOs{' '}
+                  <span className="tnum">{r.validatedStrictCoverage}%</span>
+                </p>
+              </div>
+
+              <ul className="rx-d-proof-lines">
+                <li>Predicted before migrating. Verified after.</li>
+                <li>Type-safe.</li>
+                <li>Bundle-safe.</li>
+                <li>Ready for review.</li>
+              </ul>
             </div>
 
-            {/* Secondary treatment — the prediction and the stricter lens both kept
-                visible (never merged into the headline, never behind a hover). */}
-            <div className="rx-d-proof-secondary">
-              <p className="rx-d-sub">
-                predicted <span className="tnum" data-testid="predicted-coverage">{r.predictedCoverage}%</span>{' '}
-                before migrating
-              </p>
-              <p className="rx-d-sub" data-testid="strict-coverage">
-                strict · no leftover TODOs{' '}
-                <span className="tnum">{r.validatedStrictCoverage}%</span>
+            {/* ---------- the joining line — the whole-run cost as a statement,
+                settled beneath the proof card and kept generously isolated (the
+                whitespace around it is the argument). On the wider right column the
+                worded line sits on a single line. The figure beneath is read from
+                the data (never the worded "once" above). ---------- */}
+            <div className="rx-d-join rx-d-reveal">
+              <p className="rx-d-join-line">AI was needed once.</p>
+              <p className="rx-d-join-cap tnum">
+                {r.llmCalls} LLM call{r.llmCalls === 1 ? '' : 's'} · entire migration
               </p>
             </div>
-
-            <ul className="rx-d-proof-lines">
-              <li>Predicted before migrating. Verified after.</li>
-              <li>Type-safe.</li>
-              <li>Bundle-safe.</li>
-              <li>Ready for review.</li>
-            </ul>
           </div>
         </div>
 

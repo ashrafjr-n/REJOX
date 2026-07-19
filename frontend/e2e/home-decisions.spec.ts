@@ -36,6 +36,22 @@ async function gotoHome(page: Page) {
 
 const section = (page: Page) => page.locator('[data-rx-decisions]')
 
+/** Count the rendered lines of an element's text by grouping its text
+ *  client-rects by their (rounded) top edge — one distinct top per visual line.
+ *  Independent of how the wrap happens (natural, max-width, or an explicit
+ *  <br>), so it measures what actually renders. */
+async function renderedLineCount(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const tops = new Set<number>()
+    for (const rect of Array.from(range.getClientRects())) {
+      if (rect.width > 0.5) tops.add(Math.round(rect.top))
+    }
+    return tops.size
+  })
+}
+
 /** Reveal an element by scrolling it into the viewport and letting the one-shot
  *  fade-up finish, then return its computed opacity. */
 async function revealOpacity(page: Page, selector: string): Promise<number> {
@@ -114,6 +130,37 @@ test.describe('Home / Decisions section', () => {
       .poll(() => firstWord.evaluate((el) => parseFloat(getComputedStyle(el).opacity)), { timeout: 8000 })
       .toBeGreaterThan(0.9)
     await page.screenshot({ path: 'test-results/decisions-coexist-cta.png', animations: 'disabled' })
+  })
+
+  test('the section is exactly one viewport tall at 1440×900', async ({ page }) => {
+    await gotoHome(page)
+    const measured = await section(page).evaluate((el) => el.getBoundingClientRect().height)
+    // Restructured to a single viewport: content + padding sits under 100vh, so
+    // min-height:100vh clamps the section to exactly one viewport — nothing
+    // cropped, nothing scrolled inside it.
+    expect(measured).toBe(DESKTOP.height)
+
+    // A full-section screenshot of the reworked layout (revealed).
+    await section(page).scrollIntoViewIfNeeded()
+    await page.waitForTimeout(800)
+    await section(page).screenshot({ path: 'test-results/decisions-section.png' })
+  })
+
+  test('"AI was needed once." renders on a single line', async ({ page }) => {
+    await gotoHome(page)
+    await page.locator('.rx-d-join').scrollIntoViewIfNeeded()
+    await page.waitForTimeout(300)
+    const joinLine = page.locator('.rx-d-join-line')
+    expect((await joinLine.textContent())?.trim()).toBe('AI was needed once.')
+    // On the wider right column it sits on one line, not wrapped.
+    expect(await renderedLineCount(page, '.rx-d-join-line')).toBe(1)
+  })
+
+  test('the heading renders on exactly two lines', async ({ page }) => {
+    await gotoHome(page)
+    // Deliberately broken between the two sentences — exactly two lines at the
+    // reference width, not three.
+    expect(await renderedLineCount(page, '.rx-d-heading')).toBe(2)
   })
 
   test('reduced motion: the whole section is visible with nothing hidden', async ({ page }) => {
