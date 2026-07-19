@@ -30,7 +30,11 @@
   background: transparent;
   color: var(--rx-white);
   font-family: var(--font-sans);
-  padding: clamp(52px, 8vh, 96px) var(--rx-frame-inset);
+  /* Vertical padding trimmed from 8vh so the restructured composition settles
+     inside one viewport: with a border-box, section height = vertical padding +
+     inner content, and min-height:100vh then clamps the whole thing to exactly
+     one viewport once that sum sits under it. */
+  padding: clamp(44px, 6vh, 72px) var(--rx-frame-inset);
   -webkit-font-smoothing: antialiased;
 }
 /* Shared 1180 content spine — identical to Scene 01 and the CTA — so the
@@ -52,8 +56,10 @@
 .rx-d-heading {
   /* Identical scale to Scene 01; bottom margin tightened so the one-composition
      stage clears the fold sooner. */
-  margin: 0 0 clamp(20px, 3vh, 34px);
-  max-width: 18ch;
+  margin: 0 0 clamp(18px, 2.6vh, 30px);
+  /* Wide enough that neither sentence wraps on its own; the explicit break
+     (.rx-d-heading-break) is what sets the exact two-line shape. */
+  max-width: 30ch;
   font-family: var(--font-sans);
   font-size: clamp(28px, 3.2vw, 46px);
   font-weight: 600;
@@ -61,26 +67,40 @@
   letter-spacing: -0.01em;
   color: var(--rx-white);
 }
+/* The deliberate break between the two sentences. It is a normal <br> at the
+   reference width; it only ever needs to force the single split — the max-width
+   above keeps each sentence on one line, so the heading is exactly two lines. */
+.rx-d-heading-break {
+  display: block;
+}
 
 .rx-d-accent {
   color: var(--rx-pink);
 }
 
-/* --- the single composition: decision (left) · hinge · proof (right) ---
-   Three columns on the shared spine. The two beats are the tall/dense units;
-   the hinge floats centred in its column so it reads as the pivot BETWEEN them,
-   not a divider stacked above or below. Row height follows the taller column;
-   the hinge centres against it. */
+/* --- the single composition: decision (left) · proof + join (right) ---
+   Two columns on the shared spine. The decision is the tall, dense unit and
+   takes the freed width; the right column is sized to what the proof card and
+   the joining line beneath it actually need. Row height follows the taller
+   column, which stays the decision — so the join settles into what was empty
+   vertical space on the right. */
 .rx-d-stage {
   display: grid;
-  /* Left column is the wider, denser one: giving it room reduces line-wrapping
-     in the reasoning/question, which is the cheapest way to shorten the section
-     without touching type size. The hinge stays narrow (its whitespace is the
-     argument); the proof sits right. */
-  grid-template-columns: minmax(0, 1.32fr) minmax(150px, 0.6fr) minmax(0, 1fr);
-  gap: clamp(14px, 1.8vw, 36px);
+  /* Left column is the wider, denser one: giving it the width freed by the old
+     middle column reduces line-wrapping in the reasoning/question, which is the
+     cheapest way to shorten the section without touching type size. The right
+     column keeps enough width for the proof row and for "AI was needed once."
+     to sit on a single line. */
+  grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
+  gap: clamp(28px, 3vw, 60px);
   align-items: start;
-  margin-bottom: clamp(24px, 3.5vh, 46px);
+  margin-bottom: clamp(20px, 3vh, 40px);
+}
+/* Right column: the proof card, then the joining line beneath it. A plain flex
+   column — not a reveal unit; its two children keep their own reveals. */
+.rx-d-right-col {
+  display: flex;
+  flex-direction: column;
 }
 .rx-d-attribution {
   max-width: var(--rx-d-col);
@@ -287,16 +307,17 @@
   color: var(--rx-light-silver);
 }
 
-/* ===================== the hinge ===================== */
-/* The line that JOINS the two sides. No card, no border, no icon; centred in
-   its own column and floated to the vertical middle so it pivots between the
-   one assisted decision (left) and the mechanical proof (right). The generous
-   empty space around it is the argument. */
+/* ===================== the joining line ===================== */
+/* The line that JOINS the two sides — the one assisted call (named on the left)
+   and the mechanical proof (the card above it). No card, no border, no icon;
+   settled beneath the proof card, centred within the right column and held clear
+   of the card by a generous margin. The empty space around it is the argument,
+   so it is isolated, never crushed against the card to save pixels. */
 .rx-d-join {
   align-self: center;
-  justify-self: center;
   text-align: center;
-  padding: clamp(20px, 4vh, 56px) clamp(6px, 1vw, 18px);
+  margin-top: clamp(30px, 5vh, 56px);
+  padding: 0 clamp(6px, 1vw, 18px);
 }
 .rx-d-join-line {
   margin: 0;
