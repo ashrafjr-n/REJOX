@@ -651,3 +651,34 @@
   margin-top: clamp(34px, 5vh, 60px);
   text-align: center;
 }
+
+/* ============================ footer ============================
+   The quiet sign-off. A thin, transparent strip after the CTA — the least
+   prominent thing on the page: lighter weight and smaller than the scenes'
+   attribution lines, low-opacity white (no colour, no accent). A single very
+   faint hairline lets it settle beneath the CTA without becoming its own
+   section. Aligned to the same frame inset as the rest of the page. */
+.rx-footer {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px var(--rx-frame-inset);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: var(--font-sans);
+}
+.rx-footer-mark {
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.rx-footer-copy {
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.32);
+}

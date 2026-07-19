@@ -361,16 +361,28 @@
 .rx-d-proof {
   margin-bottom: clamp(18px, 2.7vh, 30px);
 }
+/* The three proof figures sit on ONE row. What forced the wrap was never the
+   figure sizes — "PASS" is narrower than its label — but the lens sub-label
+   ("working · compiles & bundles"), which alone was ~half the card width. So the
+   figures keep their full size (their presence is the section's payoff); the
+   labels stay on one line, and only the quiet lens is allowed to wrap, which is
+   what lets all three pairs fit across. */
 .rx-d-proof-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 18px 28px;
+  flex-wrap: nowrap;
+  gap: 16px;
   align-items: flex-start;
 }
 .rx-d-metric {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/* Labels stay on a single line so the three value+label pairs read as one clean
+   row; only the lens beneath the validated pair gives way and wraps (its
+   white-space is reset to normal on .rx-d-lens below). */
+.rx-d-metric-label {
+  white-space: nowrap;
 }
 .rx-d-metric-value {
   font-family: var(--font-mono);
@@ -407,6 +419,9 @@
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: none;
+  /* Reset the nowrap the label sets: the lens is the one bit allowed to wrap so
+     the three figures fit on one row. */
+  white-space: normal;
   color: var(--rx-d-faint);
 }
 /* Secondary treatment — the prediction and the stricter lens. Quiet but
@@ -414,7 +429,10 @@
    measurement kept out of the headline, and the strict figure keeps its lens
    label so no bare "100%" over-claims. */
 .rx-d-proof-secondary {
-  margin-top: 18px;
+  /* Enlarged from 18px: with the three figures now on one row (was two) the card
+     freed vertical space; recovering it here + on the summary block below keeps
+     the card's outer height exactly what it was. */
+  margin-top: 37px;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -433,18 +451,25 @@
    the two measurements; the three affirmations state what validation proved. */
 .rx-d-proof-lines {
   list-style: none;
-  margin: 20px 0 0;
-  padding: 16px 0 0;
+  /* Enlarged margin/padding/gap (part of recovering the height freed by the
+     one-row figures — see .rx-d-proof-secondary). */
+  margin: 32px 0 0;
+  padding: 26px 0 0;
   border-top: 1px solid var(--rx-d-line);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.5;
   color: var(--rx-d-faint);
 }
+/* The framing line ("Predicted before migrating. Verified after.") is enlarged —
+   the approved way to spend the freed vertical space — so it carries more of the
+   summary's weight while the card keeps its original height. */
 .rx-d-proof-lines li:first-child {
+  font-size: 18px;
+  line-height: 1.45;
   color: var(--rx-white);
 }
 

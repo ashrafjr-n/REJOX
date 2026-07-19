@@ -111,10 +111,12 @@ const ScrollReveal = ({
     }
 
     // ---- TOP-EXIT: once the element scrolls up to ~20vh from the top, animate
-    //      it back out toward the top. Fade + blur only — NO rotation on exit,
-    //      so the text stays upright while it fades/blurs straight out. Uses
-    //      `.to()` with immediateRender:false so it records the fully-revealed
-    //      state as its start and never fights the entrance in the hold zone. ----
+    //      it back out toward the top. Fade ONLY — no rotation and, deliberately,
+    //      no blur: words leave sharp. The entrance still blurs them in (above);
+    //      the filter simply stays at blur(0px) from the entrance's end state as
+    //      they fade out, so nothing re-applies a blur on the way up. Uses `.to()`
+    //      with immediateRender:false so it records the fully-revealed state as
+    //      its start and never fights the entrance in the hold zone. ----
     if (enableExit) {
       const exitTrigger = { trigger: el, scroller, start: exitStart, end: exitEnd, scrub: true }
       tweens.push(gsap.to(wordElements, {
@@ -124,15 +126,6 @@ const ScrollReveal = ({
         immediateRender: false,
         scrollTrigger: exitTrigger,
       }))
-      if (enableBlur) {
-        tweens.push(gsap.to(wordElements, {
-          ease: 'none',
-          filter: `blur(${blurStrength}px)`,
-          stagger,
-          immediateRender: false,
-          scrollTrigger: exitTrigger,
-        }))
-      }
     }
 
     return () => {
