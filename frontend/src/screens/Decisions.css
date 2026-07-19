@@ -11,6 +11,12 @@
   --rx-d-faint: rgba(255, 255, 255, 0.62);
   --rx-d-line: rgba(255, 255, 255, 0.12);
   --rx-d-line-strong: rgba(255, 255, 255, 0.24);
+  /* Same eyebrow-rule brightness as Scene 01. */
+  --rx-d-eyebrow-rule: rgba(255, 255, 255, 0.5);
+  /* The readable column for the dense text/instrument content, left-aligned
+     within the shared 1180 spine (below) so its content is left-weighted like
+     the hero and Scene 01, not centred. */
+  --rx-d-col: 900px;
 
   position: relative;
   z-index: 1;
@@ -18,24 +24,30 @@
   background: transparent;
   color: var(--rx-white);
   font-family: var(--font-sans);
-  padding: clamp(80px, 12vh, 150px) var(--rx-frame-inset);
+  /* Top tightened (was clamp(80,12vh,150)) to close the Scene 01 → Scene 02
+     seam; bottom kept roomy before the full-viewport CTA. */
+  padding: clamp(56px, 8vh, 100px) var(--rx-frame-inset) clamp(80px, 12vh, 140px);
   -webkit-font-smoothing: antialiased;
 }
+/* Shared 1180 content spine — identical to Scene 01 and the CTA — so the
+   eyebrow/heading left edge lines up across the whole page instead of jumping
+   inward. Content is left-aligned within it (capped by --rx-d-col). */
 .rx-decisions-inner {
   width: 100%;
-  max-width: 900px;
+  max-width: 1180px;
   margin: 0 auto;
 }
 
 /* --- header --- */
 .rx-d-eyebrow {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 .rx-d-eyebrow .rx-rule {
-  background: var(--rx-d-line-strong);
+  background: var(--rx-d-eyebrow-rule);
 }
 .rx-d-heading {
-  margin: 0 0 clamp(40px, 6vh, 68px);
+  /* Identical scale + rhythm to Scene 01. */
+  margin: 0 0 clamp(26px, 3.5vh, 40px);
   max-width: 18ch;
   font-family: var(--font-sans);
   font-size: clamp(28px, 3.2vw, 46px);
@@ -43,6 +55,15 @@
   line-height: 1.12;
   letter-spacing: -0.01em;
   color: var(--rx-white);
+}
+
+/* The dense content (both beats + the joining line + attribution) sits in the
+   readable left-aligned column; the eyebrow + heading run to the same left edge
+   as the wider spine. */
+.rx-d-beat,
+.rx-d-join,
+.rx-d-attribution {
+  max-width: var(--rx-d-col);
 }
 .rx-d-accent {
   color: var(--rx-pink);
@@ -131,6 +152,28 @@
 .rx-d-rationale {
   font-family: var(--font-sans);
   color: var(--rx-d-faint);
+}
+/* our plain-language gloss — visually set apart from the verbatim engine text
+   above it: indented under a hairline, tagged "in plain terms", quieter. */
+.rx-d-gloss {
+  display: block;
+  margin-top: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--rx-d-line);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rx-d-dim);
+}
+.rx-d-gloss-tag {
+  display: inline-block;
+  margin-right: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
 }
 
 /* the question — the prominent line of the beat */

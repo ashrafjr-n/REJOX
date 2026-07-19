@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { CustomEase } from 'gsap/CustomEase'
 
 import './Decisions.css'
 import showcase from '../data/showcase.json' with { type: 'json' }
@@ -34,7 +35,12 @@ import type { ShowcaseData } from '../types/showcase.generated'
  * Desktop only.
  */
 
-gsap.registerPlugin(ScrollTrigger)
+gsap.registerPlugin(ScrollTrigger, CustomEase)
+
+// The page's house easing — the exact cubic-bezier the hero entrances and the
+// header transitions use (cubic-bezier(0.22, 1, 0.36, 1)) — so these reveals
+// speak the same motion language as the rest of the page.
+const HOUSE_EASE = CustomEase.create('rxHouse', 'M0,0 C0.22,1 0.36,1 1,1')
 
 const data = showcase as ShowcaseData
 const q = data.question
@@ -73,7 +79,7 @@ export default function Decisions() {
           opacity: 0,
           y: 22,
           duration: 0.6,
-          ease: 'power2.out',
+          ease: HOUSE_EASE,
           scrollTrigger: { trigger: el, start: 'top 82%', toggleActions: 'play none none none' },
         })
       })
@@ -129,7 +135,18 @@ export default function Decisions() {
             </div>
             <div className="rx-d-ev-row">
               <dt className="rx-d-ev-label">Its reasoning</dt>
-              <dd className="rx-d-ev-value rx-d-rationale">{ev.rationale}</dd>
+              <dd className="rx-d-ev-value rx-d-rationale">
+                {ev.rationale}
+                {/* A plain-language gloss — OURS, not the engine's verbatim text
+                    (which stays exactly as exported above). Visually marked with
+                    the "in plain terms" tag so a visitor knows it's a translation,
+                    not what the engine said. Figure-free. */}
+                <span className="rx-d-gloss">
+                  <span className="rx-d-gloss-tag">in plain terms</span>
+                  tabs along the bottom for the main sections; a product&rsquo;s
+                  detail page opens as its own screen you can swipe back from.
+                </span>
+              </dd>
             </div>
           </dl>
 
@@ -194,9 +211,10 @@ export default function Decisions() {
           <p className="rx-d-proof-note">
             Two lenses on the same validated build: working counts every file that
             compiles and bundles; strict counts only files with no leftover TODOs.
-            Both are distinct from the analyzer&rsquo;s pre-migration prediction,
-            which is deliberately conservative — it estimates before migrating;
-            validation measures what the real tools confirmed after.
+            Both are distinct from the analyzer&rsquo;s pre-migration estimate,
+            which is conservative against the working lens (it under-predicts what
+            compiles) and higher than the strict one — it estimates before the
+            tools run; validation is what they confirmed after.
           </p>
         </div>
 
