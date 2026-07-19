@@ -21,7 +21,16 @@ interface ScrollRevealProps {
       element's own height: a one-line headline and a multi-line paragraph get
       the SAME gradual, non-instant reveal. (The previous `bottom bottom` end
       collapsed the range to ~0 for a single line, which is why the headline
-      snapped in instantly.) */
+      snapped in instantly.)
+
+      The entrance FINISHES at `top 68%` — while the word still sits in the
+      lower third of the viewport — rather than the old `top center` (50%). Two
+      reasons: (1) the word must be completely sharp by the time it reaches the
+      middle band, and (2) the last CTA word ("Ship.") is clamped by the page
+      bottom and can only rise to ~64% center, so an entrance that only completed
+      at 50% left it permanently blurred. Completing at 68% guarantees every
+      word — including the clamped last one — is zero-blur across the middle band;
+      blur now lives only near the bottom edge where words enter. */
   revealStart?: string
   revealEnd?: string
   /** Top-exit — mirrors the entrance for scrolling away: as the element scrolls
@@ -44,7 +53,7 @@ const ScrollReveal = ({
   containerClassName = '',
   textClassName = '',
   revealStart = 'top bottom',
-  revealEnd = 'top center',
+  revealEnd = 'top 68%',
   enableExit = true,
   exitStart = 'top 20%',
   exitEnd = '+=50%',

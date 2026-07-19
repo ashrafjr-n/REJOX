@@ -91,13 +91,20 @@
      cheapest way to shorten the section without touching type size. The right
      column keeps enough width for the proof row and for "AI was needed once."
      to sit on a single line. */
-  grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.46fr) minmax(0, 0.96fr);
   gap: clamp(28px, 3vw, 60px);
-  align-items: start;
+  /* Stretch both columns to the row height (which the taller decision card sets)
+     so the right column fills down to the decision card's bottom. Combined with
+     the join's margin-top:auto below, the joining line settles onto that shared
+     bottom edge and the two columns finish exactly level — through the layout,
+     with no hard-coded height that would break if the content changed. */
+  align-items: stretch;
   margin-bottom: clamp(20px, 3vh, 40px);
 }
 /* Right column: the proof card, then the joining line beneath it. A plain flex
-   column — not a reveal unit; its two children keep their own reveals. */
+   column — not a reveal unit; its two children keep their own reveals. It is
+   stretched to the decision card's height (see .rx-d-stage), and the join is
+   pushed to its bottom edge. */
 .rx-d-right-col {
   display: flex;
   flex-direction: column;
@@ -312,11 +319,16 @@
    and the mechanical proof (the card above it). No card, no border, no icon;
    settled beneath the proof card, centred within the right column and held clear
    of the card by a generous margin. The empty space around it is the argument,
-   so it is isolated, never crushed against the card to save pixels. */
+   so it is isolated, never crushed against the card to save pixels.
+
+   margin-top:auto pushes the join to the BOTTOM of the stretched right column so
+   its bottom edge lands level with the decision card's bottom. The proof card's
+   own margin-bottom (below) is the MINIMUM isolation floor, so even when the two
+   columns are near-equal height the join is never crushed against the card. */
 .rx-d-join {
   align-self: center;
   text-align: center;
-  margin-top: clamp(30px, 5vh, 56px);
+  margin-top: auto;
   padding: 0 clamp(6px, 1vw, 18px);
 }
 .rx-d-join-line {
@@ -342,6 +354,13 @@
 }
 
 /* ===================== the proof (right) ===================== */
+/* Minimum isolation floor between the proof card and the joining line: the join
+   uses margin-top:auto to drop to the column bottom, which alone would give zero
+   gap when the columns are near-equal height. This keeps the whitespace doing
+   its work regardless of how the two column heights compare. */
+.rx-d-proof {
+  margin-bottom: clamp(18px, 2.7vh, 30px);
+}
 .rx-d-proof-row {
   display: flex;
   flex-wrap: wrap;
