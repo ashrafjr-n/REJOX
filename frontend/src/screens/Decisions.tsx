@@ -8,27 +8,34 @@ import showcase from '../data/showcase.json' with { type: 'json' }
 import type { ShowcaseData } from '../types/showcase.generated'
 
 /**
- * Scene 02 — "Decisions".
+ * Scene 02 — "Only when needed".
  *
  * Answers the question Scene 01 raises: now that Rejox understands the project,
- * how does it DECIDE? Two beats stacked vertically, joined by a single isolated
- * line — the whole-run LLM call count:
+ * how does it DECIDE? ONE composition, read left → hinge → right:
  *
- *   Beat A  the one genuinely unknowable decision (the navigator shape), shown
- *           with its REAL provenance. This is an AI proposal, NOT an analyzer
- *           finding — there is no formal Evidence object. Its provenance is what
- *           the model actually saw (the navbar + its links) and its own reasoning
- *           (the spec rationale), presented in reading order evidence → question
- *           → options so a visitor sees WHY before WHAT.
- *   Beat B  the proof the rest was mechanical: tsc + Metro verdicts and the two
- *           coverage lenses — the working (compiles+bundles) headline AND the
- *           stricter residue-free figure, both genuinely visible, never merged
- *           with the analyzer's conservative pre-migration prediction.
+ *   Left   the one genuinely unknowable decision (the navigation shape the
+ *          engine names in its question), shown with REAL provenance from the
+ *          data — the title is never restated here. This is an AI proposal, NOT an
+ *          analyzer finding — there is no formal Evidence object. Its provenance
+ *          is what the model actually saw (the navbar + its links) and its own
+ *          reasoning (the spec rationale), in reading order evidence → question →
+ *          options so a visitor sees WHY before WHAT. The recommended option
+ *          carries a quiet provenance marker (it came from the single assisted
+ *          call) plus our own plain-language reason, marked as ours.
+ *   Hinge  "AI was needed once." — the line that JOINS the two sides rather than
+ *          separating them: the one call sits on the left, the mechanical proof
+ *          on the right, and this is the pivot between them. The exact call
+ *          count beneath the statement is read from the data, never written here.
+ *   Right  the proof the rest was mechanical: tsc + Metro verdicts and the
+ *          validated (working, compiles+bundles) headline in one row; the
+ *          analyzer's conservative pre-migration prediction and the stricter
+ *          residue-free figure kept visible in a quiet secondary treatment —
+ *          both genuinely present, neither merged into the headline.
  *
  * Every value comes from showcase.json via the generated type; no figure, name,
  * or question text is hard-coded. Unlike Scene 01 this section is NOT pinned —
- * it's short and dense, revealed on scroll (restrained fade-up, house language).
- * Its ScrollTriggers are created inside a gsap.context scoped to the section, so
+ * it's dense, revealed on scroll (restrained fade-up, house language). Its
+ * ScrollTriggers are created inside a gsap.context scoped to the section, so
  * cleanup kills only its own triggers and it coexists with the Scene 01 pin and
  * the CTA's ScrollReveal. Reduced motion shows everything at once.
  *
@@ -92,14 +99,14 @@ export default function Decisions() {
     <section
       ref={sectionRef}
       className={'rx-decisions' + (reduced ? ' is-reduced' : '')}
-      aria-label="Scene 02 — Decisions"
+      aria-label="Scene 02 — Only when needed"
       data-rx-decisions=""
       data-reduced={reduced ? 'true' : 'false'}
     >
       <div className="rx-decisions-inner">
         <div className="rx-eyebrow rx-d-eyebrow rx-d-reveal">
           <span className="rx-rule" />
-          <span className="rx-label">Scene 02 · Decisions</span>
+          <span className="rx-label">Scene 02 · Only when needed</span>
         </div>
 
         <h2 className="rx-d-heading rx-d-reveal">
@@ -107,115 +114,149 @@ export default function Decisions() {
           everything else.
         </h2>
 
-        {/* ---------- Beat A — the decision (an AI proposal, not a finding) ---- */}
-        <div className="rx-d-beat rx-d-decision rx-d-reveal">
-          <div className="rx-d-kicker">
-            <span className="rx-d-kicker-tag">AI proposal</span>
-            <span className="rx-d-kicker-note">
-              {ev.fellBack
-                ? 'fell back to the deterministic default'
-                : 'the model proposed this — it did not fall back to the default'}
-            </span>
+        {/* One composition: the single assisted decision (left) and the proof the
+            rest was mechanical (right), joined — not divided — by the hinge line
+            between them. Placed as a grid; each of the three parts stays its own
+            reveal unit so cleanup/reduced-motion behaviour is unchanged. */}
+        <div className="rx-d-stage">
+          {/* ---------- LEFT — the decision (an AI proposal, not a finding) ---- */}
+          <div className="rx-d-beat rx-d-decision rx-d-reveal">
+            <div className="rx-d-kicker">
+              <span className="rx-d-kicker-tag">Decision required</span>
+              <span className="rx-d-kicker-note">
+                {ev.fellBack
+                  ? 'fell back to the deterministic default'
+                  : 'the model proposed this — it did not fall back to the default'}
+              </span>
+            </div>
+
+            {/* Evidence FIRST — what the model actually saw, then its reasoning. */}
+            <dl className="rx-d-evidence">
+              <div className="rx-d-ev-row">
+                <dt className="rx-d-ev-label">Detected structure</dt>
+                <dd className="rx-d-ev-value">
+                  <span className="rx-d-navname tnum">{ev.navComponent}</span>
+                  <span className="rx-d-links">
+                    {navLinks.map((link) => (
+                      <span key={link} className="rx-d-link tnum">
+                        {link}
+                      </span>
+                    ))}
+                  </span>
+                </dd>
+              </div>
+              <div className="rx-d-ev-row">
+                <dt className="rx-d-ev-label">Its reasoning</dt>
+                <dd className="rx-d-ev-value rx-d-rationale">
+                  {ev.rationale}
+                  {/* A plain-language gloss — OURS, not the engine's verbatim text
+                      (which stays exactly as exported above). Visually marked with
+                      the "in plain terms" tag so a visitor knows it's a translation,
+                      not what the engine said. Figure-free. */}
+                  <span className="rx-d-gloss">
+                    <span className="rx-d-gloss-tag">in plain terms</span>
+                    tabs along the bottom for the main sections; a product&rsquo;s
+                    detail page opens as its own screen you can swipe back from.
+                  </span>
+                </dd>
+              </div>
+            </dl>
+
+            {/* The question the reasoning leads to. */}
+            <p className="rx-d-question" data-testid="decision-question">
+              {q.title}
+            </p>
+
+            {/* The options — the recommended one marked (read from the data). The
+                relabel to "Decision required" must not erase where the pick came
+                from: the recommendation genuinely came from the single assisted
+                call, so it carries a quiet provenance marker tying it to that one
+                call, plus our own plain-language reason (marked as OURS, the same
+                way the gloss above is — never as if the engine said it). */}
+            <ul className="rx-d-options">
+              {options.map((o) => (
+                <li
+                  key={o.id}
+                  className={'rx-d-option' + (o.isRecommended ? ' is-recommended' : '')}
+                >
+                  <div className="rx-d-option-head">
+                    <span className="rx-d-option-label">{o.label}</span>
+                    {o.isRecommended && <span className="rx-d-rec">Recommended</span>}
+                  </div>
+                  {o.isRecommended && (
+                    <>
+                      <span className="rx-d-provenance">
+                        <span className="rx-d-provenance-dot" aria-hidden="true" />
+                        from the one assisted call
+                      </span>
+                      {/* Our plain-language reason — not engine output. Marked as
+                          ours with the same hairline treatment as the gloss. */}
+                      <span className="rx-d-reason">
+                        <span className="rx-d-reason-tag">our read</span>
+                        Matches the detected structure.
+                      </span>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {/* Evidence FIRST — what the model actually saw, then its reasoning. */}
-          <dl className="rx-d-evidence">
-            <div className="rx-d-ev-row">
-              <dt className="rx-d-ev-label">What it saw</dt>
-              <dd className="rx-d-ev-value">
-                <span className="rx-d-navname tnum">{ev.navComponent}</span>
-                <span className="rx-d-links">
-                  {navLinks.map((link) => (
-                    <span key={link} className="rx-d-link tnum">
-                      {link}
-                    </span>
-                  ))}
-                </span>
-              </dd>
-            </div>
-            <div className="rx-d-ev-row">
-              <dt className="rx-d-ev-label">Its reasoning</dt>
-              <dd className="rx-d-ev-value rx-d-rationale">
-                {ev.rationale}
-                {/* A plain-language gloss — OURS, not the engine's verbatim text
-                    (which stays exactly as exported above). Visually marked with
-                    the "in plain terms" tag so a visitor knows it's a translation,
-                    not what the engine said. Figure-free. */}
-                <span className="rx-d-gloss">
-                  <span className="rx-d-gloss-tag">in plain terms</span>
-                  tabs along the bottom for the main sections; a product&rsquo;s
-                  detail page opens as its own screen you can swipe back from.
-                </span>
-              </dd>
-            </div>
-          </dl>
+          {/* ---------- HINGE — the line that joins the two sides -------------- */}
+          {/* The whole-run cost as a statement, generously isolated. The figure
+              beneath it is read from the data (never the worded "once" above). */}
+          <div className="rx-d-join rx-d-reveal">
+            <p className="rx-d-join-line">AI was needed once.</p>
+            <p className="rx-d-join-cap tnum">
+              {r.llmCalls} LLM call{r.llmCalls === 1 ? '' : 's'} · entire migration
+            </p>
+          </div>
 
-          {/* The question the reasoning leads to. */}
-          <p className="rx-d-question" data-testid="decision-question">
-            {q.title}
-          </p>
-
-          {/* The options — the recommended one marked (read from the data). */}
-          <ul className="rx-d-options">
-            {options.map((o) => (
-              <li key={o.id} className={'rx-d-option' + (o.isRecommended ? ' is-recommended' : '')}>
-                <span className="rx-d-option-label">{o.label}</span>
-                {o.isRecommended && <span className="rx-d-rec">Recommended</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* ---------- The joining line — the whole-run LLM count, isolated ---- */}
-        <div className="rx-d-join rx-d-reveal">
-          <p className="rx-d-join-line">
-            <span className="rx-d-join-num tnum">{r.llmCalls}</span>
-            <span className="rx-d-join-unit">LLM call{r.llmCalls === 1 ? '' : 's'}</span>
-          </p>
-          <p className="rx-d-join-cap">for the entire migration</p>
-        </div>
-
-        {/* ---------- Beat B — the proof the rest was mechanical -------------- */}
-        <div className="rx-d-beat rx-d-proof rx-d-reveal">
-          <div className="rx-d-proof-row">
-            <div className="rx-d-metric rx-d-verified">
-              <div className="rx-d-metric-value">{tscVerdict}</div>
-              <div className="rx-d-metric-label">tsc typecheck</div>
-            </div>
-            <div className="rx-d-metric rx-d-verified">
-              <div className="rx-d-metric-value">{metroVerdict}</div>
-              <div className="rx-d-metric-label">Metro bundle</div>
-            </div>
-            <div className="rx-d-metric rx-d-predicted">
-              <div className="rx-d-metric-value" data-testid="predicted-coverage">
-                {r.predictedCoverage}%
+          {/* ---------- RIGHT — the proof the rest was mechanical ------------- */}
+          <div className="rx-d-beat rx-d-proof rx-d-reveal">
+            {/* Headline row — three verdicts: tsc, Metro, and the validated figure. */}
+            <div className="rx-d-proof-row">
+              <div className="rx-d-metric rx-d-verified">
+                <div className="rx-d-metric-value">{tscVerdict}</div>
+                <div className="rx-d-metric-label">tsc typecheck</div>
               </div>
-              <div className="rx-d-metric-label">Predicted coverage</div>
+              <div className="rx-d-metric rx-d-verified">
+                <div className="rx-d-metric-value">{metroVerdict}</div>
+                <div className="rx-d-metric-label">Metro bundle</div>
+              </div>
+              <div className="rx-d-metric rx-d-verified rx-d-headline">
+                <div className="rx-d-metric-value" data-testid="validated-coverage">
+                  {r.validatedCoverage}%
+                </div>
+                <div className="rx-d-metric-label">
+                  Validated coverage
+                  <span className="rx-d-lens" data-testid="validated-lens">
+                    working · compiles &amp; bundles
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="rx-d-metric rx-d-verified rx-d-headline">
-              <div className="rx-d-metric-value" data-testid="validated-coverage">
-                {r.validatedCoverage}%
-              </div>
-              <div className="rx-d-metric-label">
-                Validated coverage
-                <span className="rx-d-lens" data-testid="validated-lens">
-                  working · compiles &amp; bundles
-                </span>
-              </div>
-              <div className="rx-d-strict" data-testid="strict-coverage">
+
+            {/* Secondary treatment — the prediction and the stricter lens both kept
+                visible (never merged into the headline, never behind a hover). */}
+            <div className="rx-d-proof-secondary">
+              <p className="rx-d-sub">
+                predicted <span className="tnum" data-testid="predicted-coverage">{r.predictedCoverage}%</span>{' '}
+                before migrating
+              </p>
+              <p className="rx-d-sub" data-testid="strict-coverage">
                 strict · no leftover TODOs{' '}
                 <span className="tnum">{r.validatedStrictCoverage}%</span>
-              </div>
+              </p>
             </div>
+
+            <ul className="rx-d-proof-lines">
+              <li>Predicted before migrating. Verified after.</li>
+              <li>Type-safe.</li>
+              <li>Bundle-safe.</li>
+              <li>Ready for review.</li>
+            </ul>
           </div>
-          <p className="rx-d-proof-note">
-            Two lenses on the same validated build: working counts every file that
-            compiles and bundles; strict counts only files with no leftover TODOs.
-            Both are distinct from the analyzer&rsquo;s pre-migration estimate,
-            which is conservative against the working lens (it under-predicts what
-            compiles) and higher than the strict one — it estimates before the
-            tools run; validation is what they confirmed after.
-          </p>
         </div>
 
         <p className="rx-d-attribution rx-d-reveal">

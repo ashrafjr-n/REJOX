@@ -21,12 +21,16 @@
   position: relative;
   z-index: 1;
   width: 100%;
+  /* One full-height section: the composition is vertically centred in the
+     viewport. It grows past 100vh only if the content genuinely needs it (a
+     slightly taller section is preferred to crushed type). */
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
   background: transparent;
   color: var(--rx-white);
   font-family: var(--font-sans);
-  /* Top tightened (was clamp(80,12vh,150)) to close the Scene 01 → Scene 02
-     seam; bottom kept roomy before the full-viewport CTA. */
-  padding: clamp(56px, 8vh, 100px) var(--rx-frame-inset) clamp(80px, 12vh, 140px);
+  padding: clamp(52px, 8vh, 96px) var(--rx-frame-inset);
   -webkit-font-smoothing: antialiased;
 }
 /* Shared 1180 content spine — identical to Scene 01 and the CTA — so the
@@ -46,8 +50,9 @@
   background: var(--rx-d-eyebrow-rule);
 }
 .rx-d-heading {
-  /* Identical scale + rhythm to Scene 01. */
-  margin: 0 0 clamp(26px, 3.5vh, 40px);
+  /* Identical scale to Scene 01; bottom margin tightened so the one-composition
+     stage clears the fold sooner. */
+  margin: 0 0 clamp(20px, 3vh, 34px);
   max-width: 18ch;
   font-family: var(--font-sans);
   font-size: clamp(28px, 3.2vw, 46px);
@@ -57,16 +62,28 @@
   color: var(--rx-white);
 }
 
-/* The dense content (both beats + the joining line + attribution) sits in the
-   readable left-aligned column; the eyebrow + heading run to the same left edge
-   as the wider spine. */
-.rx-d-beat,
-.rx-d-join,
-.rx-d-attribution {
-  max-width: var(--rx-d-col);
-}
 .rx-d-accent {
   color: var(--rx-pink);
+}
+
+/* --- the single composition: decision (left) · hinge · proof (right) ---
+   Three columns on the shared spine. The two beats are the tall/dense units;
+   the hinge floats centred in its column so it reads as the pivot BETWEEN them,
+   not a divider stacked above or below. Row height follows the taller column;
+   the hinge centres against it. */
+.rx-d-stage {
+  display: grid;
+  /* Left column is the wider, denser one: giving it room reduces line-wrapping
+     in the reasoning/question, which is the cheapest way to shorten the section
+     without touching type size. The hinge stays narrow (its whitespace is the
+     argument); the proof sits right. */
+  grid-template-columns: minmax(0, 1.32fr) minmax(150px, 0.6fr) minmax(0, 1fr);
+  gap: clamp(14px, 1.8vw, 36px);
+  align-items: start;
+  margin-bottom: clamp(24px, 3.5vh, 46px);
+}
+.rx-d-attribution {
+  max-width: var(--rx-d-col);
 }
 
 /* --- shared beat panel: a quiet hairline frame (the join line between them is
@@ -74,16 +91,16 @@
 .rx-d-beat {
   border: 1px solid var(--rx-d-line);
   border-radius: 14px;
-  padding: clamp(22px, 3vw, 34px);
+  padding: clamp(20px, 2.4vw, 30px);
 }
 
-/* ===================== Beat A — the decision ===================== */
+/* ===================== the decision (left) ===================== */
 .rx-d-kicker {
   display: flex;
   align-items: baseline;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 22px;
+  margin-bottom: 16px;
 }
 .rx-d-kicker-tag {
   font-family: var(--font-mono);
@@ -105,10 +122,10 @@
 
 /* evidence — quiet, comes FIRST (why before what) */
 .rx-d-evidence {
-  margin: 0 0 24px;
+  margin: 0 0 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .rx-d-ev-row {
   display: grid;
@@ -178,11 +195,11 @@
 
 /* the question — the prominent line of the beat */
 .rx-d-question {
-  margin: 0 0 20px;
+  margin: 0 0 16px;
   font-family: var(--font-sans);
-  font-size: clamp(19px, 2vw, 26px);
+  font-size: clamp(19px, 1.9vw, 24px);
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.22;
   color: var(--rx-white);
 }
 
@@ -197,8 +214,7 @@
 }
 .rx-d-option {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
   padding: 11px 16px;
   border: 1px solid var(--rx-d-line);
   border-radius: 9px;
@@ -211,6 +227,11 @@
   color: var(--rx-white);
   background: rgba(255, 255, 255, 0.03);
 }
+.rx-d-option-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .rx-d-rec {
   margin-left: auto;
   font-family: var(--font-mono);
@@ -220,48 +241,90 @@
   text-transform: uppercase;
   color: var(--rx-white);
 }
-
-/* ===================== the joining line ===================== */
-/* One isolated line — the whole-run LLM count. No card, no border, no icon;
-   generous empty space above and below. Its isolation is the argument. */
-.rx-d-join {
-  text-align: center;
-  padding: clamp(46px, 8vh, 88px) 0;
-}
-.rx-d-join-line {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 14px;
+/* Provenance — a quiet marker keeping the recommendation honest after the
+   "Decision required" relabel: it names WHERE the pick came from (the single
+   assisted call), tying it to the hinge line. Mono, dim, not by colour. */
+.rx-d-provenance {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
   font-family: var(--font-mono);
-}
-.rx-d-join-num {
-  font-size: clamp(52px, 8vw, 96px);
-  font-weight: 600;
-  line-height: 1;
-  color: var(--rx-white);
-}
-.rx-d-join-unit {
-  font-size: clamp(18px, 2.4vw, 28px);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--rx-light-silver);
-}
-.rx-d-join-cap {
-  margin: 14px 0 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--rx-d-dim);
 }
+.rx-d-provenance-dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--rx-light-silver);
+}
+/* Our plain-language reason — NOT engine output. Marked as ours with the same
+   hairline + tag treatment as the "in plain terms" gloss above, so the two
+   read as one authored layer distinct from the verbatim engine text. */
+.rx-d-reason {
+  display: block;
+  margin-top: 9px;
+  padding-left: 12px;
+  border-left: 1px solid var(--rx-d-line);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rx-d-dim);
+}
+.rx-d-reason-tag {
+  display: inline-block;
+  margin-right: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
 
-/* ===================== Beat B — the proof ===================== */
+/* ===================== the hinge ===================== */
+/* The line that JOINS the two sides. No card, no border, no icon; centred in
+   its own column and floated to the vertical middle so it pivots between the
+   one assisted decision (left) and the mechanical proof (right). The generous
+   empty space around it is the argument. */
+.rx-d-join {
+  align-self: center;
+  justify-self: center;
+  text-align: center;
+  padding: clamp(20px, 4vh, 56px) clamp(6px, 1vw, 18px);
+}
+.rx-d-join-line {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(23px, 2.7vw, 36px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+  text-wrap: balance;
+}
+/* The exact figure, read from the data — mono + tabular. Kept small beneath the
+   worded statement so the prose leads and the number substantiates. */
+.rx-d-join-cap {
+  margin: 14px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--rx-d-dim);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ===================== the proof (right) ===================== */
 .rx-d-proof-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px 44px;
+  gap: 18px 28px;
   align-items: flex-start;
 }
 .rx-d-metric {
@@ -286,18 +349,13 @@
 /* Verified figures carry weight over the prediction — via size + contrast, not
    colour. tsc / Metro / validated are bright and bold; predicted is recessed. */
 .rx-d-verified .rx-d-metric-value {
-  font-size: clamp(30px, 3.4vw, 44px);
+  font-size: clamp(24px, 2.4vw, 34px);
   font-weight: 600;
   color: var(--rx-white);
 }
-.rx-d-predicted .rx-d-metric-value {
-  font-size: clamp(22px, 2.4vw, 30px);
-  font-weight: 400;
-  color: var(--rx-d-faint);
-}
 /* the validated headline is the heaviest thing in the row */
 .rx-d-headline .rx-d-metric-value {
-  font-size: clamp(38px, 4.4vw, 58px);
+  font-size: clamp(32px, 3.4vw, 46px);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -311,24 +369,43 @@
   text-transform: none;
   color: var(--rx-d-faint);
 }
-/* the stricter lens — quiet but genuinely visible, no hover, no tooltip */
-.rx-d-strict {
-  margin-top: 8px;
+/* Secondary treatment — the prediction and the stricter lens. Quiet but
+   genuinely visible (no hover, no tooltip): the prediction is a distinct
+   measurement kept out of the headline, and the strict figure keeps its lens
+   label so no bare "100%" over-claims. */
+.rx-d-proof-secondary {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rx-d-sub {
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--rx-d-dim);
 }
-.rx-d-strict .tnum {
+.rx-d-sub .tnum {
   color: var(--rx-light-silver);
 }
-.rx-d-proof-note {
-  margin: 22px 0 0;
-  max-width: 62ch;
+/* The four-line summary — the argument in plain words. The first line frames
+   the two measurements; the three affirmations state what validation proved. */
+.rx-d-proof-lines {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--rx-d-line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   font-family: var(--font-sans);
   font-size: 13px;
-  line-height: 1.55;
-  color: var(--rx-d-dim);
+  line-height: 1.5;
+  color: var(--rx-d-faint);
+}
+.rx-d-proof-lines li:first-child {
+  color: var(--rx-white);
 }
 
 /* --- attribution (matches Scene 01) --- */

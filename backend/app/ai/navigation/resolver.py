@@ -231,7 +231,7 @@ def build_shape_question(spec: NavigatorSpec, nav_ui: NavUiSummary) -> Question:
     ]
     return Question(
         id="navigator-shape",
-        title="Which navigator shape should the app use?",
+        title="Which navigation structure should the app use?",
         context=(
             f"The source nav ('{nav_ui.component}') has {len(nav_ui.links)} top-level "
             f"link(s). Rejox proposes a **{proposed}** navigator: {spec.rationale}"
