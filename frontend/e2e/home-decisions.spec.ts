@@ -121,9 +121,13 @@ test.describe('Home / Decisions section', () => {
     await page.screenshot({ path: 'test-results/decisions-coexist-pin.png', animations: 'disabled' })
 
     // The CTA's ScrollReveal still fires after scrolling past BOTH sections.
+    // Park the first word in its sharp hold zone (top ~45% of the viewport: the
+    // entrance is complete and the exit fade has not begun), which is robust to
+    // the page height — the footer added below the CTA extends max-scroll, so an
+    // old fixed offset near the very top would land in the exit fade instead.
     const firstWord = page.locator('.rx-cta-word .word').first()
     const wordTop = await firstWord.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)
-    await page.evaluate((y) => window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }), wordTop - 120)
+    await page.evaluate((y) => window.scrollTo({ top: y - window.innerHeight * 0.45, behavior: 'instant' as ScrollBehavior }), wordTop)
     await page.waitForTimeout(400)
     await expect(understanding).toHaveAttribute('data-pinned', 'false') // scrolled past the pin
     await expect
@@ -144,6 +148,45 @@ test.describe('Home / Decisions section', () => {
     await section(page).scrollIntoViewIfNeeded()
     await page.waitForTimeout(800)
     await section(page).screenshot({ path: 'test-results/decisions-section.png' })
+  })
+
+  test('the three proof figures sit on one row and the proof card keeps its height', async ({ page }) => {
+    await gotoHome(page)
+    await section(page).scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
+
+    const m = await page.evaluate(() => {
+      const vals = Array.from(document.querySelectorAll('.rx-d-metric-value')).map(
+        (v) => v.getBoundingClientRect().top,
+      )
+      return {
+        valueTops: vals,
+        valueTopSpread: Math.max(...vals) - Math.min(...vals),
+        proofHeight: document.querySelector('.rx-d-proof')!.getBoundingClientRect().height,
+      }
+    })
+
+    // The height of the proof card BEFORE this session's change, measured at
+    // 1440×900. The three figures moving from two rows to one freed vertical
+    // space, which was recovered (enlarged summary line + spacing) so the card's
+    // outer height is unchanged.
+    const PROOF_HEIGHT_BEFORE = 416
+    // eslint-disable-next-line no-console
+    console.log(
+      `[e2e] Scene02 proof: valueTopSpread=${m.valueTopSpread.toFixed(2)}px ` +
+        `proofHeight before=${PROOF_HEIGHT_BEFORE} after=${m.proofHeight.toFixed(2)}`,
+    )
+
+    // (1) All three figure values share a vertical position → one row.
+    expect(m.valueTops).toHaveLength(3)
+    expect(m.valueTopSpread).toBeLessThanOrEqual(1)
+
+    // (2) The proof card's outer height is unchanged from before this session.
+    expect(Math.abs(m.proofHeight - PROOF_HEIGHT_BEFORE)).toBeLessThanOrEqual(1)
+
+    // (3) The section is still exactly one viewport tall.
+    const secH = await section(page).evaluate((el) => el.getBoundingClientRect().height)
+    expect(secH).toBe(DESKTOP.height)
   })
 
   test('the decision card and the "1 LLM call" line finish level (columns bottom-aligned)', async ({ page }) => {

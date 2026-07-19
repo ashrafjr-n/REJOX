@@ -235,9 +235,13 @@ test.describe('Home / Understanding section', () => {
     await scrollTo(page, wordTop - (ih - 140))
     expect(await opacity()).toBeLessThan(0.6)
 
-    // AFTER: scroll the word up past ScrollReveal's entrance end ('top center')
-    // → fully revealed. Reaching here means we scrolled through the entire pin.
-    await scrollTo(page, wordTop - 120)
+    // AFTER: park the word in its sharp hold zone (top ~45% of the viewport: past
+    // the entrance end, before the exit fade) → fully revealed. Reaching here means
+    // we scrolled through the entire pin. Using a viewport-relative offset (not a
+    // fixed near-top offset) keeps this robust to page height: the footer added
+    // below the CTA extends max-scroll, so a near-top offset would now land the
+    // word in its (unchanged) exit opacity-fade instead of the revealed hold zone.
+    await scrollTo(page, wordTop - Math.round(ih * 0.45))
     await expect(section(page)).toHaveAttribute('data-pinned', 'false')
     await expect.poll(opacity, { timeout: 8000 }).toBeGreaterThan(0.9)
 

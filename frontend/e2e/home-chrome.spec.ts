@@ -148,21 +148,29 @@ test.describe('Home / header logo', () => {
 })
 
 test.describe('Home / CTA word reveal', () => {
-  test('every word is zero-blur and full-opacity across the middle band', async ({ page }) => {
+  test('every word is sharp while centred (entrance unchanged) AND sharp while exiting above centre', async ({ page }) => {
     await gotoHome(page)
     const count = await page.locator('.rx-cta-word .word').count()
     expect(count).toBe(4)
 
     const maxScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)
-    // Per word: worst blur / worst opacity observed while its center is in-band,
-    // and whether it reached the band at all (so the assertion is not vacuous).
-    const worstBlur = new Array(count).fill(0)
-    const worstOpacity = new Array(count).fill(1)
+    // Per word, over a full-page scroll sweep:
+    //  - the entrance (centred, band 30–70%): worst blur / worst opacity — must be
+    //    0 / 1, proving the entrance is UNCHANGED;
+    //  - the exit (above the viewport centre, ≤ 45%): worst blur — must be 0,
+    //    proving the exit no longer blurs. We also record whether a word actually
+    //    reached the exit region while fading (opacity < 1), so the exit claim is
+    //    demonstrated on real exits, not just vacuously true.
+    const bandBlur = new Array(count).fill(0)
+    const bandOpacity = new Array(count).fill(1)
     const reachedBand = new Array(count).fill(false)
+    const exitBlur = new Array(count).fill(0)
+    const exitFadingSharp = new Array(count).fill(false) // reached exit region with opacity<1 and blur 0
+    const highestCenter = new Array(count).fill(101)
 
-    for (let y = 0; y <= maxScroll; y += 60) {
+    for (let y = 0; y <= maxScroll; y += 40) {
       await page.evaluate((yy) => window.scrollTo({ top: yy, behavior: 'instant' as ScrollBehavior }), y)
-      await page.waitForTimeout(16)
+      await page.waitForTimeout(14)
       const snap = await page.evaluate(() => {
         const ws = document.querySelectorAll<HTMLElement>('.rx-cta-word .word')
         return Array.from(ws).map((w) => {
@@ -174,10 +182,16 @@ test.describe('Home / CTA word reveal', () => {
         })
       })
       snap.forEach((s, i) => {
+        highestCenter[i] = Math.min(highestCenter[i], s.center)
         if (s.center >= BAND.top && s.center <= BAND.bottom) {
           reachedBand[i] = true
-          worstBlur[i] = Math.max(worstBlur[i], s.blur)
-          worstOpacity[i] = Math.min(worstOpacity[i], s.opacity)
+          bandBlur[i] = Math.max(bandBlur[i], s.blur)
+          bandOpacity[i] = Math.min(bandOpacity[i], s.opacity)
+        }
+        if (s.center <= 45) {
+          // At or above the viewport centre → the exit region.
+          exitBlur[i] = Math.max(exitBlur[i], s.blur)
+          if (s.opacity < 0.999 && s.blur === 0) exitFadingSharp[i] = true
         }
       })
     }
@@ -185,22 +199,68 @@ test.describe('Home / CTA word reveal', () => {
     const labels = ['Upload', 'Wait', 'Review', 'Ship']
     labels.forEach((label, i) => {
       // eslint-disable-next-line no-console
-      console.log(`[e2e] CTA ${label}: reachedBand=${reachedBand[i]} worstBlur=${worstBlur[i].toFixed(3)}px worstOpacity=${worstOpacity[i].toFixed(3)}`)
+      console.log(
+        `[e2e] CTA ${label}: centred[blur=${bandBlur[i].toFixed(3)} op=${bandOpacity[i].toFixed(3)}] ` +
+          `exit[blur=${exitBlur[i].toFixed(3)} fadingSharp=${exitFadingSharp[i]}] highestCenter=${highestCenter[i].toFixed(1)}%`,
+      )
+      // Entrance unchanged: sharp + fully opaque while centred.
       expect(reachedBand[i], `${label} never reached the middle band`).toBe(true)
-      expect(worstBlur[i], `${label} blurred inside the middle band`).toBe(0)
-      expect(worstOpacity[i], `${label} faded inside the middle band`).toBe(1)
+      expect(bandBlur[i], `${label} blurred while centred`).toBe(0)
+      expect(bandOpacity[i], `${label} faded while centred`).toBe(1)
+      // Exit no longer blurs: zero blur anywhere at/above the viewport centre.
+      expect(exitBlur[i], `${label} blurred while exiting above centre`).toBe(0)
     })
 
-    // Screenshot of the last word ("Ship.") at its most-centred reachable position,
-    // proving it renders sharp.
+    // …and prove the exit claim on a real exit: the top word ("Upload") rises well
+    // above the centre and into the opacity-fade (its opacity drops) while staying
+    // perfectly sharp — the direct demonstration that the exit no longer blurs.
+    // (The lower words are progressively clamped toward the centre by the page
+    // bottom — Wait ~34%, Review ~47%, Ship ~60% — so only Upload reaches deep
+    // enough to fade; all four are asserted sharp wherever they do reach, above.)
+    expect(exitFadingSharp[0], 'Upload should exit above centre while fading, and stay sharp').toBe(true)
+
+    // Screenshot the exit: the words scrolled above centre, fading yet sharp.
     await page.evaluate(() => {
-      const ws = document.querySelectorAll<HTMLElement>('.rx-cta-word .word')
-      const s = ws[ws.length - 1]
-      const r = s.getBoundingClientRect()
-      window.scrollTo({ top: window.scrollY + r.top + r.height / 2 - window.innerHeight / 2, behavior: 'instant' as ScrollBehavior })
+      const w = document.querySelectorAll<HTMLElement>('.rx-cta-word .word')[0]
+      const r = w.getBoundingClientRect()
+      window.scrollTo({ top: window.scrollY + r.top - window.innerHeight * 0.12, behavior: 'instant' as ScrollBehavior })
     })
     await page.waitForTimeout(300)
-    await page.locator('.rx-cta').screenshot({ path: 'test-results/cta-ship-sharp.png' })
+    await page.locator('.rx-cta').screenshot({ path: 'test-results/cta-exit-sharp.png' })
+  })
+})
+
+test.describe('Home / footer', () => {
+  test('is a thin quiet sign-off at the very bottom, after the CTA', async ({ page }) => {
+    await gotoHome(page)
+    const footer = page.locator('.rx-footer')
+    await expect(footer).toHaveCount(1)
+
+    // It is the last element on the page, below the CTA.
+    const order = await page.evaluate(() => {
+      const cta = document.querySelector('.rx-cta')!
+      const foot = document.querySelector('.rx-footer')!
+      return {
+        afterCta: !!(cta.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING),
+        isLast: foot === document.querySelector('.rx-home')!.lastElementChild,
+      }
+    })
+    expect(order.afterCta).toBe(true)
+    expect(order.isLast).toBe(true)
+
+    // Plain-text wordmark + a copyright line for 2026; no logo/icon inside.
+    await expect(page.locator('.rx-footer-mark')).toHaveText('rejox')
+    expect(await page.locator('.rx-footer-copy').textContent()).toContain('2026')
+    expect(await footer.locator('img, svg').count()).toBe(0)
+
+    // A thin strip — short in height.
+    await footer.scrollIntoViewIfNeeded()
+    const height = await footer.evaluate((el) => el.getBoundingClientRect().height)
+    // eslint-disable-next-line no-console
+    console.log(`[e2e] footer height=${height.toFixed(1)}px`)
+    expect(height).toBeLessThan(72)
+
+    await footer.screenshot({ path: 'test-results/footer.png' })
   })
 })
 
@@ -217,13 +277,14 @@ test.describe('Home / reduced motion', () => {
     await scrollTo(page, uTop + 400)
     expect(await hiddenAttr(page)).toBe('true')
 
-    // Nothing hidden: the Scene 02 blocks are all fully visible.
+    // Nothing hidden: the Scene 02 blocks and the footer are all fully visible.
     const opac = await page.evaluate(() =>
-      ['.rx-d-decision', '.rx-d-join', '.rx-d-proof', '.rx-d-attribution'].map(
+      ['.rx-d-decision', '.rx-d-join', '.rx-d-proof', '.rx-d-attribution', '.rx-footer', '.rx-footer-mark', '.rx-footer-copy'].map(
         (s) => parseFloat(getComputedStyle(document.querySelector(s)!).opacity),
       ),
     )
     opac.forEach((o) => expect(o).toBeGreaterThan(0.9))
+    await expect(page.locator('.rx-footer')).toBeVisible()
 
     // Logo click JUMPS to the top instead of smooth-scrolling: after a short wait
     // (far less than the ~0.9s smooth animation) it is already there.

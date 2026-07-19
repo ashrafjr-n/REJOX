@@ -217,6 +217,22 @@ function ClosingCta() {
   )
 }
 
+/* ============================================================================
+ * Footer — a quiet sign-off at the very bottom, after the CTA. Deliberately
+ * minimal: the plain-text wordmark and a copyright line on one thin strip, the
+ * least prominent thing on the page (lighter/smaller than the scenes'
+ * attribution lines). Transparent background so the settled black shows through;
+ * a single hairline above lets it settle without reading as its own section.
+ * ==========================================================================*/
+function SiteFooter() {
+  return (
+    <footer className="rx-footer">
+      <span className="rx-footer-mark">rejox</span>
+      <span className="rx-footer-copy">© 2026 Rejox. All rights reserved.</span>
+    </footer>
+  )
+}
+
 export function Home() {
   const headerHidden = useHeaderAutoHide()
 
@@ -417,9 +433,11 @@ export function Home() {
           by the whole-run LLM count. Reveal-on-scroll, not pinned. */}
       <Decisions />
 
-      {/* Closing CTA — the last thing on the page: a four-word summary of the
-          flow + START MIGRATION. */}
+      {/* Closing CTA — a four-word summary of the flow + START MIGRATION. */}
       <ClosingCta />
+
+      {/* Footer — the quiet sign-off at the very bottom. */}
+      <SiteFooter />
     </div>
   )
 }
