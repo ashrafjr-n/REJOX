@@ -14,10 +14,13 @@
 
 .rx-understanding {
   /* Own tokens, scoped to the section. Greys are derived from the existing
-     --rx-white / --rx-light-silver ladder; no new brand colours. */
-  --rx-u-dim: rgba(255, 255, 255, 0.4);
+     --rx-white / --rx-light-silver ladder; no new brand colours. Values are
+     kept identical to Scene 02 so the two sections read as one system. */
+  --rx-u-dim: rgba(255, 255, 255, 0.42);
   --rx-u-line: rgba(255, 255, 255, 0.14);
   --rx-u-line-active: rgba(255, 255, 255, 0.7);
+  /* Shared eyebrow-rule brightness across the two new sections. */
+  --rx-u-eyebrow-rule: rgba(255, 255, 255, 0.5);
   /* Top padding clears the fixed header capsule (top: 20px + ~42px logo, plus
      breathing room) when the section is pinned to the top of the viewport. */
   --rx-u-pad-top: 104px;
@@ -47,20 +50,22 @@
    rule is an orange→pink gradient; here the palette is strict, so the rule is
    a plain near-white hairline. --- */
 .rx-u-eyebrow {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 .rx-u-eyebrow .rx-rule {
-  background: var(--rx-u-line-active);
+  background: var(--rx-u-eyebrow-rule);
 }
 
 /* --- heading: site sans, large but restrained. Exactly one accent word. --- */
 .rx-u-heading {
-  margin: 0 0 24px;
+  /* Harmonized section-heading scale + rhythm (identical to Scene 02). Capped
+     toward the smaller end so the pinned scene keeps vertical headroom. */
+  margin: 0 0 clamp(26px, 3.5vh, 40px);
   max-width: 20ch;
   font-family: var(--font-sans);
-  font-size: clamp(30px, 3.4vw, 52px);
+  font-size: clamp(28px, 3.2vw, 46px);
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1.12;
   letter-spacing: -0.01em;
   color: var(--rx-white);
 }
@@ -244,6 +249,19 @@
 .rx-u-llm {
   flex: 0 0 auto;
 }
+/* Its scope line — the whole-run count, so the phase figure is never misread. */
+.rx-u-llm-sub {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rx-u-dim);
+}
+.rx-u-llm-sub .tnum {
+  color: var(--rx-light-silver);
+}
 .rx-u-readout-note {
   flex-basis: 100%;
   margin: 4px 0 0;
@@ -296,9 +314,10 @@
   color: var(--rx-u-dim);
 }
 
-/* --- attribution: quiet prose, with the identifier in mono. --- */
+/* --- attribution: quiet prose, with the identifier in mono. A little space
+   above so it separates from the beat-specific readout note (they were glued). --- */
 .rx-u-attribution {
-  margin: 0;
+  margin: 12px 0 0;
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.5;

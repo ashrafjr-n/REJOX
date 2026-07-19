@@ -394,10 +394,16 @@ export default function Understanding() {
             </div>
           </div>
 
-          {/* Always visible — the understanding phase's real LLM count. */}
+          {/* Always visible — the understanding phase's real LLM count, with its
+              scope made explicit: this figure is the reading phase only; the
+              whole run's count (sourced from the same data) is stated beside it,
+              so 0 is never read as "the whole migration used none". */}
           <div className="rx-u-metric rx-u-llm">
             <dt className="rx-u-metric-value tnum">{understandingLlmCalls}</dt>
-            <dd className="rx-u-metric-label">LLM calls</dd>
+            <dd className="rx-u-metric-label">LLM calls · understanding</dd>
+            <dd className="rx-u-llm-sub">
+              whole run · <span className="tnum">{data.results.llmCalls}</span>
+            </dd>
           </div>
         </dl>
 
