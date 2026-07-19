@@ -146,6 +146,24 @@ test.describe('Home / Decisions section', () => {
     await section(page).screenshot({ path: 'test-results/decisions-section.png' })
   })
 
+  test('the decision card and the "1 LLM call" line finish level (columns bottom-aligned)', async ({ page }) => {
+    await gotoHome(page)
+    await section(page).scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
+    const bottoms = await page.evaluate(() => {
+      const dec = document.querySelector('.rx-d-decision')!.getBoundingClientRect()
+      // The joining unit's LAST line is the "N LLM call · entire migration" cap.
+      const cap = document.querySelector('.rx-d-join-cap')!.getBoundingClientRect()
+      return { decisionBottom: dec.bottom, llmLineBottom: cap.bottom }
+    })
+    const diff = Math.abs(bottoms.decisionBottom - bottoms.llmLineBottom)
+    // Achieved through the layout (stretched right column + join pushed to its
+    // bottom), not a hard-coded height — so the two columns finish level.
+    // eslint-disable-next-line no-console
+    console.log(`[e2e] Scene02 bottoms: decisionCard=${bottoms.decisionBottom.toFixed(1)} llmLine=${bottoms.llmLineBottom.toFixed(1)} diff=${diff.toFixed(2)}px`)
+    expect(diff).toBeLessThanOrEqual(2)
+  })
+
   test('"AI was needed once." renders on a single line', async ({ page }) => {
     await gotoHome(page)
     await page.locator('.rx-d-join').scrollIntoViewIfNeeded()

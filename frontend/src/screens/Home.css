@@ -113,6 +113,43 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  /* Auto-hide slides the whole capsule up out of the way and back. We animate
+     `top` (not transform) on purpose: the entrance uses framer-motion, which
+     owns the element's inline `transform`, so a transform-based hide would lose
+     to it. `top` is untouched by framer, so the two never fight. House easing,
+     quick — chrome getting out of the way, not an animation. */
+  transition: top 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Hidden state: parked fully above the viewport top edge (past its own height +
+   the 20px inset). Not interactive while hidden. Appearance is otherwise
+   untouched — only its position changes. */
+.rx-header.is-hidden {
+  top: -80px;
+  pointer-events: none;
+}
+/* Reduced motion: snap between shown/hidden instead of sliding. */
+@media (prefers-reduced-motion: reduce) {
+  .rx-header {
+    transition: none;
+  }
+}
+
+/* The logo is now a real button (scroll-to-top). It must be completely
+   transparent to layout and paint so the mark looks and sits exactly as before:
+   no padding/border/background/line-box of its own. Cursor + focusability only;
+   the keyboard focus ring (focus-visible) is intentionally kept for a11y and
+   never shows at rest. */
+.rx-logo-btn {
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  line-height: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  color: inherit;
 }
 
 .rx-logo {
