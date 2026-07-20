@@ -45,7 +45,7 @@
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--rx-orange);
+  color: var(--rx-pink);
 }
 .rx-arch-title {
   margin: 0 0 28px;
@@ -93,7 +93,7 @@
   font-size: 0.95rem;
   line-height: 1.6;
   color: var(--rx-light-silver);
-  border-left: 2px solid var(--rx-orange);
+  border-left: 2px solid var(--rx-pink);
   padding-left: 14px;
 }
 
@@ -125,7 +125,7 @@
   color: var(--rx-light-silver);
 }
 .rx-arch-node--py {
-  border-color: rgba(255, 106, 0, 0.4);
+  border-color: rgba(255, 159, 252, 0.4);
 }
 .rx-arch-wire {
   align-self: center;
@@ -188,15 +188,15 @@
 .rx-arch-stage-n {
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  color: var(--rx-orange);
+  color: var(--rx-pink);
 }
 .rx-arch-stage-calls {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   white-space: nowrap;
   color: var(--rx-white);
-  background: rgba(255, 106, 0, 0.14);
-  border: 1px solid rgba(255, 106, 0, 0.4);
+  background: rgba(255, 159, 252, 0.14);
+  border: 1px solid rgba(255, 159, 252, 0.4);
   padding: 3px 9px;
   border-radius: 999px;
 }
@@ -366,8 +366,8 @@
   border-color: rgba(143, 184, 255, 0.4);
 }
 .rx-arch-method.m-assisted {
-  color: var(--rx-orange);
-  border-color: rgba(255, 106, 0, 0.45);
+  color: var(--rx-pink);
+  border-color: rgba(255, 159, 252, 0.45);
 }
 .rx-arch-method.m-manual {
   color: var(--rx-light-silver);
