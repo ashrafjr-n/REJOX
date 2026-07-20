@@ -187,6 +187,9 @@
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
+  /* Items with a route render as react-router <Link> (an <a>); items without one
+     stay <button>. This keeps the two visually identical — no anchor underline. */
+  text-decoration: none;
   transition: background-color 0.18s ease, color 0.18s ease;
 }
 .rx-nav-item:hover {
