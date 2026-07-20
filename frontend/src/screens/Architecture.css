@@ -25,7 +25,10 @@
   --rx-frame-pad: 26px;
   --rx-hairline: rgba(255, 255, 255, 0.12);
 
-  background: var(--rx-black);
+  /* Pure black to match the home page's settled background under the hero
+     (which resolves to #000), rather than the slightly-lighter --rx-black
+     (#050505) base. */
+  background: #000;
   color: var(--rx-white);
   font-family: var(--font-sans);
 }
