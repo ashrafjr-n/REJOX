@@ -669,6 +669,17 @@
   padding: 16px var(--rx-frame-inset);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   font-family: var(--font-sans);
+  /* The CTA above is a 100vh section with its content vertically centred, so by
+     construction a tall band of dead space sits below the button before this
+     footer. We lift the footer up into that dead space with a negative top
+     margin — the footer's own top spacing — leaving the CTA pixel-identical.
+     The lift is capped at just under the footer's own height: the CTA box still
+     reserves a full 100vh, so pulling the footer up by more than its height
+     would raise its bottom edge above the CTA's box bottom and leave a black
+     strip beneath the footer. The footer is a deterministic ~52.5px tall, so
+     -50px reclaims very nearly a full footer-height of the gap while staying
+     flush with the page's bottom edge (a ~2.5px safety buffer). */
+  margin-top: -50px;
 }
 .rx-footer-mark {
   font-size: 13px;
