@@ -1,8 +1,4 @@
-import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { gsap } from 'gsap'
-import { ScrollToPlugin } from 'gsap/ScrollToPlugin'
-import { CustomEase } from 'gsap/CustomEase'
 
 import './Home.css'
 import BorderGlow from './BorderGlow'
@@ -10,7 +6,7 @@ import LightPillar from './LightPillar'
 import ScrollReveal from './ScrollReveal'
 import Understanding from './Understanding'
 import Decisions from './Decisions'
-import rejoxLogo from '../assets/rejox-logo.svg'
+import { SiteHeader } from '../components/SiteHeader'
 
 /**
  * Rejox marketing home — a static hero followed by a closing call-to-action.
@@ -38,75 +34,6 @@ import rejoxLogo from '../assets/rejox-logo.svg'
  * either), so it stays visible across the whole page. Everything is scoped
  * under `.rx-home`; the /app workflow is untouched.
  */
-
-gsap.registerPlugin(ScrollToPlugin, CustomEase)
-
-// The page's house easing — the same cubic-bezier(0.22, 1, 0.36, 1) the hero
-// entrances and header transitions use — so the logo's scroll-to-top speaks the
-// same motion language as the rest of the page. Registered under its own name so
-// it never collides with the Scene 02 module's 'rxHouse'.
-const HOME_HOUSE_EASE = CustomEase.create('rxHomeHouse', 'M0,0 C0.22,1 0.36,1 1,1')
-
-const NAV_ITEMS = ['Home', 'Architecture', 'Docs']
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-}
-
-/**
- * Header auto-hide: while the hero fills the viewport the header is always
- * visible; once scrolled past the hero, scrolling DOWN hides it (chrome getting
- * out of the way) and scrolling UP by any meaningful amount brings it straight
- * back — the user never has to return to the top. A small threshold swallows
- * trackpad jitter/momentum so the state never flickers.
- *
- * It reads window.scrollY only (the header is position:fixed, a sibling of the
- * pinned Scene 01, so the pin's spacer/transform never moves it): direction
- * detection works identically in normal flow and while the pinned section is
- * active. The actual hide/show transition (or the reduced-motion snap) is CSS.
- */
-function useHeaderAutoHide(): boolean {
-  const [hidden, setHidden] = useState(false)
-
-  useEffect(() => {
-    // Movement (in px) required before the header commits to a new state — large
-    // enough that jitter and momentum tails don't toggle it, small enough that a
-    // deliberate flick reveals it immediately.
-    const THRESHOLD = 8
-    let lastY = window.scrollY
-    let ticking = false
-
-    const update = () => {
-      ticking = false
-      const y = window.scrollY
-      // Hero is one viewport tall; while it is still on screen keep the header.
-      const heroInView = y <= window.innerHeight
-      if (heroInView) {
-        lastY = y
-        setHidden(false)
-        return
-      }
-      const delta = y - lastY
-      if (Math.abs(delta) < THRESHOLD) return // within jitter band — accumulate
-      setHidden(delta > 0) // scrolling down hides; up reveals
-      lastY = y
-    }
-
-    const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(update)
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  return hidden
-}
 
 function ArrowRight() {
   return (
@@ -234,20 +161,6 @@ function SiteFooter() {
 }
 
 export function Home() {
-  const headerHidden = useHeaderAutoHide()
-
-  // Logo → back to the hero. Smooth, house-eased scroll that matches the page's
-  // motion language; reduced-motion jumps instead of animating. Structured so
-  // that pointing the logo at the home route later is a one-line swap (turn the
-  // <button> into a react-router <Link to="/">).
-  const handleLogoClick = () => {
-    if (prefersReducedMotion()) {
-      window.scrollTo({ top: 0 }) // jump, no animation
-      return
-    }
-    gsap.to(window, { duration: 0.9, ease: HOME_HOUSE_EASE, scrollTo: { y: 0 } })
-  }
-
   return (
     <div className="rx-home">
       {/* WebGL light-pillar background — a single fixed, full-viewport layer
@@ -274,49 +187,12 @@ export function Home() {
         />
       </div>
 
-      {/* ---------- floating capsule header: fixed to the viewport, sibling
-          of both the hero and the closing CTA so it stays visible for the
-          whole page. ---------- */}
-      <motion.header
-        className={'rx-header' + (headerHidden ? ' is-hidden' : '')}
-        data-hidden={headerHidden ? 'true' : 'false'}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      >
-        {/* Logo is a real interactive control (keyboard-focusable, labelled) that
-            returns to the hero. Purely a behaviour/semantics change — the button
-            is transparent to layout and paint (no padding/border/background), so
-            the logo looks and sits exactly as before. To point it at the home
-            route later, swap this <button> for <Link to="/"> — one line. */}
-        <button
-          type="button"
-          className="rx-logo-btn"
-          onClick={handleLogoClick}
-          aria-label="Rejox — back to top"
-        >
-          <img className="rx-logo" src={rejoxLogo} alt="" />
-        </button>
-
-        <nav className="rx-nav" aria-label="Primary">
-          {NAV_ITEMS.map((item, i) => (
-            <button
-              key={item}
-              type="button"
-              className={
-                'rx-nav-item ' + (i === 0 ? 'is-active' : 'is-inactive')
-              }
-              aria-current={i === 0 ? 'page' : undefined}
-            >
-              {item}
-            </button>
-          ))}
-        </nav>
-
-        <button type="button" className="rx-cta-pill">
-          Login
-        </button>
-      </motion.header>
+      {/* Floating capsule header (logo, nav, Login) — fixed to the viewport,
+          sibling of both the hero and the closing CTA so it stays visible for
+          the whole page. Shared with the other marketing pages so it stays
+          identical everywhere; on `/` its logo scroll-to-top and Home active
+          state behave exactly as before. */}
+      <SiteHeader />
 
       <div className="rx-hero">
         <div className="rx-frame">

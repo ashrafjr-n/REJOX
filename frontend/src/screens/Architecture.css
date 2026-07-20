@@ -1,0 +1,445 @@
+/* /architecture — a static, single-column explainer.
+   Pure-black background; the shared header's Home.css supplies the --rx-* tokens
+   and --font-* comes from index.css, so this page wears the exact same type and
+   colour system as the home page. No scroll-driven scenes — only the one-shot
+   entry fade owned by framer-motion in Architecture.tsx. */
+
+.rx-arch {
+  position: relative;
+  min-height: 100vh;
+  /* The brand palette + spacing tokens are defined in Home.css scoped to
+     `.rx-home`, so they don't reach this page. Mirror them here (values kept in
+     sync with Home.css) so both this column AND the shared <SiteHeader/> nested
+     inside it inherit the exact same tokens. A shared tokens file would be the
+     clean way to dedupe these later. */
+  --rx-black: #050505;
+  --rx-orange: #ff6a00;
+  --rx-red: #c53322;
+  --rx-pink: #ff9ffc;
+  --rx-white: #ffffff;
+  --rx-dark-silver: #1c1c1f;
+  --rx-nav-item-bg: #2a2a2f;
+  --rx-light-silver: #c9c9ce;
+  --rx-frame-inset: 48px;
+  --rx-frame-inset-top: 78px;
+  --rx-frame-pad: 26px;
+  --rx-hairline: rgba(255, 255, 255, 0.12);
+
+  background: var(--rx-black);
+  color: var(--rx-white);
+  font-family: var(--font-sans);
+}
+
+/* One readable column. Top padding clears the fixed capsule header; side padding
+   matches the page frame inset. */
+.rx-arch-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(140px, 20vh, 200px) var(--rx-frame-inset) clamp(80px, 12vh, 140px);
+}
+
+/* ---- lede: the core principle as the page title ---- */
+.rx-arch-kicker {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-orange);
+}
+.rx-arch-title {
+  margin: 0 0 28px;
+  font-size: clamp(1.9rem, 4.2vw, 3rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+
+/* ---- shared prose ---- */
+.rx-arch-body {
+  margin: 0 0 16px;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--rx-light-silver);
+}
+.rx-arch-body:last-child {
+  margin-bottom: 0;
+}
+.rx-arch code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: var(--rx-white);
+  background: var(--rx-nav-item-bg);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* ---- sections ---- */
+.rx-arch-section {
+  margin-top: clamp(56px, 8vh, 88px);
+  padding-top: clamp(40px, 6vh, 64px);
+  border-top: 1px solid var(--rx-hairline);
+}
+.rx-arch-h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+.rx-arch-note {
+  margin: 20px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--rx-light-silver);
+  border-left: 2px solid var(--rx-orange);
+  padding-left: 14px;
+}
+
+/* ---- Python / Node diagram ---- */
+.rx-arch-diagram {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.rx-arch-node {
+  border: 1px solid var(--rx-hairline);
+  border-radius: 12px;
+  background: var(--rx-dark-silver);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rx-arch-node-t {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-arch-node-s {
+  font-size: 0.85rem;
+  color: var(--rx-light-silver);
+}
+.rx-arch-node--py {
+  border-color: rgba(255, 106, 0, 0.4);
+}
+.rx-arch-wire {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+}
+.rx-arch-wire::before,
+.rx-arch-wire::after {
+  content: '';
+  width: 1px;
+  height: 12px;
+  background: var(--rx-hairline);
+}
+.rx-arch-wire-l {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--rx-light-silver);
+  padding: 4px 0;
+  white-space: nowrap;
+}
+.rx-arch-workers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ---- pipeline stages ---- */
+.rx-arch-stages {
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rx-arch-stage {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rx-hairline);
+}
+.rx-arch-stage:last-child {
+  border-bottom: 0;
+}
+.rx-arch-stage-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.rx-arch-stage-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-arch-stage-n {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--rx-orange);
+}
+.rx-arch-stage-calls {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  color: var(--rx-white);
+  background: rgba(255, 106, 0, 0.14);
+  border: 1px solid rgba(255, 106, 0, 0.4);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.rx-arch-stage-calls.is-zero {
+  color: var(--rx-light-silver);
+  background: transparent;
+  border-color: var(--rx-hairline);
+}
+.rx-arch-stage-body {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--rx-light-silver);
+}
+
+/* ---- knowledge-graph stats ---- */
+.rx-arch-stats {
+  margin-top: 24px;
+  display: flex;
+  gap: 16px;
+}
+.rx-arch-stat {
+  flex: 1;
+  border: 1px solid var(--rx-hairline);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rx-arch-stat-n {
+  font-size: clamp(2.2rem, 6vw, 3rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--rx-white);
+}
+.rx-arch-stat-l {
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+.rx-arch-kinds {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 32px;
+}
+.rx-arch-kinds-t {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+.rx-arch-taglist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rx-arch-taglist li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--rx-light-silver);
+  border-bottom: 1px dashed var(--rx-hairline);
+  padding-bottom: 5px;
+}
+.rx-arch-taglist li span {
+  color: var(--rx-white);
+  font-weight: 600;
+}
+
+/* ---- resolution ladder ---- */
+.rx-arch-ladder {
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  counter-reset: rung;
+}
+.rx-arch-ladder li {
+  border: 1px solid var(--rx-hairline);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: var(--rx-dark-silver);
+}
+.rx-arch-rung {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--rx-white);
+  margin-bottom: 6px;
+}
+.rx-arch-ladder li p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--rx-light-silver);
+}
+
+/* ---- conversion-rules table ---- */
+.rx-arch-tablewrap {
+  margin-top: 24px;
+  overflow-x: auto;
+  border: 1px solid var(--rx-hairline);
+  border-radius: 12px;
+}
+.rx-arch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.rx-arch-table th,
+.rx-arch-table td {
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rx-hairline);
+  vertical-align: top;
+}
+.rx-arch-table thead th {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+}
+.rx-arch-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.rx-arch-table code {
+  background: none;
+  padding: 0;
+  color: var(--rx-white);
+  font-size: 0.82rem;
+  /* Wrap long patterns rather than forcing the table wider than its column and
+     pushing the Method badge out of view. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.rx-arch-method {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--rx-hairline);
+  color: var(--rx-light-silver);
+}
+.rx-arch-method.m-deterministic {
+  color: #7fe0a8;
+  border-color: rgba(127, 224, 168, 0.4);
+}
+.rx-arch-method.m-rule {
+  color: #8fb8ff;
+  border-color: rgba(143, 184, 255, 0.4);
+}
+.rx-arch-method.m-assisted {
+  color: var(--rx-orange);
+  border-color: rgba(255, 106, 0, 0.45);
+}
+.rx-arch-method.m-manual {
+  color: var(--rx-light-silver);
+  border-color: var(--rx-hairline);
+}
+
+/* ---- supported / unsupported ---- */
+.rx-arch-cols {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.rx-arch-col-t {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.rx-arch-col-t--ok {
+  color: #7fe0a8;
+}
+.rx-arch-col-t--no {
+  color: var(--rx-red);
+}
+.rx-arch-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rx-arch-list li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--rx-light-silver);
+}
+.rx-arch-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+/* ---- closing ---- */
+.rx-arch-closing {
+  margin-top: clamp(56px, 8vh, 88px);
+  padding-top: clamp(40px, 6vh, 64px);
+  border-top: 1px solid var(--rx-hairline);
+}
+.rx-arch-closing strong {
+  color: var(--rx-white);
+  font-weight: 600;
+}
+
+/* ---- narrow screens: collapse the two-column blocks ---- */
+@media (max-width: 620px) {
+  .rx-arch-workers,
+  .rx-arch-kinds,
+  .rx-arch-cols {
+    grid-template-columns: 1fr;
+  }
+  .rx-arch-stats {
+    flex-direction: column;
+  }
+}
