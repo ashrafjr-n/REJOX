@@ -228,7 +228,7 @@ function SiteFooter() {
   return (
     <footer className="rx-footer">
       <span className="rx-footer-mark">rejox</span>
-      <span className="rx-footer-copy">© 2026 Rejox. All rights reserved.</span>
+      <span className="rx-footer-copy">© 2026 All rights reserved.</span>
     </footer>
   )
 }
