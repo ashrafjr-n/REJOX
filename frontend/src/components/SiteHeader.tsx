@@ -26,7 +26,7 @@ const HOME_HOUSE_EASE = CustomEase.create('rxHomeHouse', 'M0,0 C0.22,1 0.36,1 1,
 const NAV_ITEMS: { label: string; to: string | null }[] = [
   { label: 'Home', to: '/' },
   { label: 'Architecture', to: '/architecture' },
-  { label: 'Docs', to: null },
+  { label: 'Docs', to: '/docs' },
 ]
 
 function prefersReducedMotion(): boolean {
