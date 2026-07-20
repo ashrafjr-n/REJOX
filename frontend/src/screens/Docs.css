@@ -97,8 +97,27 @@
   padding-top: 0;
   border-top: 0;
 }
-.rx-docs-stub {
-  scroll-margin-top: 120px;
+
+/* Aside/pointer note — a quiet left-ruled callout (matches the Architecture
+   page's note treatment). */
+.rx-docs-note {
+  margin: 20px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--rx-light-silver);
+  border-left: 2px solid var(--rx-pink);
+  padding-left: 14px;
+}
+
+/* Inline text link (e.g. the pointer to /architecture). */
+.rx-docs-inlink {
+  color: var(--rx-pink);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 159, 252, 0.4);
+  transition: border-color 0.15s ease;
+}
+.rx-docs-inlink:hover {
+  border-bottom-color: var(--rx-pink);
 }
 
 /* ---- type ---- */
