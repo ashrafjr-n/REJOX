@@ -47,7 +47,7 @@ gsap.registerPlugin(ScrollToPlugin, CustomEase)
 // it never collides with the Scene 02 module's 'rxHouse'.
 const HOME_HOUSE_EASE = CustomEase.create('rxHomeHouse', 'M0,0 C0.22,1 0.36,1 1,1')
 
-const NAV_ITEMS = ['Home', 'About', 'Docs', 'Features']
+const NAV_ITEMS = ['Home', 'Architecture', 'Docs']
 
 function prefersReducedMotion(): boolean {
   return (
