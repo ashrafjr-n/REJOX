@@ -1,0 +1,250 @@
+/* /docs — a classic two-column docs page (sticky sidebar + content column).
+   Reuses the /architecture shell: same pure-black base, --rx-* tokens, type
+   scale, and the one-shot entry fade owned by framer-motion in Docs.tsx. The
+   accent matches the current /architecture page (pink). */
+
+.rx-docs {
+  position: relative;
+  min-height: 100vh;
+  /* The brand tokens are defined in Home.css scoped to `.rx-home`, so they don't
+     reach this page. Mirror them here (in sync with Home.css / Architecture.css)
+     so this page AND the shared <SiteHeader/> nested inside it inherit the exact
+     same tokens. A shared tokens file would be the clean way to dedupe later. */
+  --rx-black: #050505;
+  --rx-orange: #ff6a00;
+  --rx-red: #c53322;
+  --rx-pink: #ff9ffc;
+  --rx-white: #ffffff;
+  --rx-dark-silver: #1c1c1f;
+  --rx-nav-item-bg: #2a2a2f;
+  --rx-light-silver: #c9c9ce;
+  --rx-frame-inset: 48px;
+  --rx-frame-inset-top: 78px;
+  --rx-frame-pad: 26px;
+  --rx-hairline: rgba(255, 255, 255, 0.12);
+
+  background: var(--rx-black);
+  color: var(--rx-white);
+  font-family: var(--font-sans);
+}
+
+/* Two columns: a fixed-width sidebar + a readable content column, centred as a
+   pair. Top padding clears the fixed capsule header; sides match the frame inset. */
+.rx-docs-main {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: clamp(140px, 20vh, 200px) var(--rx-frame-inset) clamp(80px, 12vh, 140px);
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+}
+
+/* ---- sidebar ---- */
+.rx-docs-sidebar {
+  position: sticky;
+  top: 120px;
+  align-self: start;
+}
+.rx-docs-eyebrow {
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+.rx-docs-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--rx-hairline);
+}
+.rx-docs-navlink {
+  padding: 7px 0 7px 16px;
+  margin-left: -1px;
+  border-left: 1px solid transparent;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  color: var(--rx-light-silver);
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.rx-docs-navlink:hover {
+  color: var(--rx-white);
+}
+.rx-docs-navlink.is-active {
+  color: var(--rx-white);
+  font-weight: 600;
+  border-left-color: var(--rx-pink);
+}
+
+/* ---- content column ---- */
+.rx-docs-content {
+  min-width: 0;
+  max-width: 720px;
+}
+
+/* Sections + anchor stubs land below the fixed header when jumped to. */
+.rx-docs-section {
+  scroll-margin-top: 120px;
+  margin-top: clamp(56px, 8vh, 88px);
+  padding-top: clamp(40px, 6vh, 64px);
+  border-top: 1px solid var(--rx-hairline);
+}
+.rx-docs-section--first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.rx-docs-stub {
+  scroll-margin-top: 120px;
+}
+
+/* ---- type ---- */
+.rx-docs-kicker {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rx-pink);
+}
+.rx-docs-title {
+  margin: 0 0 22px;
+  font-size: clamp(1.9rem, 4.2vw, 3rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+.rx-docs-h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+.rx-docs-h3 {
+  margin: 32px 0 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--rx-white);
+}
+.rx-docs-body {
+  margin: 0 0 16px;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--rx-light-silver);
+}
+.rx-docs-body:last-child {
+  margin-bottom: 0;
+}
+.rx-docs code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: var(--rx-white);
+  background: var(--rx-nav-item-bg);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* ---- command block ---- */
+.rx-docs-cmd {
+  margin: 0 0 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--rx-hairline);
+  border-radius: 12px;
+  background: var(--rx-dark-silver);
+  overflow-x: auto;
+}
+.rx-docs-cmd code {
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  color: var(--rx-white);
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  white-space: pre;
+}
+
+/* ---- ordered steps ---- */
+.rx-docs-steps {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rx-docs-steps li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 40px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--rx-light-silver);
+  min-height: 26px;
+}
+.rx-docs-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 159, 252, 0.45);
+  background: rgba(255, 159, 252, 0.14);
+  color: var(--rx-white);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+.rx-docs-steps strong,
+.rx-docs-list strong {
+  color: var(--rx-white);
+  font-weight: 600;
+}
+
+/* ---- unordered (limitations) ---- */
+.rx-docs-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rx-docs-list li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--rx-light-silver);
+}
+.rx-docs-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rx-pink);
+}
+
+/* ---- narrow screens: sidebar stacks above the content ---- */
+@media (max-width: 720px) {
+  .rx-docs-main {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .rx-docs-sidebar {
+    position: static;
+    top: auto;
+  }
+}

@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { Home } from './screens/Home.tsx'
 import { Architecture } from './screens/Architecture.tsx'
+import { Docs } from './screens/Docs.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -12,6 +13,7 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/architecture" element={<Architecture />} />
+        <Route path="/docs" element={<Docs />} />
         <Route path="/app" element={<App />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
