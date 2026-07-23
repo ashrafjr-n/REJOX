@@ -1,4 +1,4 @@
-# Rejox AI
+# Rejox
 
 **AI-assisted migration from React (web) to React Native.** Rejox resolves by
 rules whatever rules can resolve, and invokes AI only where genuine reasoning is
