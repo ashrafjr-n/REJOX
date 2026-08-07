@@ -40,7 +40,7 @@ yarn-error.log*
 *.swp
 
 # Claude Code local settings
-.claude/settings.local.json
+.claude
 
 # Uploads / working data
 uploads/
