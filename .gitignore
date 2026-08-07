@@ -54,3 +54,6 @@ tmp/
 
 # AI resolution cache (local SQLite)
 *.sqlite3
+
+
+CLAUDE.md
