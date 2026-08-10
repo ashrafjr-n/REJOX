@@ -92,7 +92,7 @@ export function PlanScreen() {
     return (
       <div className="flex flex-col items-center pt-24 text-center">
         <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-signal/20 border-t-signal" />
-        <div className="eyebrow mt-5">Stage 04 · Plan</div>
+        <div className="eyebrow mt-5">Stage 03 · Review</div>
         <p className="mt-2 text-[14px] text-ink-2">
           Ordering the migration into dependency waves…
         </p>
@@ -162,7 +162,7 @@ function PlanView({
     <div className="space-y-5">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <div className="eyebrow mb-2">Stage 04 · Migration Plan</div>
+          <div className="eyebrow mb-2">Stage 03 · Migration Plan</div>
           <h1 className="text-[24px] font-semibold tracking-tight text-ink">
             {steps.length} steps, {waves.length} dependency waves
           </h1>
