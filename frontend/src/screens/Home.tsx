@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 
 import './Home.css'
 import BorderGlow from './BorderGlow'
@@ -7,6 +8,7 @@ import ScrollReveal from './ScrollReveal'
 import Understanding from './Understanding'
 import Decisions from './Decisions'
 import { SiteHeader } from '../components/SiteHeader'
+import { usePipelineStore } from '../store/pipelineStore'
 
 /**
  * Rejox marketing home — a static hero followed by a closing call-to-action.
@@ -51,10 +53,23 @@ function ArrowRight() {
 
 /* The Start-migration pill. Rendered identically in the hero and the closing
    CTA, so it lives in one place — a pure markup move: same element structure,
-   class names, SVG and hover behaviour as the two former inline copies. */
+   class names, SVG and hover behaviour as the two former inline copies.
+   Because both instances are this one component, they share one click target:
+   clear any previous run out of the pipeline store (so "start" really starts at
+   the beginning) and enter the /app flow at its first step, Upload. */
 function StartButton() {
+  const navigate = useNavigate()
+  const reset = usePipelineStore((s) => s.reset)
+
   return (
-    <button type="button" className="rx-start">
+    <button
+      type="button"
+      className="rx-start"
+      onClick={() => {
+        reset()
+        navigate('/app')
+      }}
+    >
       <span className="rx-start-label">Start migration</span>
       <span className="rx-start-chip" aria-hidden="true">
         <ArrowRight />
