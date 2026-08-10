@@ -1,33 +1,146 @@
-import { useEffect, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
 
 import { ApiError, analyze } from '../api/rejox'
 import { Button } from '../components/ui/Button'
-import { AlertIcon } from '../components/icons'
+import { AlertIcon, CheckIcon, CircuitIcon } from '../components/icons'
+import { cn } from '../lib/cn'
+import { formatScore } from '../lib/display'
 import { usePipelineStore } from '../store/pipelineStore'
-import type { SourceRequest } from '../types/api'
+import type { AnalysisReport, SourceRequest } from '../types/api'
 
 /**
  * `/api/analyze` is a single blocking call — the backend gives us no per-stage
- * progress, so the UI must not pretend to know one. We show one honest
- * indeterminate state plus an elapsed-time counter, and list the passes the
- * engine performs as *static* text. Nothing is marked complete until the
- * backend actually returns the report (which advances us to the Report stage).
+ * progress, so the UI must not pretend to know one.
+ *
+ * Two phases, and the difference between them is the whole point:
+ *
+ *  1. **Waiting** — the request is genuinely in flight. One honest indeterminate
+ *     spinner plus an elapsed counter. Nothing is claimed to be finished.
+ *  2. **Reveal** — the response has *already landed*. Every line below is read
+ *     straight out of that response; the stagger is presentation, not progress,
+ *     so nothing on screen says "analyzing" once we are here. The elapsed time
+ *     freezes at what the engine actually took.
+ *
+ * The sequence ends on a Ready line and then hands off to the Migration Report.
+ * Under `prefers-reduced-motion` every line is shown at once (no stagger).
  */
-const PASSES = [
-  { label: 'Parsing source', detail: 'JSX / TSX → AST via the parser worker' },
-  { label: 'Building the knowledge graph', detail: 'components · routes · stores · endpoints' },
-  { label: 'Detecting libraries', detail: 'mapping dependencies to RN equivalents' },
-  { label: 'Scoring migratability', detail: 'Coverage · Confidence · Risk' },
-] as const
+
+/** Delay between revealed lines. Presentation only — the data is already here. */
+const STEP_MS = 360
+/** Beat the Ready line holds before the Report takes over. */
+const READY_HOLD_MS = 1100
+/** The house easing, as used by the marketing pages and the other screens. */
+const HOUSE_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+
+type FindingTone = 'fact' | 'transitional' | 'flag' | 'ready'
+
+interface Finding {
+  id: string
+  label: string
+  detail: string
+  tone: FindingTone
+}
+
+/**
+ * Turn the real `AnalysisReport` into the lines we narrate. Every value here is
+ * a field the response actually carries (or a count derived from one) — nothing
+ * is invented, and a line is omitted when the report has nothing to say.
+ */
+function buildFindings(report: AnalysisReport): Finding[] {
+  const s = report.summary
+  const libraries = report.libraries ?? []
+  const unsupported = libraries.filter((l) => l.status === 'unsupported')
+  const needsWork = libraries.filter(
+    (l) => l.status === 'needs-conversion' || l.status === 'partial',
+  )
+  const warnings = report.warnings ?? []
+  const blockers = report.blockers ?? []
+
+  const findings: Finding[] = [
+    {
+      id: 'project',
+      label: `Parsed ${report.projectName}`,
+      detail: `${libraries.length} ${libraries.length === 1 ? 'dependency' : 'dependencies'} scanned`,
+      tone: 'fact',
+    },
+    {
+      id: 'components',
+      label: `${s.componentCount} components`,
+      detail: `${s.pageCount} ${s.pageCount === 1 ? 'page' : 'pages'}`,
+      tone: 'fact',
+    },
+    {
+      id: 'routing',
+      label: report.routing.library
+        ? `${s.routeCount} routes · ${report.routing.library}`
+        : `${s.routeCount} routes · no router detected`,
+      detail: report.routing.hasParams
+        ? 'parameterised routes present'
+        : 'no route params',
+      tone: 'fact',
+    },
+    {
+      id: 'graph',
+      // The transitional beat between the raw counts and the notable findings.
+      // Past tense: by the time any of this is on screen the graph exists.
+      label: 'Knowledge graph built',
+      detail: `${s.apiEndpointCount} API endpoints · ${s.storeCount} ${s.storeCount === 1 ? 'store' : 'stores'}`,
+      tone: 'transitional',
+    },
+  ]
+
+  if (unsupported.length > 0) {
+    findings.push({
+      id: 'unsupported',
+      label: `${unsupported.length} unsupported ${unsupported.length === 1 ? 'library' : 'libraries'}`,
+      detail: unsupported.map((l) => l.name).join(' · '),
+      tone: 'flag',
+    })
+  } else if (needsWork.length > 0) {
+    findings.push({
+      id: 'libraries',
+      label: `${needsWork.length} libraries need conversion`,
+      detail: needsWork.map((l) => l.name).join(' · '),
+      tone: 'flag',
+    })
+  }
+
+  if (warnings.length > 0 || blockers.length > 0) {
+    findings.push({
+      id: 'issues',
+      label:
+        blockers.length > 0
+          ? `${blockers.length} ${blockers.length === 1 ? 'blocker' : 'blockers'} · ${warnings.length} warnings`
+          : `${warnings.length} ${warnings.length === 1 ? 'warning' : 'warnings'}`,
+      detail: blockers.length > 0 ? 'blocking issues found' : 'no blockers',
+      tone: 'flag',
+    })
+  }
+
+  findings.push({
+    id: 'ready',
+    label: 'Ready',
+    detail: `Coverage ${formatScore(report.coverage)} · Confidence ${formatScore(report.confidence)}`,
+    tone: 'ready',
+  })
+
+  return findings
+}
 
 export function AnalyzingScreen() {
   const ingest = usePipelineStore((s) => s.ingest)
   const selectedRoot = usePipelineStore((s) => s.selectedRoot)
   const completeAnalysis = usePipelineStore((s) => s.completeAnalysis)
   const reset = usePipelineStore((s) => s.reset)
+  const reduceMotion = useReducedMotion()
 
   const [elapsedMs, setElapsedMs] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  /** The landed response. Non-null ⇒ the engine is done; nothing is in flight. */
+  const [report, setReport] = useState<AnalysisReport | null>(null)
+  /** How much of the (already-known) result has been revealed so far. */
+  const [revealed, setRevealed] = useState(0)
 
   useEffect(() => {
     if (!ingest) {
@@ -49,8 +162,13 @@ export function AnalyzingScreen() {
       : { runId: ingest.runId }
 
     analyze(source, controller.signal)
-      .then((report) => {
-        if (!cancelled) completeAnalysis(report)
+      .then((landed) => {
+        if (cancelled) return
+        // Freeze the counter at what the call really took, then hand over to
+        // the reveal — from here on nothing is in flight.
+        clearInterval(ticker)
+        setElapsedMs(performance.now() - startedAt)
+        setReport(landed)
       })
       .catch((err: unknown) => {
         // A cancelled (aborted) request is expected on teardown — ignore it.
@@ -64,7 +182,35 @@ export function AnalyzingScreen() {
       clearInterval(ticker)
       controller.abort()
     }
-  }, [ingest, selectedRoot, completeAnalysis, reset])
+  }, [ingest, selectedRoot, reset])
+
+  const findings = useMemo(
+    () => (report ? buildFindings(report) : []),
+    [report],
+  )
+
+  // The reveal. It only ever runs on data we already hold, so the timing is
+  // pacing, never a stand-in for work. Reduced motion skips straight to the
+  // full list and only keeps the hand-off beat.
+  useEffect(() => {
+    if (!report || findings.length === 0) return
+
+    // One duration for both paths: reduced motion drops the stagger, not the
+    // time to read the list.
+    const totalMs = (findings.length - 1) * STEP_MS + READY_HOLD_MS
+    const timers: number[] = []
+
+    if (reduceMotion) {
+      setRevealed(findings.length)
+    } else {
+      for (let i = 1; i <= findings.length; i += 1) {
+        timers.push(window.setTimeout(() => setRevealed(i), (i - 1) * STEP_MS))
+      }
+    }
+    timers.push(window.setTimeout(() => completeAnalysis(report), totalMs))
+
+    return () => timers.forEach(clearTimeout)
+  }, [report, findings, reduceMotion, completeAnalysis])
 
   if (error) {
     return (
@@ -89,62 +235,125 @@ export function AnalyzingScreen() {
     )
   }
 
+  const landed = report !== null
+
   return (
     <div className="mx-auto max-w-xl pt-6" data-testid="analyzing-screen">
       <header className="mb-8 text-center">
         <div className="eyebrow mb-3">Stage 02 · Understanding</div>
         <h1 className="text-[22px] font-semibold tracking-tight text-ink">
-          Analyzing project…
+          {landed ? 'What the engine found' : 'Analyzing project…'}
         </h1>
         <p className="mt-2 text-[13.5px] text-ink-3">
-          Deterministic passes over your source — no code is changed here.
+          {landed
+            ? 'Read straight from the analysis. No code has been changed.'
+            : 'Deterministic passes over your source — no code is changed here.'}
         </p>
       </header>
 
-      {/* Honest, indeterminate indicator + elapsed time. No fake per-stage
-          completion: the backend reports nothing until the report is ready. */}
-      <div className="flex flex-col items-center rounded-xl border border-line bg-surface-1 px-6 py-8 shadow-[var(--shadow-panel)]">
-        <span
-          className="h-9 w-9 animate-spin rounded-full border-[3px] border-signal/20 border-t-signal"
-          role="progressbar"
-          aria-label="Analyzing"
+      {landed ? (
+        <FindingsList
+          findings={findings}
+          revealed={revealed}
+          elapsedMs={elapsedMs}
+          reduceMotion={reduceMotion === true}
         />
-        <div className="mt-5 flex items-baseline gap-2">
-          <span className="tnum font-mono text-[26px] font-semibold text-ink tabular-nums">
-            {(elapsedMs / 1000).toFixed(1)}
-          </span>
-          <span className="text-[13px] text-ink-4">s elapsed</span>
+      ) : (
+        /* Honest, indeterminate indicator + elapsed time, shown only while the
+           request is genuinely in flight. No fake per-stage completion. */
+        <div className="flex flex-col items-center rounded-xl border border-line bg-surface-1 px-6 py-8 shadow-[var(--shadow-panel)]">
+          <span
+            className="h-9 w-9 animate-spin rounded-full border-[3px] border-signal/20 border-t-signal"
+            role="progressbar"
+            aria-label="Analyzing"
+          />
+          <div className="mt-5 flex items-baseline gap-2">
+            <span className="tnum font-mono text-[26px] font-semibold text-ink tabular-nums">
+              {(elapsedMs / 1000).toFixed(1)}
+            </span>
+            <span className="text-[13px] text-ink-4">s elapsed</span>
+          </div>
+          <p className="mt-1 font-mono text-[11px] tracking-wide text-ink-3">
+            running · waiting on the engine
+          </p>
         </div>
-        <p className="mt-1 font-mono text-[11px] tracking-wide text-ink-3">
-          running · waiting on the engine
-        </p>
-      </div>
+      )}
+    </div>
+  )
+}
 
-      {/* What this pass performs — static reference, NOT a progress tracker.
-          No spinners, no checkmarks, no timed advancement. */}
-      <div className="mt-5">
-        <div className="eyebrow mb-2.5 text-center">What this pass performs</div>
-        <ul className="overflow-hidden rounded-xl border border-line bg-surface-0">
-          {PASSES.map((pass, i) => (
-            <li
-              key={pass.label}
-              className="flex items-center gap-4 border-b border-line/60 px-4 py-3 last:border-0"
-            >
-              <span className="font-mono text-[10px] tracking-widest text-ink-4 tabular-nums">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13.5px] font-medium text-ink-2">
-                  {pass.label}
-                </div>
-                <div className="font-mono text-[11px] text-ink-4">
-                  {pass.detail}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+const MARKER_CLASS: Record<FindingTone, string> = {
+  fact: 'border-signal/40 bg-signal/10 text-signal',
+  transitional: 'border-line-strong bg-surface-2 text-ink-3',
+  flag: 'border-warn/40 bg-warn/10 text-warn',
+  ready: 'border-pos/40 bg-pos/15 text-pos',
+}
+
+function FindingsList({
+  findings,
+  revealed,
+  elapsedMs,
+  reduceMotion,
+}: {
+  findings: Finding[]
+  revealed: number
+  elapsedMs: number
+  reduceMotion: boolean
+}) {
+  return (
+    <div>
+      <div className="mb-2.5 flex items-baseline justify-between">
+        <div className="eyebrow">Findings</div>
+        {/* Past tense on purpose: this is what the call took, not a live clock. */}
+        <span className="font-mono text-[11px] tracking-wide text-ink-4">
+          engine returned in {(elapsedMs / 1000).toFixed(1)}s
+        </span>
       </div>
+      <ul
+        className="overflow-hidden rounded-xl border border-line bg-surface-0"
+        role="status"
+        aria-live="polite"
+      >
+        {findings.slice(0, revealed).map((f) => (
+          <motion.li
+            key={f.id}
+            data-testid="finding-row"
+            data-tone={f.tone}
+            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: HOUSE_EASE }}
+            className="flex items-center gap-4 border-b border-line/60 px-4 py-3 last:border-0"
+          >
+            <span
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border',
+                MARKER_CLASS[f.tone],
+              )}
+            >
+              {f.tone === 'ready' ? (
+                <CheckIcon className="text-[15px]" />
+              ) : f.tone === 'transitional' ? (
+                <CircuitIcon className="text-[15px]" />
+              ) : f.tone === 'flag' ? (
+                <AlertIcon className="text-[14px]" />
+              ) : (
+                <CheckIcon className="text-[15px]" />
+              )}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div
+                className={cn(
+                  'text-[13.5px] font-medium',
+                  f.tone === 'ready' ? 'text-ink' : 'text-ink-2',
+                )}
+              >
+                {f.label}
+              </div>
+              <div className="font-mono text-[11px] text-ink-4">{f.detail}</div>
+            </div>
+          </motion.li>
+        ))}
+      </ul>
     </div>
   )
 }
