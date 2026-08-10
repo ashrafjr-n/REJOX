@@ -83,7 +83,7 @@ function ReportHeader({
   return (
     <div className="flex items-end justify-between gap-4">
       <div>
-        <div className="eyebrow mb-2">Stage 03 · Migration Report</div>
+        <div className="eyebrow mb-2">Stage 02 · Migration Report</div>
         <div className="flex items-center gap-3">
           <h1 className="text-[24px] leading-tight font-semibold tracking-tight text-ink">
             {report.projectName}

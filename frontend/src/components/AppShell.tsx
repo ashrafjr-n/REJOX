@@ -7,26 +7,58 @@ import { usePipelineStore } from '../store/pipelineStore'
 import type { Stage } from '../store/pipelineStore'
 import { CircuitIcon } from './icons'
 
-/** The pipeline stages, in order, for the header stepper. */
-const STEPPER: { id: Stage; label: string }[] = [
-  { id: 'upload', label: 'Upload' },
-  { id: 'analyzing', label: 'Analyze' },
-  { id: 'report', label: 'Report' },
-  { id: 'plan', label: 'Plan' },
-  { id: 'ask', label: 'Ask' },
-  { id: 'migrate', label: 'Migrate' },
+/**
+ * The pipeline as the user reads it, in order — display only. `stages` names the
+ * internal stages a step covers: the analyzing spinner and the Migration Report
+ * it produces are one user-facing step (Understanding), and Download is the
+ * terminal hand-off inside the Migration screen, so it owns no stage of its own.
+ * `num` is fixed per step, so a step's number never shifts when another is
+ * omitted.
+ */
+interface Step {
+  id: string
+  label: string
+  num: string
+  stages: Stage[]
+}
+
+const STEPPER: Step[] = [
+  { id: 'upload', num: '01', label: 'Upload', stages: ['upload'] },
+  { id: 'understanding', num: '02', label: 'Understanding', stages: ['analyzing', 'report'] },
+  { id: 'review', num: '03', label: 'Review', stages: ['plan'] },
+  { id: 'decisions', num: '04', label: 'Decisions', stages: ['ask'] },
+  { id: 'migration', num: '05', label: 'Migration', stages: ['migrate'] },
+  { id: 'download', num: '06', label: 'Download', stages: [] },
 ]
 
 function Stepper({ stage }: { stage: Stage }) {
-  const activeIndex = STEPPER.findIndex((s) => s.id === stage)
+  const plan = usePipelineStore((s) => s.plan)
+
+  // Read the real plan response: a plan that asks nothing has no Decisions step
+  // at all. Until the plan lands (`plan === null`) nothing is known yet, so the
+  // step stays visible rather than flickering out and back in.
+  const hasDecisions = plan == null || (plan.questions ?? []).length > 0
+
+  // With no Decisions step on show, the `ask` stage (which then only confirms
+  // there is nothing to decide) reads as part of Review — so exactly one step is
+  // highlighted on every screen, whichever shape the flow takes.
+  const steps = hasDecisions
+    ? STEPPER
+    : STEPPER.filter((s) => s.id !== 'decisions').map((s) =>
+        s.id === 'review' ? { ...s, stages: [...s.stages, 'ask' as Stage] } : s,
+      )
+
+  const activeIndex = steps.findIndex((s) => s.stages.includes(stage))
   return (
     <nav className="hidden items-center gap-1 md:flex" aria-label="Pipeline progress">
-      {STEPPER.map((step, i) => {
+      {steps.map((step, i) => {
         const state =
           i < activeIndex ? 'done' : i === activeIndex ? 'active' : 'todo'
         return (
           <div key={step.id} className="flex items-center gap-1">
             <span
+              data-testid={`step-${step.id}`}
+              data-state={state}
               className={cn(
                 'flex items-center gap-2 rounded-md px-2.5 py-1 text-[12px] font-medium tracking-tight transition-colors',
                 state === 'active' && 'bg-signal/10 text-signal',
@@ -40,11 +72,11 @@ function Stepper({ stage }: { stage: Stage }) {
                   state === 'active' ? 'text-signal' : 'text-ink-4',
                 )}
               >
-                {String(i + 1).padStart(2, '0')}
+                {step.num}
               </span>
               {step.label}
             </span>
-            {i < STEPPER.length - 1 && (
+            {i < steps.length - 1 && (
               <span
                 className={cn(
                   'h-px w-6',

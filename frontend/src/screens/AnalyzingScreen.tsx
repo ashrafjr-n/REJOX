@@ -92,7 +92,7 @@ export function AnalyzingScreen() {
   return (
     <div className="mx-auto max-w-xl pt-6" data-testid="analyzing-screen">
       <header className="mb-8 text-center">
-        <div className="eyebrow mb-3">Stage 02 · Intelligence</div>
+        <div className="eyebrow mb-3">Stage 02 · Understanding</div>
         <h1 className="text-[22px] font-semibold tracking-tight text-ink">
           Analyzing project…
         </h1>

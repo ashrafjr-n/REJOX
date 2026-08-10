@@ -73,7 +73,7 @@ export function AskScreen() {
     <div className="mx-auto max-w-3xl space-y-5">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <div className="eyebrow mb-2">Stage 05 · Decisions</div>
+          <div className="eyebrow mb-2">Stage 04 · Decisions</div>
           <h1 className="text-[24px] font-semibold tracking-tight text-ink">
             {questions.length > 0
               ? `${questions.length} decision${questions.length === 1 ? '' : 's'} to make`
