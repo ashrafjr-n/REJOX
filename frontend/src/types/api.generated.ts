@@ -788,7 +788,7 @@ export interface components {
             /** Message */
             message: string;
             /** Stage */
-            stage?: ("emit" | "install" | "typecheck" | "bundle" | "repair" | "done") | null;
+            stage?: ("intelligence" | "analyze" | "plan" | "emit" | "install" | "typecheck" | "bundle" | "repair" | "done") | null;
         };
         /**
          * MigrationEvent
@@ -810,7 +810,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "emit" | "install" | "typecheck" | "bundle" | "repair" | "done";
+            stage: "intelligence" | "analyze" | "plan" | "emit" | "install" | "typecheck" | "bundle" | "repair" | "done";
             /** Ts */
             ts: number;
             /** Message */

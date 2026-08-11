@@ -17,7 +17,7 @@ from app.main import app
 from app.models.knowledge_graph import KnowledgeGraph
 from app.models.plan import MigrationPlan
 from app.pipeline.analyzer import analyze_graph
-from app.pipeline.planner import plan_migration
+from app.pipeline.planner import PlannerError, plan_migration
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -271,3 +271,38 @@ def test_every_finding_belongs_to_a_target_file(plan: MigrationPlan) -> None:
         target_files = {t.split("#", 1)[0] for t in s.targets}
         for f in s.findings:
             assert f.componentId.split("#", 1)[0] in target_files
+
+
+# --- Typed failures ----------------------------------------------------------
+
+
+def test_phase_failure_becomes_a_planner_error_with_context(
+    sample_kg: KnowledgeGraph, monkeypatch
+) -> None:
+    """An unexpected planning failure names the phase and what it was planning."""
+    import app.pipeline.planner as planner_mod
+
+    def boom(_report, _kg):
+        raise ZeroDivisionError("division by zero")
+
+    monkeypatch.setattr(planner_mod, "_questions", boom)
+    with pytest.raises(PlannerError) as excinfo:
+        plan_migration(analyze_graph(sample_kg), sample_kg)
+    message = str(excinfo.value)
+    assert "questions" in message
+    assert "sample-app" in message
+    assert "ZeroDivisionError: division by zero" in message
+
+
+def test_plan_endpoint_reports_the_planner_failure(monkeypatch) -> None:
+    """The API answers with the typed message, not an opaque 500 body."""
+    import app.pipeline.planner as planner_mod
+
+    def boom(_report, _kg):
+        raise ZeroDivisionError("division by zero")
+
+    monkeypatch.setattr(planner_mod, "_component_waves", boom)
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/api/plan", json={"path": str(SAMPLE_APP)})
+    assert resp.status_code == 500
+    assert "component waves" in resp.json()["detail"]
