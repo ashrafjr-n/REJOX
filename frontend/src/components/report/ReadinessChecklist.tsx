@@ -230,7 +230,7 @@ function Glyph({ glyph }: { glyph: Glyph }) {
       aria-hidden="true"
     >
       {glyph === 'ok' ? (
-        <CheckIcon className="text-[14px]" />
+        <CheckIcon className="text-[15px]" />
       ) : glyph === 'pending' ? (
         <InfoIcon className="text-[13px]" />
       ) : (
@@ -284,11 +284,11 @@ export function ReadinessChecklist({
             <Glyph glyph={line.glyph} />
             <span className="sr-only">{GLYPH_LABEL[line.glyph]}</span>
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3">
-              <span className="text-[13.5px] font-medium text-ink">
+              <span className="text-[15px] font-medium text-ink">
                 {line.label}
               </span>
               {line.detail && (
-                <span className="truncate font-mono text-[11px] text-ink-4">
+                <span className="truncate font-mono text-[11.5px] text-ink-4">
                   {line.detail}
                 </span>
               )}
@@ -308,7 +308,7 @@ export function ReadinessChecklist({
           <Glyph glyph={verdict.glyph} />
           <span className="sr-only">{GLYPH_LABEL[verdict.glyph]}</span>
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold text-ink">
+            <div className="text-[15px] font-semibold text-ink">
               {verdict.label}
             </div>
             {verdict.detail && (
@@ -324,7 +324,7 @@ export function ReadinessChecklist({
           second readout competing with the checklist. */}
       <motion.p
         {...row(lines.length + 1)}
-        className="border-t border-line/60 px-5 py-2.5 font-mono text-[11px] tracking-wide text-ink-4"
+        className="border-t border-line/60 px-5 py-2.5 font-mono text-[11.5px] tracking-wide text-ink-4"
       >
         Coverage {formatScore(report.coverage)} · Confidence{' '}
         {formatScore(report.confidence)} · Risk {RISK_LABEL[report.risk]} ·{' '}

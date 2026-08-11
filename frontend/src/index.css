@@ -16,36 +16,86 @@
 }
 
 /*
- * Rejox design system — an engineering instrument, not a landing page.
- * Dark, precise, cinematic. Restrained palette; typography does the work.
+ * The site's brand palette, mirrored from Home.css (`.rx-home`) so that /app
+ * inherits the exact same values the marketing pages use. Architecture.css and
+ * Docs.css each keep their own scoped copy of these (unchanged); this `:root`
+ * declaration is the shared home their comments asked for, and is what the
+ * pipeline theme below is now built out of.
+ */
+:root {
+  --rx-black: #050505;
+  --rx-orange: #ff6a00;
+  --rx-red: #c53322;
+  --rx-pink: #ff9ffc;
+  --rx-white: #ffffff;
+  --rx-dark-silver: #1c1c1f;
+  --rx-nav-item-bg: #2a2a2f;
+  --rx-light-silver: #c9c9ce;
+  --rx-hairline: rgba(255, 255, 255, 0.12);
+
+  /* Frame geometry. The shared header positions itself against these, so any
+     page mounting <SiteHeader/> — /app included — must supply them or the
+     capsule collapses to its content width. */
+  --rx-frame-inset: 48px;
+  --rx-frame-inset-top: 78px;
+  --rx-frame-pad: 26px;
+  /* Where the capsule header's content starts, so /app's chrome bars can line
+     their edges up with the logo and the Login pill. */
+  --rx-frame-gutter: calc(var(--rx-frame-inset) + 1px + var(--rx-frame-pad));
+
+  /* Steps the brand set doesn't define, derived from it rather than invented:
+     one more rung on the neutral ramp, a stronger hairline, and two dimmer
+     text levels between --rx-light-silver and the background. */
+  --rx-surface-raised: #35353b;
+  --rx-hairline-strong: rgba(255, 255, 255, 0.22);
+  --rx-silver-dim: #8a8a91;
+  --rx-silver-faint: #5c5c63;
+
+  /* Type scale, matched to /architecture's document scale (rem @16px):
+     kicker 12px · micro/mono 11.5px · small 13px · body 15px · lead 16px. */
+  --text-micro: 11.5px;
+  --text-small: 13px;
+  --text-body: 15px;
+  --text-lead: 16px;
+}
+
+/*
+ * The pipeline theme. Same instrument structure as before — a surface ladder,
+ * four ink levels, semantic status — but every value now resolves to a brand
+ * token above, so /app and the marketing pages are one colour system.
  * Tokens below become Tailwind utilities (bg-surface-1, text-ink-2, font-mono…).
  */
 @theme {
-  /* --- Surfaces: a deliberate depth ladder, near-black with a cool cast --- */
-  --color-void: #06070a;
-  --color-surface-0: #0a0c11;
-  --color-surface-1: #0f1218;
-  --color-surface-2: #151922;
-  --color-surface-3: #1c212c;
-  --color-line: #232a36;
-  --color-line-strong: #303948;
+  /* --- Surfaces: the brand's neutral ramp, black → dark-silver → nav pill --- */
+  --color-void: #000; /* the settled black /architecture sits on */
+  --color-surface-0: var(--rx-black);
+  --color-surface-1: var(--rx-dark-silver);
+  --color-surface-2: var(--rx-nav-item-bg);
+  --color-surface-3: var(--rx-surface-raised);
+  --color-line: var(--rx-hairline);
+  --color-line-strong: var(--rx-hairline-strong);
 
-  /* --- Ink: four steps of legible contrast --- */
-  --color-ink: #e8ebf0;
-  --color-ink-2: #a6afbd;
-  --color-ink-3: #6f7a8a;
-  --color-ink-4: #49525f;
+  /* --- Ink: white → light-silver, then two derived dimmer steps --- */
+  --color-ink: var(--rx-white);
+  --color-ink-2: var(--rx-light-silver);
+  --color-ink-3: var(--rx-silver-dim);
+  --color-ink-4: var(--rx-silver-faint);
 
-  /* --- Signal accent: a single cool cyan. Used sparingly, on purpose. --- */
-  --color-signal: #4cc9e6;
-  --color-signal-deep: #2ba3c4;
+  /* --- Interactive accent. On the home page every interactive thing is a
+     white or silver pill (nav item, Login, Start migration), so that is what
+     "signal" means here too. --- */
+  --color-signal: var(--rx-white);
+  --color-signal-deep: var(--rx-light-silver);
 
-  /* --- Semantic status. Muted, never neon — instrument readouts. --- */
-  --color-pos: #46c98a;
-  --color-warn: #e0a24e;
-  --color-danger: #e5595f;
-  --color-info: #5b9bf0;
-  --color-ai: #b48ce6; /* AI-resolved provenance / Confidence axis */
+  /* --- Semantic status, drawn from the brand's two accent hues plus red.
+     The home palette has no green or blue: pink is the bright/positive accent
+     (and doubles as the AI axis), orange is attention, red is failure, and
+     light-silver carries the merely-informational. --- */
+  --color-pos: var(--rx-pink);
+  --color-warn: var(--rx-orange);
+  --color-danger: color-mix(in oklab, var(--rx-red) 72%, var(--rx-white));
+  --color-info: var(--rx-light-silver);
+  --color-ai: var(--rx-pink); /* AI-resolved provenance / Confidence axis */
 
   /* --- Type --- */
   --font-sans: "Clash Display", "Inter", -apple-system, BlinkMacSystemFont,
@@ -105,36 +155,32 @@
 }
 
 @layer utilities {
-  /* The ambient backdrop: a cool vignette bleeding from the top, over void. */
+  /* The page ground: flat black, exactly as /architecture and /docs sit on.
+     The old cool radial vignette and the faint engineering grid are gone —
+     they were /app's own atmosphere, and nowhere else on the site has one. */
   .app-bg {
-    background:
-      radial-gradient(
-        1200px 620px at 50% -12%,
-        color-mix(in oklab, var(--color-signal) 8%, transparent),
-        transparent 62%
-      ),
-      var(--color-void);
+    background: var(--color-void);
   }
 
-  /* A faint engineering grid, masked so it fades toward the edges. */
-  .grid-veil {
-    background-image:
-      linear-gradient(to right, rgb(255 255 255 / 0.02) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(255 255 255 / 0.02) 1px, transparent 1px);
-    background-size: 44px 44px;
-    -webkit-mask-image: radial-gradient(
-      70% 60% at 50% 0%,
-      #000 0%,
-      transparent 75%
-    );
-    mask-image: radial-gradient(70% 60% at 50% 0%, #000 0%, transparent 75%);
-  }
-
-  /* Eyebrow label — the small-caps monospace tag above section titles. */
+  /* Eyebrow label — the same kicker the marketing pages use above a title:
+     sans, 12px, semibold, wide-tracked uppercase (see .rx-arch-kicker /
+     .rx-eyebrow .rx-label). It used to be monospace, which broke the site's
+     mono-for-identifiers rule on a label that is prose. */
   .eyebrow {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-ink-3);
+  }
+
+  /* The same uppercase micro-label in monospace, for rows that are naming a
+     machine thing (a stage, a status) rather than a section. */
+  .label-mono {
     font-family: var(--font-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.18em;
+    font-size: var(--text-micro);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--color-ink-3);
   }

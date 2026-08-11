@@ -11,17 +11,24 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
 }
 
+/**
+ * The home page's button language: everything is a pill. `primary` is the
+ * Login / Start-migration treatment (white fill, black label, soft silver
+ * glow); `secondary` is the nav-item pill (nav-item-bg fill, silver label,
+ * inverting to light-silver on hover); `ghost` is the same pill with no fill
+ * until you touch it.
+ */
 const VARIANT_CLASS: Record<Variant, string> = {
   primary:
-    'bg-signal text-void font-semibold hover:bg-[color-mix(in_oklab,var(--color-signal)_88%,white)] shadow-[0_0_0_1px_var(--color-signal-deep),0_10px_24px_-10px_color-mix(in_oklab,var(--color-signal)_60%,transparent)]',
+    'bg-signal text-void font-semibold hover:bg-ink-2 shadow-[0_6px_18px_rgba(201,201,206,0.35)] hover:shadow-[0_8px_24px_rgba(201,201,206,0.55)]',
   secondary:
-    'bg-surface-2 text-ink ring-1 ring-inset ring-line-strong hover:bg-surface-3 hover:ring-ink-4',
-  ghost: 'text-ink-2 hover:text-ink hover:bg-surface-2',
+    'bg-surface-2 text-ink-2 hover:bg-ink-2 hover:text-void',
+  ghost: 'text-ink-2 hover:bg-surface-2 hover:text-ink',
 }
 
 const SIZE_CLASS: Record<Size, string> = {
-  sm: 'h-8 px-3 text-[13px] gap-1.5 rounded-md',
-  md: 'h-10 px-4 text-sm gap-2 rounded-lg',
+  sm: 'h-8 px-4 text-[13px] gap-1.5 rounded-full',
+  md: 'h-10 px-5 text-[13px] gap-2 rounded-full',
 }
 
 export function Button({

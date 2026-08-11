@@ -18,11 +18,11 @@ function IssueRow({ issue }: { issue: Issue }) {
           <span className="text-[13px] font-medium text-ink">
             {issue.message}
           </span>
-          <span className="font-mono text-[10.5px] tracking-wide text-ink-4">
+          <span className="font-mono text-[11.5px] tracking-wide text-ink-4">
             {issue.code}
           </span>
         </div>
-        <div className="text-[12px] leading-snug text-ink-3">
+        <div className="text-[13px] leading-snug text-ink-3">
           {issue.evidence.file && (
             <span className="font-mono text-ink-4">
               {issue.evidence.file} ·{' '}
@@ -50,7 +50,7 @@ export function FindingsPanel({
       eyebrow="Findings"
       title="Blockers & warnings"
       actions={
-        <div className="flex items-center gap-3 font-mono text-[12px] tabular-nums">
+        <div className="flex items-center gap-3 font-mono text-[13px] tabular-nums">
           {blockers.length > 0 && (
             <span className="text-danger">{blockers.length} blocking</span>
           )}

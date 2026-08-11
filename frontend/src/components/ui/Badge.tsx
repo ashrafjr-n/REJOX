@@ -36,7 +36,8 @@ export function Badge({ tone = 'neutral', dot, children, className }: BadgeProps
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium ring-1 ring-inset whitespace-nowrap',
+        // Pill, like every chip on the marketing pages.
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-medium ring-1 ring-inset whitespace-nowrap',
         TONE_CLASS[tone],
         className,
       )}

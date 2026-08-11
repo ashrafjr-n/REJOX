@@ -97,7 +97,7 @@ export function AskScreen() {
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pos/15 text-pos">
               <CheckIcon className="text-[20px]" />
             </span>
-            <p className="mt-4 max-w-md text-[13.5px] leading-relaxed text-ink-2">
+            <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-2">
               The planner generated no decisions for this project — nothing is
               ambiguous or unsupported. You can start the migration directly.
             </p>
@@ -119,13 +119,13 @@ export function AskScreen() {
 
       {error && (
         <div className="flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger/8 px-3.5 py-3 text-[13px] text-danger">
-          <AlertIcon className="mt-0.5 shrink-0 text-[15px]" />
+          <AlertIcon className="mt-0.5 shrink-0 text-[16px]" />
           <span>{error}</span>
         </div>
       )}
 
       <div className="flex items-center justify-between border-t border-line pt-4">
-        <span className="text-[12.5px] text-ink-3">
+        <span className="text-[13px] text-ink-3">
           {questions.length > 0 && unanswered.length > 0
             ? `${unanswered.length} required decision${unanswered.length === 1 ? '' : 's'} left`
             : 'Ready to migrate'}
@@ -159,13 +159,13 @@ function QuestionCard({
     <Panel testId="ask-question" title={question.title}>
       {/* The finding that justified the question — non-negotiable. */}
       <div className="flex items-start gap-2.5 rounded-lg border border-line bg-surface-0 px-3.5 py-2.5">
-        <span className="mt-0.5 font-mono text-[10px] tracking-widest text-ink-4">
+        <span className="mt-0.5 font-mono text-[11.5px] tracking-widest text-ink-4">
           WHY
         </span>
         <div>
-          <p className="text-[12.5px] leading-relaxed text-ink-2">{question.context}</p>
+          <p className="text-[13px] leading-relaxed text-ink-2">{question.context}</p>
           {uniqueAffects.length > 0 && (
-            <p className="mt-1 text-[11px] text-ink-4">
+            <p className="mt-1 text-[11.5px] text-ink-4">
               Affects: {uniqueAffects.join(' · ')}
             </p>
           )}
@@ -188,7 +188,7 @@ function QuestionCard({
               )}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[13.5px] font-medium text-ink">{o.label}</span>
+                <span className="text-[15px] font-medium text-ink">{o.label}</span>
                 <span className="flex items-center gap-1.5">
                   {o.isRecommended && <Badge tone="pos">recommended</Badge>}
                   <span
@@ -199,7 +199,7 @@ function QuestionCard({
                   />
                 </span>
               </div>
-              <p className="mt-1 text-[12px] text-ink-3">{o.description}</p>
+              <p className="mt-1 text-[13px] text-ink-3">{o.description}</p>
               <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-4">
                 {o.tradeoffs}
               </p>

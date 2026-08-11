@@ -243,7 +243,7 @@ export function AnalyzingScreen() {
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-danger/15 text-danger">
             <AlertIcon className="text-[20px]" />
           </span>
-          <h2 className="mt-4 text-[15px] font-semibold text-ink">
+          <h2 className="mt-4 text-[16px] font-semibold text-ink">
             The engine hit a wall
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-ink-2">
@@ -295,7 +295,7 @@ export function AnalyzingScreen() {
             </span>
             <span className="text-[13px] text-ink-4">s elapsed</span>
           </div>
-          <p className="mt-1 font-mono text-[11px] tracking-wide text-ink-3">
+          <p className="mt-1 font-mono text-[11.5px] tracking-wide text-ink-3">
             running · waiting on the engine
           </p>
         </div>
@@ -327,7 +327,7 @@ function FindingsList({
       <div className="mb-2.5 flex items-baseline justify-between">
         <div className="eyebrow">Findings</div>
         {/* Past tense on purpose: this is what the call took, not a live clock. */}
-        <span className="font-mono text-[11px] tracking-wide text-ink-4">
+        <span className="font-mono text-[11.5px] tracking-wide text-ink-4">
           engine returned in {(elapsedMs / 1000).toFixed(1)}s
         </span>
       </div>
@@ -353,25 +353,25 @@ function FindingsList({
               )}
             >
               {f.tone === 'ready' ? (
-                <CheckIcon className="text-[15px]" />
+                <CheckIcon className="text-[16px]" />
               ) : f.tone === 'transitional' ? (
-                <CircuitIcon className="text-[15px]" />
+                <CircuitIcon className="text-[16px]" />
               ) : f.tone === 'flag' ? (
-                <AlertIcon className="text-[14px]" />
+                <AlertIcon className="text-[15px]" />
               ) : (
-                <CheckIcon className="text-[15px]" />
+                <CheckIcon className="text-[16px]" />
               )}
             </span>
             <div className="min-w-0 flex-1">
               <div
                 className={cn(
-                  'text-[13.5px] font-medium',
+                  'text-[15px] font-medium',
                   f.tone === 'ready' ? 'text-ink' : 'text-ink-2',
                 )}
               >
                 {f.label}
               </div>
-              <div className="font-mono text-[11px] text-ink-4">{f.detail}</div>
+              <div className="font-mono text-[11.5px] text-ink-4">{f.detail}</div>
             </div>
           </motion.li>
         ))}

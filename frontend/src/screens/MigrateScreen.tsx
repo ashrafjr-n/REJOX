@@ -168,7 +168,7 @@ export function MigrateScreen() {
 
       {loadError && (
         <div className="flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger/8 px-3.5 py-3 text-[13px] text-danger">
-          <AlertIcon className="mt-0.5 shrink-0 text-[15px]" />
+          <AlertIcon className="mt-0.5 shrink-0 text-[16px]" />
           <span>{loadError}</span>
         </div>
       )}
@@ -214,7 +214,7 @@ function StreamStatus({ status }: { status: JobStatus }) {
           status === 'failed' && 'bg-danger',
         )}
       />
-      <span className="font-mono text-[11px] tracking-wide text-ink-3">
+      <span className="font-mono text-[11.5px] tracking-wide text-ink-3">
         {live ? 'streaming' : status}
       </span>
     </div>
@@ -226,7 +226,7 @@ function LlmCallout({ llmCalls }: { llmCalls: number }) {
     <div className="flex items-center justify-between rounded-xl border border-ai/25 bg-ai/8 px-5 py-3.5">
       <div>
         <div className="eyebrow text-ai/80">AI Resolution Engine</div>
-        <p className="mt-0.5 text-[12.5px] text-ink-3">
+        <p className="mt-0.5 text-[13px] text-ink-3">
           Rules did the rest — the LLM is a scalpel, used only where reasoning is required.
         </p>
       </div>
@@ -255,13 +255,13 @@ function StageIndicator({ state }: { state: StageState }) {
   if (state === 'done')
     return (
       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-pos/15 text-pos">
-        <CheckIcon className="text-[14px]" />
+        <CheckIcon className="text-[15px]" />
       </span>
     )
   if (state === 'failed')
     return (
       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-danger/15 text-danger">
-        <AlertIcon className="text-[14px]" />
+        <AlertIcon className="text-[15px]" />
       </span>
     )
   if (state === 'running')
@@ -293,10 +293,10 @@ function StageRow({
         <StageIndicator state={state} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className={cn('text-[13.5px] font-medium', state === 'pending' ? 'text-ink-4' : 'text-ink')}>
+        <div className={cn('text-[15px] font-medium', state === 'pending' ? 'text-ink-4' : 'text-ink')}>
           {label}
         </div>
-        {d && <div className="mt-0.5 font-mono text-[11px] text-ink-3">{stageDetail(stage, d)}</div>}
+        {d && <div className="mt-0.5 font-mono text-[11.5px] text-ink-3">{stageDetail(stage, d)}</div>}
       </div>
       {d && stageVerdict(stage, d)}
     </li>
@@ -348,9 +348,9 @@ function RepairRow({ events, view }: { events: MigrationEvent[]; view: StageView
         <StageIndicator state={state as StageState} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[13.5px] font-medium text-ink">AI repair</div>
+        <div className="text-[15px] font-medium text-ink">AI repair</div>
         {last?.repairRound != null && (
-          <div className="mt-0.5 font-mono text-[11px] text-ink-3">
+          <div className="mt-0.5 font-mono text-[11.5px] text-ink-3">
             round {last.repairRound} of {last.maxRepairRounds} · {last.repairAttempts ?? 0} attempt(s)
           </div>
         )}
@@ -367,10 +367,10 @@ function FailurePanel({ error, onReset }: { error: MigrationError; onReset: () =
           <AlertIcon className="text-[18px]" />
         </span>
         <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold text-ink">
+          <h2 className="text-[16px] font-semibold text-ink">
             Failed during <span className="text-danger">{error.stage ?? 'migration'}</span>
           </h2>
-          <p className="mt-1 font-mono text-[12px] text-ink-4">{error.type}</p>
+          <p className="mt-1 font-mono text-[13px] text-ink-4">{error.type}</p>
           <p className="mt-2 text-[13px] leading-relaxed text-ink-2">{error.message}</p>
           <div className="mt-4">
             <Button variant="secondary" onClick={onReset}>
@@ -440,7 +440,7 @@ function ResultPanel({
       </div>
 
       <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
-        <span className="text-[12.5px] text-ink-3">
+        <span className="text-[13px] text-ink-3">
           {runId ? 'The React Native project is ready to download.' : 'Migration finished.'}
         </span>
         <div className="flex gap-2">

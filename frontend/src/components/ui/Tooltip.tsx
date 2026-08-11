@@ -37,7 +37,7 @@ export function Tooltip({ content, children, className, width = 260 }: TooltipPr
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
             style={{ width }}
-            className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-lg border border-line-strong bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-2 shadow-[0_12px_32px_-8px_rgb(0_0_0/0.7)]"
+            className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-xl border border-line-strong bg-surface-2 px-3 py-2.5 text-[13px] leading-relaxed text-ink-2 shadow-[0_12px_32px_-8px_rgb(0_0_0/0.7)]"
           >
             {content}
           </motion.span>
