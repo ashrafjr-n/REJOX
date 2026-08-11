@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { cn } from '../lib/cn'
+import { visibleSteps } from '../lib/steps'
 import { useHealth } from '../lib/useHealth'
 import type { HealthStatus } from '../lib/useHealth'
 import { usePipelineStore } from '../store/pipelineStore'
@@ -8,46 +9,16 @@ import type { Stage } from '../store/pipelineStore'
 import { CircuitIcon } from './icons'
 
 /**
- * The pipeline as the user reads it, in order — display only. `stages` names the
- * internal stages a step covers: the analyzing spinner and the Migration Report
- * it produces are one user-facing step (Understanding), and Download is the
- * terminal hand-off inside the Migration screen, so it owns no stage of its own.
- * `num` is fixed per step, so a step's number never shifts when another is
- * omitted.
+ * The indicator reads the shared step registry (lib/steps.ts) — the same source
+ * every screen's eyebrow reads, so the two can never drift apart. That registry
+ * also owns the two dynamic cases: a plan with no questions drops the Decisions
+ * step, and a finished migration moves the highlight onto Download.
  */
-interface Step {
-  id: string
-  label: string
-  num: string
-  stages: Stage[]
-}
-
-const STEPPER: Step[] = [
-  { id: 'upload', num: '01', label: 'Upload', stages: ['upload'] },
-  { id: 'understanding', num: '02', label: 'Understanding', stages: ['analyzing', 'report'] },
-  { id: 'review', num: '03', label: 'Review', stages: ['plan'] },
-  { id: 'decisions', num: '04', label: 'Decisions', stages: ['ask'] },
-  { id: 'migration', num: '05', label: 'Migration', stages: ['migrate'] },
-  { id: 'download', num: '06', label: 'Download', stages: [] },
-]
-
 function Stepper({ stage }: { stage: Stage }) {
   const plan = usePipelineStore((s) => s.plan)
+  const downloadReady = usePipelineStore((s) => s.downloadReady)
 
-  // Read the real plan response: a plan that asks nothing has no Decisions step
-  // at all. Until the plan lands (`plan === null`) nothing is known yet, so the
-  // step stays visible rather than flickering out and back in.
-  const hasDecisions = plan == null || (plan.questions ?? []).length > 0
-
-  // With no Decisions step on show, the `ask` stage (which then only confirms
-  // there is nothing to decide) reads as part of Review — so exactly one step is
-  // highlighted on every screen, whichever shape the flow takes.
-  const steps = hasDecisions
-    ? STEPPER
-    : STEPPER.filter((s) => s.id !== 'decisions').map((s) =>
-        s.id === 'review' ? { ...s, stages: [...s.stages, 'ask' as Stage] } : s,
-      )
-
+  const steps = visibleSteps(plan, downloadReady)
   const activeIndex = steps.findIndex((s) => s.stages.includes(stage))
   return (
     <nav className="hidden items-center gap-1 md:flex" aria-label="Pipeline progress">

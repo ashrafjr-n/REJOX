@@ -1,11 +1,13 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 
-import { ApiError, analyze } from '../api/rejox'
+import { ApiError, analyze, plan as fetchPlan } from '../api/rejox'
+import { StepHeader } from '../components/StepHeader'
 import { Button } from '../components/ui/Button'
 import { AlertIcon, CheckIcon, CircuitIcon } from '../components/icons'
 import { cn } from '../lib/cn'
 import { formatScore } from '../lib/display'
+import { DUR, HOUSE_EASE } from '../lib/motion'
 import { usePipelineStore } from '../store/pipelineStore'
 import type { AnalysisReport, SourceRequest } from '../types/api'
 
@@ -30,8 +32,6 @@ import type { AnalysisReport, SourceRequest } from '../types/api'
 const STEP_MS = 360
 /** Beat the Ready line holds before the Report takes over. */
 const READY_HOLD_MS = 1100
-/** The house easing, as used by the marketing pages and the other screens. */
-const HOUSE_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
 type FindingTone = 'fact' | 'transitional' | 'flag' | 'ready'
 
@@ -132,6 +132,9 @@ export function AnalyzingScreen() {
   const ingest = usePipelineStore((s) => s.ingest)
   const selectedRoot = usePipelineStore((s) => s.selectedRoot)
   const completeAnalysis = usePipelineStore((s) => s.completeAnalysis)
+  const setPlan = usePipelineStore((s) => s.setPlan)
+  const beginPlanPrefetch = usePipelineStore((s) => s.beginPlanPrefetch)
+  const failPlanPrefetch = usePipelineStore((s) => s.failPlanPrefetch)
   const reset = usePipelineStore((s) => s.reset)
   const reduceMotion = useReducedMotion()
 
@@ -169,6 +172,20 @@ export function AnalyzingScreen() {
         clearInterval(ticker)
         setElapsedMs(performance.now() - startedAt)
         setReport(landed)
+
+        // Prefetch the plan behind the reveal. It costs one more request but
+        // the reveal covers it, and it is what lets the Review checklist state
+        // the real number of pending decisions on the *first* visit instead of
+        // discovering them a screen later. Failure is silent here: the Plan
+        // screen re-requests and reports errors properly.
+        beginPlanPrefetch()
+        fetchPlan(source, controller.signal)
+          .then((res) => {
+            if (!cancelled) setPlan(res.plan)
+          })
+          .catch(() => {
+            if (!cancelled) failPlanPrefetch()
+          })
       })
       .catch((err: unknown) => {
         // A cancelled (aborted) request is expected on teardown — ignore it.
@@ -182,7 +199,14 @@ export function AnalyzingScreen() {
       clearInterval(ticker)
       controller.abort()
     }
-  }, [ingest, selectedRoot, reset])
+  }, [
+    ingest,
+    selectedRoot,
+    reset,
+    beginPlanPrefetch,
+    failPlanPrefetch,
+    setPlan,
+  ])
 
   const findings = useMemo(
     () => (report ? buildFindings(report) : []),
@@ -238,18 +262,16 @@ export function AnalyzingScreen() {
   const landed = report !== null
 
   return (
-    <div className="mx-auto max-w-xl pt-6" data-testid="analyzing-screen">
-      <header className="mb-8 text-center">
-        <div className="eyebrow mb-3">Stage 02 · Understanding</div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-ink">
-          {landed ? 'What the engine found' : 'Analyzing project…'}
-        </h1>
-        <p className="mt-2 text-[13.5px] text-ink-3">
-          {landed
+    <div className="mx-auto max-w-3xl space-y-6" data-testid="analyzing-screen">
+      <StepHeader
+        stage="analyzing"
+        title={landed ? 'What the engine found' : 'Analyzing project…'}
+        description={
+          landed
             ? 'Read straight from the analysis. No code has been changed.'
-            : 'Deterministic passes over your source — no code is changed here.'}
-        </p>
-      </header>
+            : 'Deterministic passes over your source — no code is changed here.'
+        }
+      />
 
       {landed ? (
         <FindingsList
@@ -321,7 +343,7 @@ function FindingsList({
             data-tone={f.tone}
             initial={reduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.28, ease: HOUSE_EASE }}
+            transition={{ duration: DUR.enter, ease: HOUSE_EASE }}
             className="flex items-center gap-4 border-b border-line/60 px-4 py-3 last:border-0"
           >
             <span

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Panel } from '../ui/Panel'
 import { cn } from '../../lib/cn'
 import { formatDelta, formatScore } from '../../lib/display'
+import { DUR, HOUSE_EASE, STAGGER_FINE } from '../../lib/motion'
 import type { ScoreContribution } from '../../types/api'
 
 interface Props {
@@ -33,7 +34,11 @@ export function ScoreBreakdown({ contributions, coverage }: Props) {
               key={`${c.label}-${i}`}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.25 }}
+              transition={{
+                delay: Math.min(i * STAGGER_FINE, 0.36),
+                duration: DUR.enter,
+                ease: HOUSE_EASE,
+              }}
               className="flex items-center gap-4 px-5 py-3"
             >
               {/* Signed delta */}
@@ -71,7 +76,11 @@ export function ScoreBreakdown({ contributions, coverage }: Props) {
                     animate={{
                       width: `${(Math.abs(c.delta) / maxMagnitude) * 100}%`,
                     }}
-                    transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.4 }}
+                    transition={{
+                      delay: Math.min(i * STAGGER_FINE, 0.36),
+                      duration: DUR.settle,
+                      ease: HOUSE_EASE,
+                    }}
                     className={cn(
                       'h-full rounded-full',
                       positive ? 'bg-pos/70' : 'bg-danger/70',
