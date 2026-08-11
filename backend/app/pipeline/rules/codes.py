@@ -38,3 +38,7 @@ UNKNOWN_LIBRARY = "UNKNOWN_LIBRARY"
 # Routing
 ROUTER_NEEDS_CONVERSION = "ROUTER_NEEDS_CONVERSION"
 OBJECT_ROUTER_UNPARSED = "OBJECT_ROUTER_UNPARSED"
+
+# Parsing (parser-worker warnings — the graph itself is incomplete)
+PARSE_FAILED = "PARSE_FAILED"    # a file never made it into the KG at all
+PARSE_WARNING = "PARSE_WARNING"  # a file is in the KG but read imperfectly

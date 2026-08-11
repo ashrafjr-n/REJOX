@@ -35,7 +35,16 @@ from app.models.validation import (
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
 
 # The pipeline's real, ordered boundaries — instrumented, never invented.
+#
+# The first three run *before* the Migration Engine: a job rebuilds the graph,
+# analyzes and plans before it can emit anything. They exist so a failure there
+# is reported where it happened (they are not instrumented with
+# started/completed events — nothing observable happens between them, and the
+# Migration Engine's own stages start at ``emit``).
 MigrationStage = Literal[
+    "intelligence",  # build the Knowledge Graph (parser-worker)
+    "analyze",       # analyze the graph into a report
+    "plan",          # turn the report into an ordered migration plan
     "emit",       # transform + assemble the RN project (incl. the 1 nav-shape decision)
     "install",    # npm install in the emitted project
     "typecheck",  # tsc --noEmit

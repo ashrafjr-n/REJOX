@@ -30,6 +30,7 @@ from app.models.jobs import (
     MigrationEvent,
     MigrationEventData,
     MigrationResult,
+    MigrationStage,
 )
 from app.pipeline import workspace
 from app.pipeline.analyzer import analyze_graph
@@ -176,22 +177,30 @@ def start_job(
             state.updatedAt = _now()
             snapshot = state.model_copy(deep=True)
         _persist(snapshot)
+        # The stage the job is actually in, advanced as each one is entered, so
+        # a failure before the Migration Engine is reported where it happened
+        # (parse/analyze/plan) instead of being blamed on emit.
+        stage: MigrationStage = "intelligence"
         try:
             kg = build_knowledge_graph(source_root)
+            stage = "analyze"
             report = analyze_graph(kg)
+            stage = "plan"
             plan = plan_migration(report, kg)
+            stage = "emit"
             run_migration(
                 kg=kg, report=report, plan=plan, source_root=source_root,
                 answers=answers, out_dir=out_dir, run_id=run_id,
                 install=install, run_bundle=run_bundle, emit=emit,
             )
         except Exception as exc:  # noqa: BLE001 - report every failure honestly
-            # run_migration emits its own 'failed' for pipeline-stage errors;
-            # this covers setup failures (parse/analyze/plan) before emit began.
+            # run_migration emits its own 'failed' (with its own current stage)
+            # for anything inside the Migration Engine; this covers the setup
+            # stages above it, and anything that escaped without a terminal.
             if not _has_terminal(job_id):
                 emit(
-                    "failed", "emit", f"Migration failed: {exc}",
-                    error=MigrationError(type=type(exc).__name__, message=str(exc), stage="emit"),
+                    "failed", stage, f"Migration failed during {stage}: {exc}",
+                    error=MigrationError(type=type(exc).__name__, message=str(exc), stage=stage),
                 )
 
     threading.Thread(target=worker, name=f"migrate-{job_id[:8]}", daemon=True).start()
