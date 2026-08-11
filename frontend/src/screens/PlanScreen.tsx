@@ -10,6 +10,7 @@ import type { Edge, Node } from 'reactflow'
 import 'reactflow/dist/style.css'
 
 import { ApiError, plan as fetchPlan } from '../api/rejox'
+import { StepHeader } from '../components/StepHeader'
 import { PlanNode } from '../components/plan/PlanNode'
 import type { PlanNodeData } from '../components/plan/PlanNode'
 import { Badge } from '../components/ui/Badge'
@@ -88,14 +89,28 @@ export function PlanScreen() {
     )
   }
 
+  // Normally never seen: the plan is prefetched during the analysis reveal, so
+  // it is already in the store by the time this screen mounts. Kept honest for
+  // the case where the prefetch failed or is still running, and styled like the
+  // Analyzing screen's waiting card so it belongs to the same flow.
   if (!plan) {
     return (
-      <div className="flex flex-col items-center pt-24 text-center">
-        <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-signal/20 border-t-signal" />
-        <div className="eyebrow mt-5">Stage 03 · Review</div>
-        <p className="mt-2 text-[14px] text-ink-2">
-          Ordering the migration into dependency waves…
-        </p>
+      <div className="mx-auto max-w-3xl space-y-6">
+        <StepHeader
+          stage="plan"
+          title="Ordering the migration…"
+          description="Sequencing the steps into dependency waves — leaves first, pages last."
+        />
+        <div className="flex flex-col items-center rounded-xl border border-line bg-surface-1 px-6 py-8 shadow-[var(--shadow-panel)]">
+          <span
+            className="h-9 w-9 animate-spin rounded-full border-[3px] border-signal/20 border-t-signal"
+            role="progressbar"
+            aria-label="Planning"
+          />
+          <p className="mt-5 font-mono text-[11px] tracking-wide text-ink-3">
+            running · waiting on the planner
+          </p>
+        </div>
       </div>
     )
   }
@@ -159,28 +174,23 @@ function PlanView({
   const selected = steps.find((s) => s.id === selectedId) ?? null
 
   return (
-    <div className="space-y-5">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <div className="eyebrow mb-2">Stage 03 · Migration Plan</div>
-          <h1 className="text-[24px] font-semibold tracking-tight text-ink">
-            {steps.length} steps, {waves.length} dependency waves
-          </h1>
-          <p className="mt-1.5 text-[13.5px] text-ink-3">
-            Ordered leaves → composites → pages. Flagged nodes are gated by a
-            decision or carry a manual-review finding.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={onReset}>
-            New analysis
-          </Button>
-          <Button variant="primary" onClick={onContinue}>
-            {questions.length > 0 ? 'Continue to decisions' : 'Continue'}
-            <ArrowRightIcon className="text-[16px]" />
-          </Button>
-        </div>
-      </header>
+    <div className="space-y-6">
+      <StepHeader
+        stage="plan"
+        title={`${steps.length} steps, ${waves.length} dependency waves`}
+        description="Ordered leaves → composites → pages. Flagged nodes are gated by a decision or carry a manual-review finding."
+        actions={
+          <>
+            <Button variant="ghost" onClick={onReset}>
+              New analysis
+            </Button>
+            <Button variant="primary" onClick={onContinue}>
+              {questions.length > 0 ? 'Continue to decisions' : 'Continue'}
+              <ArrowRightIcon className="text-[16px]" />
+            </Button>
+          </>
+        }
+      />
 
       {/* Wave legend — the ordering, legible at a glance and countable. */}
       <div className="flex flex-wrap gap-2">
@@ -200,7 +210,7 @@ function PlanView({
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* The DAG */}
         <div className="h-[560px] overflow-hidden rounded-xl border border-line bg-surface-0">
           <ReactFlow
@@ -242,7 +252,7 @@ function PlanView({
       </div>
 
       {(candidates.length > 0 || unsupported.length > 0) && (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           {candidates.length > 0 && (
             <Panel
               eyebrow="Findings"

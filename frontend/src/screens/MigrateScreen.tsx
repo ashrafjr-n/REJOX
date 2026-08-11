@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ApiError, getJob } from '../api/rejox'
 import { downloadUrl, jobEventsUrl } from '../lib/api'
+import { StepHeader } from '../components/StepHeader'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Panel } from '../components/ui/Panel'
@@ -117,7 +118,15 @@ export function MigrateScreen() {
   const jobId = usePipelineStore((s) => s.jobId)
   const report = usePipelineStore((s) => s.report)
   const reset = usePipelineStore((s) => s.reset)
+  const markDownloadReady = usePipelineStore((s) => s.markDownloadReady)
   const { events, status, result, error, loadError } = useMigration(jobId)
+
+  // A finished job means the user is at the hand-off, so the step indicator
+  // should say Download rather than leaving Migration lit with the download
+  // button already on screen. Display state only — the job data is untouched.
+  useEffect(() => {
+    if (status === 'succeeded') markDownloadReady()
+  }, [status, markDownloadReady])
 
   const byStage = new Map<MigrationStage, StageView>()
   let llmCalls = 0
@@ -136,24 +145,23 @@ export function MigrateScreen() {
   const failedStage = status === 'failed' ? (error?.stage ?? null) : null
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5" data-testid="migrate-screen">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <div className="eyebrow mb-2">Stage 05 · Migration</div>
-          <h1 className="text-[24px] font-semibold tracking-tight text-ink">
-            {status === 'succeeded'
-              ? 'Migration complete'
-              : status === 'failed'
-                ? 'Migration failed'
-                : 'Migrating…'}
-          </h1>
-          <p className="mt-1.5 text-[13.5px] text-ink-3">
-            A live readout of the engine. Each row completes only when the
-            backend says it did — no timers, no guesses.
-          </p>
-        </div>
-        <StreamStatus status={status} />
-      </header>
+    <div className="mx-auto max-w-3xl space-y-6" data-testid="migrate-screen">
+      <StepHeader
+        stage="migrate"
+        title={
+          status === 'succeeded'
+            ? 'Migration complete'
+            : status === 'failed'
+              ? 'Migration failed'
+              : 'Migrating…'
+        }
+        description={
+          status === 'succeeded'
+            ? 'Every row below completed on the backend. The React Native project is ready to take away.'
+            : 'A live readout of the engine. Each row completes only when the backend says it did — no timers, no guesses.'
+        }
+        actions={<StreamStatus status={status} />}
+      />
 
       {/* The LLM-call counter — the product's thesis, shown proudly. */}
       <LlmCallout llmCalls={llmCalls} />
@@ -389,7 +397,8 @@ function ResultPanel({
   return (
     <Panel
       testId="migrate-result"
-      eyebrow="Review · validated"
+      // "Review" is the name of step 03; this panel is the Download hand-off.
+      eyebrow="Hand-off · validated"
       title="The migrated project compiles and bundles"
       actions={
         <div className="flex items-center gap-2">

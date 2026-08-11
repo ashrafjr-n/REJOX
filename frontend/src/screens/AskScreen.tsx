@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { ApiError, startMigration } from '../api/rejox'
+import { StepHeader } from '../components/StepHeader'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Panel } from '../components/ui/Panel'
@@ -70,24 +71,25 @@ export function AskScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <div className="eyebrow mb-2">Stage 04 · Decisions</div>
-          <h1 className="text-[24px] font-semibold tracking-tight text-ink">
-            {questions.length > 0
-              ? `${questions.length} decision${questions.length === 1 ? '' : 's'} to make`
-              : 'No decisions needed'}
-          </h1>
-          <p className="mt-1.5 text-[13.5px] text-ink-3">
-            Every question below was raised by a specific finding — its cause is
-            shown with it.
-          </p>
-        </div>
-        <Button variant="ghost" onClick={goToPlan}>
-          Back to plan
-        </Button>
-      </header>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <StepHeader
+        stage="ask"
+        title={
+          questions.length > 0
+            ? `${questions.length} decision${questions.length === 1 ? '' : 's'} to make`
+            : 'No decisions needed'
+        }
+        description={
+          questions.length > 0
+            ? 'Every question below was raised by a specific finding — its cause is shown with it.'
+            : 'The planner found nothing ambiguous, so there is nothing to answer before migrating.'
+        }
+        actions={
+          <Button variant="ghost" onClick={goToPlan}>
+            Back to plan
+          </Button>
+        }
+      />
 
       {questions.length === 0 ? (
         <Panel>

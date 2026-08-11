@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 
 import { ApiError, uploadGithub, uploadZip } from '../api/rejox'
+import { StepHeader } from '../components/StepHeader'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Panel } from '../components/ui/Panel'
@@ -16,6 +17,7 @@ import {
 } from '../components/icons'
 import { cn } from '../lib/cn'
 import { formatBytes } from '../lib/display'
+import { DUR, HOUSE_EASE } from '../lib/motion'
 import { usePipelineStore } from '../store/pipelineStore'
 import type { CandidateRoot, IngestedProject } from '../types/api'
 
@@ -44,7 +46,7 @@ export function UploadScreen() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={{ duration: DUR.enter, ease: HOUSE_EASE }}
           >
             <LandedView ingest={ingest} />
           </motion.div>
@@ -54,7 +56,7 @@ export function UploadScreen() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={{ duration: DUR.enter, ease: HOUSE_EASE }}
           >
             <InputView />
           </motion.div>
@@ -124,17 +126,13 @@ function InputView() {
 
   return (
     <div>
-      <header className="mb-8">
-        <div className="eyebrow mb-3">Stage 01 · Upload</div>
-        <h1 className="text-[26px] leading-tight font-semibold tracking-tight text-ink">
-          Hand Rejox a React codebase.
-        </h1>
-        <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-ink-2">
-          It builds a deterministic knowledge graph of the project, then reports
-          exactly how much migrates cleanly to React Native — and where genuine
-          reasoning is required.
-        </p>
-      </header>
+      <div className="mb-8">
+        <StepHeader
+          stage="upload"
+          title="Hand Rejox a React codebase."
+          description="It builds a deterministic knowledge graph of the project, then reports exactly how much migrates cleanly to React Native — and where genuine reasoning is required."
+        />
+      </div>
 
       {/* Dropzone */}
       <div
@@ -237,7 +235,7 @@ function InputView() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: DUR.exit, ease: HOUSE_EASE }}
             className="overflow-hidden"
           >
             <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger/8 px-3.5 py-3 text-[13px] text-danger">

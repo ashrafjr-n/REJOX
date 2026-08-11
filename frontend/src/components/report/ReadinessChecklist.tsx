@@ -1,9 +1,10 @@
 import { motion, useReducedMotion } from 'framer-motion'
 
 import { Panel } from '../ui/Panel'
-import { AlertIcon, CheckIcon } from '../icons'
+import { AlertIcon, CheckIcon, InfoIcon } from '../icons'
 import { cn } from '../../lib/cn'
 import { LIBRARY_STATUS_LABEL, RISK_LABEL, formatScore } from '../../lib/display'
+import { rowEntry } from '../../lib/motion'
 import type {
   AnalysisReport,
   LibraryCategory,
@@ -11,6 +12,9 @@ import type {
   LibraryStatus,
   MigrationPlan,
 } from '../../types/api'
+import type { PipelineState } from '../../store/pipelineStore'
+
+type PlanStatus = PipelineState['planStatus']
 
 /**
  * The Review step's lead: "is this project ready to migrate?", answerable in a
@@ -49,9 +53,7 @@ const MAX_LIBRARY_LINES = 5
 /** Names listed inline on the grouped line before it, too, says "+N more". */
 const MAX_INLINE_NAMES = 5
 
-const HOUSE_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
-
-type Glyph = 'ok' | 'warn' | 'block'
+type Glyph = 'ok' | 'warn' | 'block' | 'pending'
 
 interface CheckLine {
   id: string
@@ -64,12 +66,14 @@ const GLYPH_CLASS: Record<Glyph, string> = {
   ok: 'border-pos/40 bg-pos/12 text-pos',
   warn: 'border-warn/40 bg-warn/12 text-warn',
   block: 'border-danger/40 bg-danger/12 text-danger',
+  pending: 'border-line-strong bg-surface-2 text-ink-3',
 }
 
 const VERDICT_CLASS: Record<Glyph, string> = {
   ok: 'border-pos/30 bg-pos/8',
   warn: 'border-warn/30 bg-warn/8',
   block: 'border-danger/30 bg-danger/8',
+  pending: 'border-line bg-surface-2/50',
 }
 
 /** `unsupported` first, then the manual-review statuses, then the rest. */
@@ -158,12 +162,25 @@ function buildLines(report: AnalysisReport): CheckLine[] {
 function buildVerdict(
   report: AnalysisReport,
   plan: MigrationPlan | null,
+  planStatus: PlanStatus,
 ): CheckLine {
   const libraries = report.libraries ?? []
   const blockers = report.blockers ?? []
   const unsupported = libraries.filter((l) => l.status === 'unsupported')
   const manual = libraries.filter((l) => MANUAL_REVIEW.includes(l.status))
   const questions = plan?.questions ?? []
+
+  // The plan is prefetched during the analysis reveal, so it is normally here
+  // before this screen mounts. If it is still in flight we say so rather than
+  // publish a verdict that would change under the reader a second later.
+  if (!plan && planStatus === 'loading') {
+    return {
+      id: 'verdict',
+      glyph: 'pending',
+      label: 'Checking whether any decisions are needed…',
+      detail: 'Reading the migration plan.',
+    }
+  }
 
   if (blockers.length > 0) {
     return {
@@ -214,6 +231,8 @@ function Glyph({ glyph }: { glyph: Glyph }) {
     >
       {glyph === 'ok' ? (
         <CheckIcon className="text-[14px]" />
+      ) : glyph === 'pending' ? (
+        <InfoIcon className="text-[13px]" />
       ) : (
         <AlertIcon className="text-[13px]" />
       )}
@@ -226,28 +245,24 @@ const GLYPH_LABEL: Record<Glyph, string> = {
   ok: 'OK:',
   warn: 'Needs review:',
   block: 'Blocked:',
+  pending: 'Pending:',
 }
 
 export function ReadinessChecklist({
   report,
   plan,
+  planStatus,
 }: {
   report: AnalysisReport
   plan: MigrationPlan | null
+  planStatus: PlanStatus
 }) {
   const reduceMotion = useReducedMotion() === true
   const lines = buildLines(report)
-  const verdict = buildVerdict(report, plan)
+  const verdict = buildVerdict(report, plan, planStatus)
   const warnings = report.warnings ?? []
 
-  const row = (i: number) =>
-    reduceMotion
-      ? { initial: false as const, animate: { opacity: 1, y: 0 } }
-      : {
-          initial: { opacity: 0, y: 6 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.3, ease: HOUSE_EASE, delay: i * 0.06 },
-        }
+  const row = (i: number) => rowEntry(i, reduceMotion)
 
   return (
     <Panel

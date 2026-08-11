@@ -11,21 +11,20 @@ import { ScoreBreakdown } from '../components/report/ScoreBreakdown'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Stat } from '../components/ui/Metric'
+import { StepHeader } from '../components/StepHeader'
 import { ArrowRightIcon, ChevronDownIcon } from '../components/icons'
 import { cn } from '../lib/cn'
+import { DUR, HOUSE_EASE, STAGGER, enter } from '../lib/motion'
 import { usePipelineStore } from '../store/pipelineStore'
 import type { AnalysisReport } from '../types/api'
 
-/** The pipeline's house easing. */
-const HOUSE_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
-
 /** A section wrapper that fades its contents up as they enter the report. */
-function Section({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+function Section({ children, index = 0 }: { children: ReactNode; index?: number }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut', delay }}
+      transition={enter(index * STAGGER)}
     >
       {children}
     </motion.div>
@@ -35,19 +34,23 @@ function Section({ children, delay = 0 }: { children: ReactNode; delay?: number 
 export function ReportScreen() {
   const report = usePipelineStore((s) => s.report)
   const plan = usePipelineStore((s) => s.plan)
+  const planStatus = usePipelineStore((s) => s.planStatus)
   const reset = usePipelineStore((s) => s.reset)
   const goToPlan = usePipelineStore((s) => s.goToPlan)
 
   if (!report) return null
 
   return (
-    <div className="space-y-6" data-testid="report-screen">
+    // Narrower than the shell so the step-to-step width change is a gradient
+    // (768 column → 1024 report → full-width DAG) rather than a jump.
+    <div className="mx-auto max-w-5xl space-y-6" data-testid="report-screen">
       <ReportHeader report={report} onReset={reset} onPlan={goToPlan} />
 
-      {/* Lead: the readable-in-three-seconds answer. The plan is only in the
-          store once the user has been to the Plan step, so the "decisions
-          pending" verdict appears on a return visit — never guessed. */}
-      <ReadinessChecklist report={report} plan={plan} />
+      {/* Lead: the readable-in-three-seconds answer. The plan is prefetched
+          behind the analysis reveal, so the decisions verdict is accurate on
+          the first visit; `planStatus` covers the case where it is still in
+          flight. Never guessed. */}
+      <ReadinessChecklist report={report} plan={plan} planStatus={planStatus} />
 
       {/* Everything that used to lead this screen, intact, one click away. */}
       <FullAnalysis report={report} />
@@ -100,34 +103,36 @@ function FullAnalysis({ report }: { report: AnalysisReport }) {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: open ? 1 : 0, y: open ? 0 : 6 }}
           transition={
-            reduceMotion ? { duration: 0 } : { duration: 0.3, ease: HOUSE_EASE }
+            reduceMotion
+              ? { duration: 0 }
+              : { duration: DUR.enter, ease: HOUSE_EASE }
           }
           className="mt-6 space-y-6"
         >
-          <Section delay={0.05}>
+          <Section index={0}>
             <MetricsHeader report={report} />
           </Section>
 
-          <Section delay={0.1}>
+          <Section index={1}>
             <SummaryTiles report={report} />
           </Section>
 
-          <Section delay={0.15}>
+          <Section index={2}>
             <ScoreBreakdown
               contributions={report.contributions ?? []}
               coverage={report.coverage}
             />
           </Section>
 
-          <Section delay={0.2}>
+          <Section index={3}>
             <LibrariesTable libraries={report.libraries ?? []} />
           </Section>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Section delay={0.25}>
+            <Section index={4}>
               <DomainsPanel domains={report.domains ?? []} />
             </Section>
-            <Section delay={0.3}>
+            <Section index={5}>
               <FindingsPanel
                 blockers={report.blockers ?? []}
                 warnings={report.warnings ?? []}
@@ -150,31 +155,27 @@ function ReportHeader({
   onPlan: () => void
 }) {
   return (
-    <div className="flex items-end justify-between gap-4">
-      <div>
-        <div className="eyebrow mb-2">Stage 02 · Migration Report</div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-[24px] leading-tight font-semibold tracking-tight text-ink">
-            {report.projectName}
-          </h1>
-          <Badge tone="signal" dot>
-            analyzed
-          </Badge>
-        </div>
-        <p className="mt-1.5 text-[13.5px] text-ink-3">
-          A deterministic read of the project. Nothing has been migrated yet.
-        </p>
-      </div>
-      <div className="flex gap-2">
-        <Button variant="ghost" onClick={onReset}>
-          New analysis
-        </Button>
-        <Button variant="primary" onClick={onPlan}>
-          Plan the migration
-          <ArrowRightIcon className="text-[16px]" />
-        </Button>
-      </div>
-    </div>
+    <StepHeader
+      stage="report"
+      title={report.projectName}
+      badge={
+        <Badge tone="signal" dot>
+          analyzed
+        </Badge>
+      }
+      description="A deterministic read of the project. Nothing has been migrated yet."
+      actions={
+        <>
+          <Button variant="ghost" onClick={onReset}>
+            New analysis
+          </Button>
+          <Button variant="primary" onClick={onPlan}>
+            Plan the migration
+            <ArrowRightIcon className="text-[16px]" />
+          </Button>
+        </>
+      }
+    />
   )
 }
 
