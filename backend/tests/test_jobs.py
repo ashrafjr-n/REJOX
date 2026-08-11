@@ -179,3 +179,36 @@ def test_sse_reconnect_with_last_event_id_loses_nothing(client) -> None:
 def test_unknown_job_is_404(client) -> None:
     assert client.get("/api/jobs/deadbeefdeadbeef").status_code == 404
     assert client.get("/api/jobs/deadbeefdeadbeef/events").status_code == 404
+
+
+# --- Failure attribution (the stage that actually failed) --------------------
+
+
+@pytest.mark.parametrize(
+    ("target", "stage"),
+    [
+        ("build_knowledge_graph", "intelligence"),
+        ("analyze_graph", "analyze"),
+        ("plan_migration", "plan"),
+    ],
+)
+def test_failure_before_migration_reports_the_real_stage(
+    client, monkeypatch, target: str, stage: str
+) -> None:
+    """A job that dies while building the graph / analyzing / planning says so —
+    it is not blamed on emit, which never started."""
+    import app.jobs as jobs_mod
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError(f"{target} exploded")
+
+    monkeypatch.setattr(jobs_mod, target, boom)
+    run_id = _upload(client)
+    job_id = _start_emit_only(client, run_id)
+    state = _await(client, job_id)
+
+    assert state["status"] == "failed"
+    assert state["error"]["stage"] == stage
+    assert state["error"]["type"] == "RuntimeError"
+    assert state["events"][-1]["stage"] == stage
+    assert stage in state["events"][-1]["message"]

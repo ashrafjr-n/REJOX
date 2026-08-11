@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.analysis import AnalysisReport
 from app.models.knowledge_graph import KnowledgeGraph
-from app.pipeline.analyzer import analyze_graph
+from app.pipeline.analyzer import AnalyzerError, analyze_graph
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -292,3 +292,90 @@ def test_analyze_endpoint_rejects_bad_path() -> None:
     client = TestClient(app)
     resp = client.post("/api/analyze", json={"path": "/no/such/project/xyz"})
     assert resp.status_code == 400
+
+
+# --- Parser warnings (kg.warnings → report issues) ---------------------------
+
+
+def _with_warnings(name: str, warnings: list[str]) -> KnowledgeGraph:
+    kg = _load(name)
+    return kg.model_copy(update={"warnings": warnings})
+
+
+def test_parse_failure_is_a_blocker_naming_the_file() -> None:
+    """A file the worker could not load is absent from the graph — that hole is
+    reported, not swallowed."""
+    report = analyze_graph(
+        _with_warnings("sample-app.kg.json", ["Failed to load src/App.tsx: EACCES"])
+    )
+    issue = next(b for b in report.blockers if b.code == "PARSE_FAILED")
+    assert issue.evidence.file == "src/App.tsx"
+    assert "EACCES" in issue.evidence.detail
+
+
+def test_syntax_error_is_a_warning_not_a_blocker() -> None:
+    """ts-morph still parses a file with syntax errors, so its extraction is
+    partial (a warning), not missing (a blocker)."""
+    report = analyze_graph(
+        _with_warnings(
+            "sample-app.kg.json", ["Syntax error in src/Broken.tsx: ';' expected."]
+        )
+    )
+    assert report.blockers == []
+    issue = next(w for w in report.warnings if w.code == "PARSE_WARNING")
+    assert issue.evidence.file == "src/Broken.tsx"
+
+
+def test_unrecognized_parser_warning_still_surfaces() -> None:
+    """A warning shape we do not recognize is reported, never dropped."""
+    report = analyze_graph(_with_warnings("sample-app.kg.json", ["Something new broke"]))
+    issue = next(w for w in report.warnings if w.code == "PARSE_WARNING")
+    assert issue.evidence.detail == "Something new broke"
+    assert issue.evidence.file is None
+
+
+def test_object_router_warning_is_reported_once_by_routing() -> None:
+    """routing.py owns that warning; the parsing rule must not duplicate it."""
+    report = analyze_graph(
+        _with_warnings(
+            "sample-app.kg.json",
+            ["Object-config router (createBrowserRouter/createHashRouter) in "
+             "src/main.tsx is not yet parsed; only JSX <Route> is extracted."],
+        )
+    )
+    codes = [i.code for i in report.blockers + report.warnings]
+    assert codes.count("OBJECT_ROUTER_UNPARSED") == 1
+    assert "PARSE_FAILED" not in codes and "PARSE_WARNING" not in codes
+
+
+# --- Typed failures ----------------------------------------------------------
+
+
+def test_rule_failure_becomes_an_analyzer_error_with_context(monkeypatch) -> None:
+    """An unexpected rule failure names the rule and the graph it was walking."""
+    import app.pipeline.analyzer as analyzer_mod
+
+    def boom(_kg):
+        raise ZeroDivisionError("division by zero")
+
+    monkeypatch.setattr(analyzer_mod, "analyze_libraries", boom)
+    with pytest.raises(AnalyzerError) as excinfo:
+        analyze_graph(_load("sample-app.kg.json"))
+    message = str(excinfo.value)
+    assert "library rules" in message
+    assert "sample-app" in message
+    assert "ZeroDivisionError: division by zero" in message
+
+
+def test_analyze_endpoint_reports_the_analyzer_failure(monkeypatch) -> None:
+    """The API answers with the typed message, not an opaque 500 body."""
+    import app.pipeline.analyzer as analyzer_mod
+
+    def boom(_kg):
+        raise ZeroDivisionError("division by zero")
+
+    monkeypatch.setattr(analyzer_mod, "analyze_components", boom)
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/api/analyze", json={"path": str(SAMPLE_APP)})
+    assert resp.status_code == 500
+    assert "component rules" in resp.json()["detail"]

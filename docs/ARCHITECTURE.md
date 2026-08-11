@@ -451,9 +451,16 @@ backend/app/pipeline/
     ├── components.py      # ELEMENT_MAP / EVENT_MAP → per-component issues
     ├── styling.py         # Tailwind class classifier + styling report
     ├── routing.py         # react-router → proposed React Navigation stack
+    ├── parsing.py         # kg.warnings → PARSE_FAILED / PARSE_WARNING issues
     ├── domains.py         # DOMAIN_TABLE → functional-domain risk assessment
     └── scoring.py         # Coverage contributions + provenance Confidence
 ```
+
+A rule that fails raises `AnalyzerError` naming the rule and the graph it was
+walking (same contract as `IngestError` / `IntelligenceError` /
+`TransformerError`); the API turns it into a `500` carrying that message rather
+than an opaque body, and the CLI prints it instead of a traceback. The Planner
+mirrors this with `PlannerError`.
 
 ### Rule groups
 
@@ -474,6 +481,12 @@ backend/app/pipeline/
 - **Routing rules** — react-router → a `needs-conversion` finding plus a proposed
   React Navigation stack (screen name + params per route). A worker
   `createBrowserRouter` warning surfaces as an `OBJECT_ROUTER_UNPARSED` blocker.
+- **Parsing rules** — the worker's per-file `kg.warnings` become report issues,
+  so a partially-parsed project is never silent. A file that never made it into
+  the graph (failed to load / extract, or an unreadable `package.json`) is a
+  `PARSE_FAILED` **blocker**; a file that is in the graph but was read
+  imperfectly (syntax diagnostics) is a `PARSE_WARNING`. The object-config
+  router warning is skipped here — routing owns it, one fact = one issue.
 
 ### Domain Risk Assessment (`rules/domains.py`)
 
