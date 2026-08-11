@@ -31,10 +31,10 @@ from rich.text import Text
 from app.models.analysis import AnalysisReport
 from app.models.knowledge_graph import KnowledgeGraph
 from app.models.plan import MigrationPlan, Question
-from app.pipeline.analyzer import analyze_graph
+from app.pipeline.analyzer import AnalyzerError, analyze_graph
 from app.pipeline.emit import emit_project
 from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
-from app.pipeline.planner import plan_migration
+from app.pipeline.planner import PlannerError, plan_migration
 from app.pipeline.validator import (
     ValidatorError,
     validate_project,
@@ -514,12 +514,16 @@ def migrate(
         with console.status("[cyan]Building the knowledge graph…[/]", spinner="dots"):
             kg = build_knowledge_graph(src)
             report = analyze_graph(kg)
-    except IntelligenceError as exc:
+    except (IntelligenceError, AnalyzerError) as exc:
         console.print(f"[red]Analysis failed:[/] {exc}")
         raise typer.Exit(code=1)
     _render_report(report)
 
-    plan = plan_migration(report, kg)
+    try:
+        plan = plan_migration(report, kg)
+    except PlannerError as exc:
+        console.print(f"[red]Planning failed:[/] {exc}")
+        raise typer.Exit(code=1)
 
     # 2. Ask.
     inner, ai_label = _make_provider()
@@ -638,10 +642,14 @@ def export_showcase(
             c_intel = counter.calls
             report = analyze_graph(kg)
             c_analyze = counter.calls
-    except IntelligenceError as exc:
+    except (IntelligenceError, AnalyzerError) as exc:
         console.print(f"[red]Analysis failed:[/] {exc}")
         raise typer.Exit(code=1)
-    plan = plan_migration(report, kg)
+    try:
+        plan = plan_migration(report, kg)
+    except PlannerError as exc:
+        console.print(f"[red]Planning failed:[/] {exc}")
+        raise typer.Exit(code=1)
     c_plan = counter.calls
 
     # 2. Ask — the one genuine reasoning call (navigator shape), auto-accepted.

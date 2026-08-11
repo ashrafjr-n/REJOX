@@ -31,12 +31,12 @@ from app.models.analysis import AnalysisReport
 from app.models.ingest import IngestedProject
 from app.models.jobs import JobCreated, JobState
 from app.models.knowledge_graph import KnowledgeGraph
-from app.models.plan import PlanResponse
+from app.models.plan import MigrationPlan, PlanResponse
 from app.pipeline import workspace
-from app.pipeline.analyzer import analyze_graph
+from app.pipeline.analyzer import AnalyzerError, analyze_graph
 from app.pipeline.ingest import IngestError, ingest_github, ingest_zip
 from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
-from app.pipeline.planner import plan_migration
+from app.pipeline.planner import PlannerError, plan_migration
 
 app = FastAPI(
     title="Rejox AI",
@@ -133,6 +133,24 @@ def _build_kg(source: Path) -> KnowledgeGraph:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+# The Analyzer and Planner are deterministic and total over a valid graph, so a
+# failure there is OUR defect, not a bad upload: it stays a 500 (never a 4xx
+# that would blame the user's project), but carries the stage's typed message
+# instead of FastAPI's opaque "Internal Server Error".
+def _analyze(kg: KnowledgeGraph) -> AnalysisReport:
+    try:
+        return analyze_graph(kg)
+    except AnalyzerError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def _plan(report: AnalysisReport, kg: KnowledgeGraph) -> MigrationPlan:
+    try:
+        return plan_migration(report, kg)
+    except PlannerError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 # --- Upload stage ------------------------------------------------------------
 
 
@@ -222,7 +240,7 @@ def analyze(req: SourceRequest) -> AnalysisReport:
         if plan_cached is not None:
             return plan_cached.report
 
-    report = analyze_graph(_build_kg(_source_for(req)))
+    report = _analyze(_build_kg(_source_for(req)))
     if run is not None:
         _write_cache(run, _ANALYSIS_CACHE, report)
     return report
@@ -238,8 +256,8 @@ def plan(req: SourceRequest) -> PlanResponse:
             return cached
 
     kg = _build_kg(_source_for(req))
-    report = analyze_graph(kg)
-    response = PlanResponse(report=report, plan=plan_migration(report, kg))
+    report = _analyze(kg)
+    response = PlanResponse(report=report, plan=_plan(report, kg))
     if run is not None:
         _write_cache(run, _PLAN_CACHE, response)
         _write_cache(run, _ANALYSIS_CACHE, report)

@@ -20,9 +20,17 @@ Step ordering — the step list is derived from the report, not hardcoded:
   navigation → validation. Content steps with no targets are omitted. Component
   conversion is split into dependency *waves* via the KG `renders` edges
   (leaf/shared components first, pages last) using Kahn's algorithm.
+
+Failures are typed: anything that blows up while planning is re-raised as a
+:class:`PlannerError` naming the phase and the report it was planning over — the
+same contract the stages around it (``AnalyzerError``, ``TransformerError``,
+``ValidatorError``) provide.
 """
 
 from __future__ import annotations
+
+from contextlib import contextmanager
+from typing import Iterator
 
 from app.models.analysis import AnalysisReport
 from app.models.knowledge_graph import KnowledgeGraph
@@ -56,6 +64,39 @@ UNSUPPORTED_SUGGESTIONS = {
     "next": "Extract app code out of Next.js; SSR/Next is out of scope.",
     "electron": "Desktop shell is unsupported; target mobile platforms only.",
 }
+
+
+class PlannerError(RuntimeError):
+    """Raised when the Planner cannot turn a report + graph into a plan.
+
+    The Planner is deterministic and total over a valid report, so this means a
+    planning phase hit content it could not handle — a defect, not user input.
+    The message carries the failing phase plus the report's shape so the failure
+    is diagnosable from the message alone.
+    """
+
+
+def _plan_context(report: AnalysisReport, kg: KnowledgeGraph) -> str:
+    """The report/KG facts worth embedding in a failure message."""
+    return (
+        f"project '{report.projectName}' ({len(report.components)} components, "
+        f"{len(report.routing.routes)} routes, {len(kg.edges)} graph edges, "
+        f"{len(report.blockers)} blockers)"
+    )
+
+
+@contextmanager
+def _phase(label: str, report: AnalysisReport, kg: KnowledgeGraph) -> Iterator[None]:
+    """Run one planning phase, tagging any failure with the phase + context."""
+    try:
+        yield
+    except PlannerError:
+        raise  # already tagged — never re-wrap
+    except Exception as exc:
+        raise PlannerError(
+            f"Planner failed in {label} for {_plan_context(report, kg)}: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
 
 
 # --- Small helpers ----------------------------------------------------------
@@ -606,18 +647,28 @@ def _unsupported(report: AnalysisReport) -> list[UnsupportedItem]:
 
 
 def plan_migration(report: AnalysisReport, kg: KnowledgeGraph) -> MigrationPlan:
-    """Build the ordered Migration Plan and Ask-stage questions."""
-    questions = _questions(report, kg)
-    question_ids = [q.id for q in questions]
-    waves = _component_waves(report, kg)
-    steps = _steps(report, kg, waves, question_ids)
-    _assign_waves(steps)          # each step's topological layer (was UI-side)
-    _attach_findings(steps, report)  # per-step issues over real KG ids
+    """Build the ordered Migration Plan and Ask-stage questions.
 
-    return MigrationPlan(
-        projectName=report.projectName,
-        questions=questions,
-        steps=steps,
-        manualReviewCandidates=_manual_review(report),
-        unsupportedItems=_unsupported(report),
-    )
+    Raises:
+        PlannerError: if any planning phase fails on this report/graph.
+    """
+    with _phase("questions", report, kg):
+        questions = _questions(report, kg)
+        question_ids = [q.id for q in questions]
+    with _phase("component waves", report, kg):
+        waves = _component_waves(report, kg)
+    with _phase("steps", report, kg):
+        steps = _steps(report, kg, waves, question_ids)
+    with _phase("step waves", report, kg):
+        _assign_waves(steps)      # each step's topological layer (was UI-side)
+    with _phase("step findings", report, kg):
+        _attach_findings(steps, report)  # per-step issues over real KG ids
+
+    with _phase("plan assembly", report, kg):
+        return MigrationPlan(
+            projectName=report.projectName,
+            questions=questions,
+            steps=steps,
+            manualReviewCandidates=_manual_review(report),
+            unsupportedItems=_unsupported(report),
+        )
