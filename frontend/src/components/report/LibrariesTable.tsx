@@ -17,7 +17,7 @@ function CompatibilityBar({ value }: { value: number }) {
           style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
         />
       </div>
-      <span className="tnum w-8 text-right font-mono text-[12px] text-ink-2 tabular-nums">
+      <span className="tnum w-8 text-right font-mono text-[13px] text-ink-2 tabular-nums">
         {value}
       </span>
     </div>
@@ -32,7 +32,7 @@ const columns: Column<LibraryFinding>[] = [
       <div className="flex items-center gap-2">
         <span className="font-medium text-ink">{lib.name}</span>
         {lib.version && (
-          <span className="font-mono text-[11px] text-ink-4">{lib.version}</span>
+          <span className="font-mono text-[11.5px] text-ink-4">{lib.version}</span>
         )}
       </div>
     ),
@@ -63,7 +63,7 @@ const columns: Column<LibraryFinding>[] = [
             <span
               key={rn.name}
               title={rn.note || undefined}
-              className="rounded border border-line-strong bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink-2"
+              className="rounded border border-line-strong bg-surface-2 px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2"
             >
               {rn.name}
             </span>
@@ -89,7 +89,7 @@ export function LibrariesTable({ libraries }: { libraries: LibraryFinding[] }) {
       title="Libraries"
       description="Each dependency mapped to its React Native standing and equivalent."
       actions={
-        <span className="font-mono text-[12px] text-ink-3 tabular-nums">
+        <span className="font-mono text-[13px] text-ink-3 tabular-nums">
           {libraries.length} detected
         </span>
       }

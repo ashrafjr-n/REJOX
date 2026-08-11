@@ -44,7 +44,7 @@ export function ScoreBreakdown({ contributions, coverage }: Props) {
               {/* Signed delta */}
               <span
                 className={cn(
-                  'tnum w-14 shrink-0 text-right font-mono text-[15px] font-semibold tabular-nums',
+                  'tnum w-14 shrink-0 text-right font-mono text-[16px] font-semibold tabular-nums',
                   positive ? 'text-pos' : 'text-danger',
                 )}
               >
@@ -54,16 +54,16 @@ export function ScoreBreakdown({ contributions, coverage }: Props) {
               {/* Label + reason */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-[13.5px] font-medium text-ink">
+                  <span className="text-[15px] font-medium text-ink">
                     {c.label}
                   </span>
                   {c.evidence && (
-                    <span className="truncate font-mono text-[11px] text-ink-4">
+                    <span className="truncate font-mono text-[11.5px] text-ink-4">
                       {c.evidence}
                     </span>
                   )}
                 </div>
-                <div className="text-[12.5px] leading-snug text-ink-3">
+                <div className="text-[13px] leading-snug text-ink-3">
                   {c.reason}
                 </div>
               </div>

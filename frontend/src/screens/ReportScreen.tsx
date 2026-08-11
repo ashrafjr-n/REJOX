@@ -79,7 +79,7 @@ function FullAnalysis({ report }: { report: AnalysisReport }) {
       >
         <div className="min-w-0">
           <div className="eyebrow mb-1.5">Detail</div>
-          <h2 className="text-[15px] font-semibold tracking-tight text-ink">
+          <h2 className="text-[16px] font-semibold tracking-tight text-ink">
             {open ? 'Hide full analysis' : 'View full analysis'}
           </h2>
           <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-ink-3">
@@ -87,7 +87,7 @@ function FullAnalysis({ report }: { report: AnalysisReport }) {
             risk, and all blockers and warnings.
           </p>
         </div>
-        <span className="flex shrink-0 items-center gap-2 font-mono text-[12px] text-ink-3">
+        <span className="flex shrink-0 items-center gap-2 font-mono text-[13px] text-ink-3">
           {open ? 'collapse' : 'expand'}
           <ChevronDownIcon
             className={cn(

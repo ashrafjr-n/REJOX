@@ -27,7 +27,7 @@ export function PlanNode({ data, selected }: NodeProps<PlanNodeData>) {
       data-testid="plan-node"
       data-flagged={flagged ? 'true' : 'false'}
       className={cn(
-        'w-[230px] rounded-lg border bg-surface-1 px-3 py-2.5 shadow-[var(--shadow-panel)] transition-colors',
+        'w-[230px] rounded-xl border bg-surface-1 px-3 py-2.5 shadow-[var(--shadow-panel)] transition-colors',
         selected
           ? 'border-signal ring-2 ring-signal/40'
           : flagged
@@ -39,16 +39,16 @@ export function PlanNode({ data, selected }: NodeProps<PlanNodeData>) {
 
       <div className="flex items-center justify-between gap-2">
         <Badge tone={STEP_KIND_TONE[step.kind]}>{step.kind}</Badge>
-        <span className="font-mono text-[10px] tabular-nums text-ink-4">
+        <span className="font-mono text-[11.5px] tabular-nums text-ink-4">
           #{step.order}
         </span>
       </div>
 
-      <div className="mt-1.5 text-[12.5px] font-medium leading-snug text-ink">
+      <div className="mt-1.5 text-[13px] font-medium leading-snug text-ink">
         {step.title}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 text-[10.5px] text-ink-3">
+      <div className="mt-2 flex items-center gap-2 text-[11.5px] text-ink-3">
         <Badge tone={EFFORT_TONE[step.estimatedEffort]}>{step.estimatedEffort}</Badge>
         <span className="font-mono tabular-nums">{targets.length} targets</span>
         {deps.length > 0 && (
@@ -64,8 +64,8 @@ export function PlanNode({ data, selected }: NodeProps<PlanNodeData>) {
             </Badge>
           )}
           {findingCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-warn">
-              <AlertIcon className="text-[12px]" />
+            <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-warn">
+              <AlertIcon className="text-[13px]" />
               {findingCount} review
             </span>
           )}

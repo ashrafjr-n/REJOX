@@ -46,7 +46,7 @@ export function Panel({
           <div className="min-w-0">
             {eyebrow && <div className="eyebrow mb-1.5">{eyebrow}</div>}
             {title && (
-              <h2 className="text-[15px] font-semibold tracking-tight text-ink">
+              <h2 className="text-[16px] font-semibold tracking-tight text-ink">
                 {title}
               </h2>
             )}

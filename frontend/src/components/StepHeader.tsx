@@ -50,7 +50,7 @@ export function StepHeader({
         )}
       </div>
       {description && (
-        <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-ink-3">
+        <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-ink-3">
           {description}
         </p>
       )}

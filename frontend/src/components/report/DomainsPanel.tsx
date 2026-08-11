@@ -10,7 +10,7 @@ export function DomainsPanel({ domains }: { domains: DomainRisk[] }) {
       title="Domains & risk"
       description="What the project actually does — detected from graph evidence, each with its migration risk."
       actions={
-        <span className="font-mono text-[12px] text-ink-3 tabular-nums">
+        <span className="font-mono text-[13px] text-ink-3 tabular-nums">
           {domains.length} detected
         </span>
       }
@@ -24,22 +24,22 @@ export function DomainsPanel({ domains }: { domains: DomainRisk[] }) {
           {domains.map((d) => (
             <div
               key={d.domain}
-              className="flex flex-col rounded-lg border border-line bg-surface-0 p-4"
+              className="flex flex-col rounded-xl border border-line bg-surface-0 p-4"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[13.5px] font-medium text-ink capitalize">
+                <span className="text-[15px] font-medium text-ink capitalize">
                   {d.domain}
                 </span>
                 <Badge tone={RISK_TONE[d.risk]} dot>
                   {RISK_LABEL[d.risk]} risk
                 </Badge>
               </div>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">
+              <p className="mt-2 text-[13px] leading-relaxed text-ink-2">
                 {d.reason}
               </p>
               {d.rnNotes && (
-                <p className="mt-2 border-t border-line/60 pt-2 text-[12px] leading-relaxed text-ink-3">
-                  <span className="font-mono text-[10.5px] tracking-wide text-ink-4">
+                <p className="mt-2 border-t border-line/60 pt-2 text-[13px] leading-relaxed text-ink-3">
+                  <span className="font-mono text-[11.5px] tracking-wide text-ink-4">
                     RN&nbsp;·&nbsp;
                   </span>
                   {d.rnNotes}

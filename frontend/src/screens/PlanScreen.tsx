@@ -77,7 +77,7 @@ export function PlanScreen() {
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-danger/15 text-danger">
             <AlertIcon className="text-[20px]" />
           </span>
-          <h2 className="mt-4 text-[15px] font-semibold text-ink">Planning failed</h2>
+          <h2 className="mt-4 text-[16px] font-semibold text-ink">Planning failed</h2>
           <p className="mx-auto mt-2 max-w-sm text-[13px] text-ink-2">{error}</p>
           <div className="mt-5 flex justify-center">
             <Button variant="secondary" onClick={reset}>
@@ -107,7 +107,7 @@ export function PlanScreen() {
             role="progressbar"
             aria-label="Planning"
           />
-          <p className="mt-5 font-mono text-[11px] tracking-wide text-ink-3">
+          <p className="mt-5 font-mono text-[11.5px] tracking-wide text-ink-3">
             running · waiting on the planner
           </p>
         </div>
@@ -198,9 +198,9 @@ function PlanView({
           <div
             key={i}
             data-testid="plan-wave"
-            className="flex items-center gap-2 rounded-md border border-line bg-surface-0 px-2.5 py-1"
+            className="flex items-center gap-2 rounded-full border border-line bg-surface-0 px-3 py-1"
           >
-            <span className="font-mono text-[10px] tracking-widest text-signal">
+            <span className="font-mono text-[11.5px] tracking-widest text-signal">
               W{i + 1}
             </span>
             <span className="text-[11.5px] text-ink-3">
@@ -226,12 +226,14 @@ function PlanView({
           >
             <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--color-line)" />
             <Controls showInteractive={false} />
+            {/* Dark, quiet chrome: the minimap used to read as a light slab
+                against the black canvas. */}
             <MiniMap
               pannable
               zoomable
-              maskColor="rgba(0,0,0,0.6)"
-              style={{ background: 'var(--color-surface-1)' }}
-              nodeColor="var(--color-surface-3)"
+              maskColor="rgba(0,0,0,0.72)"
+              style={{ background: 'var(--color-surface-0)' }}
+              nodeColor="var(--color-line-strong)"
             />
           </ReactFlow>
         </div>
@@ -258,14 +260,14 @@ function PlanView({
               eyebrow="Findings"
               title="Manual review"
               actions={
-                <span className="font-mono text-[12px] text-ink-3 tabular-nums">
+                <span className="font-mono text-[13px] text-ink-3 tabular-nums">
                   {candidates.length}
                 </span>
               }
             >
               <ul className="space-y-2.5">
                 {candidates.map((c) => (
-                  <li key={c.componentId} className="text-[12.5px]">
+                  <li key={c.componentId} className="text-[13px]">
                     <div className="font-mono text-[11.5px] text-ink-2">
                       {c.componentId}
                     </div>
@@ -279,7 +281,7 @@ function PlanView({
             <Panel eyebrow="Findings" title="Unsupported">
               <ul className="space-y-2.5">
                 {unsupported.map((u) => (
-                  <li key={u.name} className="text-[12.5px]">
+                  <li key={u.name} className="text-[13px]">
                     <div className="font-medium text-ink">{u.name}</div>
                     <div className="text-ink-3">{u.reason}</div>
                     <div className="mt-0.5 text-ink-4">{u.suggestion}</div>
@@ -326,7 +328,7 @@ function StepDetail({ step }: { step: PlanStep }) {
       </p>
 
       {step.notes && (
-        <p className="mt-3 rounded-md border border-line bg-surface-0 px-3 py-2 text-[12px] leading-relaxed text-ink-3">
+        <p className="mt-3 rounded-md border border-line bg-surface-0 px-3 py-2 text-[13px] leading-relaxed text-ink-3">
           {step.notes}
         </p>
       )}
@@ -347,14 +349,14 @@ function StepDetail({ step }: { step: PlanStep }) {
         <Section title={`Findings (${findings.length})`}>
           <ul className="space-y-1.5">
             {findings.map((f, i) => (
-              <li key={`${f.componentId}-${f.code}-${i}`} className="flex gap-2 text-[12px]">
+              <li key={`${f.componentId}-${f.code}-${i}`} className="flex gap-2 text-[13px]">
                 <AlertIcon
                   className={cn('mt-0.5 shrink-0 text-[13px]', SEVERITY_TEXT[f.severity])}
                 />
                 <span className="min-w-0">
-                  <span className="font-mono text-[10.5px] text-ink-4">{f.code}</span>{' '}
+                  <span className="font-mono text-[11.5px] text-ink-4">{f.code}</span>{' '}
                   <span className="text-ink-2">{f.message}</span>
-                  <span className="block truncate font-mono text-[10.5px] text-ink-4">
+                  <span className="block truncate font-mono text-[11.5px] text-ink-4">
                     {f.componentId}
                   </span>
                 </span>
@@ -370,7 +372,7 @@ function StepDetail({ step }: { step: PlanStep }) {
             {deps.map((d) => (
               <span
                 key={d}
-                className="rounded border border-line-strong bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink-2"
+                className="rounded border border-line-strong bg-surface-2 px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2"
               >
                 {d}
               </span>
@@ -382,7 +384,7 @@ function StepDetail({ step }: { step: PlanStep }) {
       <Section title={`Targets (${targets.length})`}>
         <ul className="max-h-56 space-y-1 overflow-y-auto">
           {targets.map((t) => (
-            <li key={t} className="truncate font-mono text-[11px] text-ink-3" title={t}>
+            <li key={t} className="truncate font-mono text-[11.5px] text-ink-3" title={t}>
               {t}
             </li>
           ))}

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useLocation } from 'react-router-dom'
 import { gsap } from 'gsap'
@@ -11,6 +10,7 @@ import { CustomEase } from 'gsap/CustomEase'
 // the exact same chrome by rendering <SiteHeader/>, with nothing moved out of
 // Home.css (so the home page's own styling is untouched).
 import '../screens/Home.css'
+import { useHeaderAutoHide } from '../lib/useHeaderAutoHide'
 import rejoxLogo from '../assets/rejox-logo.svg'
 
 gsap.registerPlugin(ScrollToPlugin, CustomEase)
@@ -34,58 +34,6 @@ function prefersReducedMotion(): boolean {
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
-}
-
-/**
- * Header auto-hide: while the hero fills the viewport the header is always
- * visible; once scrolled past the hero, scrolling DOWN hides it (chrome getting
- * out of the way) and scrolling UP by any meaningful amount brings it straight
- * back — the user never has to return to the top. A small threshold swallows
- * trackpad jitter/momentum so the state never flickers.
- *
- * It reads window.scrollY only (the header is position:fixed, a sibling of the
- * pinned Scene 01, so the pin's spacer/transform never moves it): direction
- * detection works identically in normal flow and while the pinned section is
- * active. The actual hide/show transition (or the reduced-motion snap) is CSS.
- */
-function useHeaderAutoHide(): boolean {
-  const [hidden, setHidden] = useState(false)
-
-  useEffect(() => {
-    // Movement (in px) required before the header commits to a new state — large
-    // enough that jitter and momentum tails don't toggle it, small enough that a
-    // deliberate flick reveals it immediately.
-    const THRESHOLD = 8
-    let lastY = window.scrollY
-    let ticking = false
-
-    const update = () => {
-      ticking = false
-      const y = window.scrollY
-      // Hero is one viewport tall; while it is still on screen keep the header.
-      const heroInView = y <= window.innerHeight
-      if (heroInView) {
-        lastY = y
-        setHidden(false)
-        return
-      }
-      const delta = y - lastY
-      if (Math.abs(delta) < THRESHOLD) return // within jitter band — accumulate
-      setHidden(delta > 0) // scrolling down hides; up reveals
-      lastY = y
-    }
-
-    const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(update)
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  return hidden
 }
 
 /**

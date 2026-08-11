@@ -65,7 +65,7 @@ export function ScoreMetric({ label, value, tone, caption, aside, testId }: Scor
         />
       </div>
       {caption && (
-        <p className="mt-3 text-[12.5px] leading-relaxed text-ink-3">{caption}</p>
+        <p className="mt-3 text-[13px] leading-relaxed text-ink-3">{caption}</p>
       )}
     </div>
   )
@@ -125,7 +125,7 @@ export function LevelMetric({
         ))}
       </div>
       {caption && (
-        <p className="mt-3 text-[12.5px] leading-relaxed text-ink-3">{caption}</p>
+        <p className="mt-3 text-[13px] leading-relaxed text-ink-3">{caption}</p>
       )}
     </div>
   )
@@ -139,7 +139,7 @@ interface StatProps {
 /** A compact project-summary tile: large mono figure + small label. */
 export function Stat({ label, value }: StatProps) {
   return (
-    <div className="rounded-lg border border-line bg-surface-0 px-4 py-3.5">
+    <div className="rounded-xl border border-line bg-surface-0 px-4 py-3.5">
       <div className="tnum text-2xl font-semibold tracking-tight text-ink tabular-nums">
         {value}
       </div>

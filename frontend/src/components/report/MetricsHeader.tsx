@@ -10,7 +10,7 @@ function InfoAside({ content }: { content: React.ReactNode }) {
   return (
     <Tooltip content={content} width={280}>
       <span className="text-ink-4 transition-colors hover:text-ink-2">
-        <InfoIcon className="text-[14px]" />
+        <InfoIcon className="text-[15px]" />
       </span>
     </Tooltip>
   )

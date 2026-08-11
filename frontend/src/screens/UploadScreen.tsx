@@ -185,10 +185,10 @@ function InputView() {
             <UploadIcon />
           )}
         </span>
-        <p className="mt-4 text-[14px] font-medium text-ink">
+        <p className="mt-4 text-[15px] font-medium text-ink">
           {busy === 'zip' ? 'Landing archive…' : 'Drop a .zip, or click to browse'}
         </p>
-        <p className="mt-1 text-[12.5px] text-ink-3">
+        <p className="mt-1 text-[13px] text-ink-3">
           The project must contain a <code className="font-mono text-ink-2">package.json</code> that
           depends on React.
         </p>
@@ -197,7 +197,7 @@ function InputView() {
       {/* Divider */}
       <div className="my-5 flex items-center gap-4">
         <span className="h-px flex-1 bg-line" />
-        <span className="font-mono text-[11px] tracking-widest text-ink-4">OR</span>
+        <span className="font-mono text-[11.5px] tracking-widest text-ink-4">OR</span>
         <span className="h-px flex-1 bg-line" />
       </div>
 
@@ -216,7 +216,7 @@ function InputView() {
               if (e.key === 'Enter') void submitGithub()
             }}
             placeholder="https://github.com/owner/repo"
-            className="h-10 w-full rounded-lg border border-line-strong bg-surface-1 pr-3 pl-10 text-[14px] text-ink placeholder:text-ink-4 outline-none focus:border-signal/60 focus:ring-2 focus:ring-signal/20 disabled:opacity-60"
+            className="h-10 w-full rounded-lg border border-line-strong bg-surface-1 pr-3 pl-10 text-[15px] text-ink placeholder:text-ink-4 outline-none focus:border-signal/60 focus:ring-2 focus:ring-signal/20 disabled:opacity-60"
           />
         </div>
         <Button
@@ -239,7 +239,7 @@ function InputView() {
             className="overflow-hidden"
           >
             <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger/8 px-3.5 py-3 text-[13px] text-danger">
-              <AlertIcon className="mt-0.5 shrink-0 text-[15px]" />
+              <AlertIcon className="mt-0.5 shrink-0 text-[16px]" />
               <span>{error}</span>
             </div>
           </motion.div>
@@ -254,7 +254,7 @@ function InputView() {
           { label: 'Max files', value: LIMITS.maxFileCount.toLocaleString() },
         ].map((l) => (
           <div key={l.label} className="bg-surface-0 px-3 py-3">
-            <div className="tnum text-[15px] font-semibold text-ink-2 tabular-nums">
+            <div className="tnum text-[16px] font-semibold text-ink-2 tabular-nums">
               {l.value}
             </div>
             <div className="eyebrow mt-1">{l.label}</div>
@@ -297,10 +297,10 @@ function LandedView({ ingest }: { ingest: IngestedProject }) {
     >
       <div className="flex items-center gap-3 rounded-lg border border-pos/25 bg-pos/8 px-4 py-3">
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-pos/15 text-pos">
-          <CheckIcon className="text-[15px]" />
+          <CheckIcon className="text-[16px]" />
         </span>
         <div className="min-w-0">
-          <div className="text-[13.5px] font-medium text-ink">
+          <div className="text-[15px] font-medium text-ink">
             {ingest.fileCount.toLocaleString()} files ·{' '}
             {formatBytes(ingest.sizeBytes)} landed cleanly
           </div>
@@ -315,9 +315,9 @@ function LandedView({ ingest }: { ingest: IngestedProject }) {
           {warnings.map((w, i) => (
             <li
               key={i}
-              className="flex items-start gap-2 text-[12.5px] text-warn"
+              className="flex items-start gap-2 text-[13px] text-warn"
             >
-              <AlertIcon className="mt-0.5 shrink-0 text-[14px]" />
+              <AlertIcon className="mt-0.5 shrink-0 text-[15px]" />
               <span>{w}</span>
             </li>
           ))}
@@ -360,7 +360,7 @@ function LandedView({ ingest }: { ingest: IngestedProject }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-[13.5px] font-medium text-ink">
+                    <span className="truncate text-[15px] font-medium text-ink">
                       {c.packageName}
                     </span>
                     {isDefault && (
