@@ -1,42 +1,31 @@
 /* ------------------------------------------------------------------ *
- * Scene 01 — "Understanding". The first scroll-driven section below the
- * hero. An INSTRUMENT, not a cinematic moment: white / near-white / greys
- * on black, with --rx-pink permitted on exactly one heading word and
- * nowhere else. No orange, no gradients, no glow — that treatment belongs
- * to the hero alone. Numbers and identifiers are mono with tabular
- * numerals; prose is the site sans. That split is the section's whole
- * visual signature.
+ * Scene 01 — "Understanding". Three cards, read left to right: source
+ * files → knowledge graph → build order. A plain in-flow section — no pin,
+ * no SVG, no scroll-hijacking. An INSTRUMENT, not a cinematic moment: white /
+ * near-white / greys on black, with --rx-pink permitted on exactly one
+ * heading word and the LLM figure, nowhere else.
  *
  * Background is TRANSPARENT so the page's fixed pillar layer (settled to
  * flat black by the time we reach it) shows through — no per-section
- * background seam. Desktop only this session.
+ * background seam. Same rhythm as Scene 02 (Decisions): one full-viewport
+ * moment, vertically centred, that grows past 100vh only if content needs it.
  * ------------------------------------------------------------------ */
 
 .rx-understanding {
-  /* Own tokens, scoped to the section. Greys are derived from the existing
-     --rx-white / --rx-light-silver ladder; no new brand colours. Values are
-     kept identical to Scene 02 so the two sections read as one system. */
   --rx-u-dim: rgba(255, 255, 255, 0.42);
   --rx-u-line: rgba(255, 255, 255, 0.14);
-  --rx-u-line-active: rgba(255, 255, 255, 0.7);
-  /* Shared eyebrow-rule brightness across the two new sections. */
   --rx-u-eyebrow-rule: rgba(255, 255, 255, 0.5);
-  /* Top padding clears the fixed header capsule (top: 20px + ~42px logo, plus
-     breathing room) when the section is pinned to the top of the viewport. */
-  --rx-u-pad-top: 104px;
 
   position: relative;
   z-index: 1;
   width: 100%;
-  /* When pinned, the section is exactly one viewport tall and fills the screen;
-     the pin-spacer GSAP inserts provides the scroll distance. */
   min-height: 100vh;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   background: transparent;
   color: var(--rx-white);
   font-family: var(--font-sans);
-  padding: var(--rx-u-pad-top) var(--rx-frame-inset) clamp(48px, 8vh, 96px);
+  padding: clamp(44px, 6vh, 72px) var(--rx-frame-inset);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -46,9 +35,7 @@
   margin: 0 auto;
 }
 
-/* --- eyebrow: reuses the hero's .rx-eyebrow rule/label pattern. The hero's
-   rule is an orange→pink gradient; here the palette is strict, so the rule is
-   a plain near-white hairline. --- */
+/* --- eyebrow: reuses the hero's .rx-eyebrow rule/label pattern. --- */
 .rx-u-eyebrow {
   margin-bottom: 18px;
 }
@@ -56,12 +43,10 @@
   background: var(--rx-u-eyebrow-rule);
 }
 
-/* --- heading: site sans, large but restrained. Exactly one accent word. --- */
+/* --- heading: identical scale to Scene 02, so the two read as one system. --- */
 .rx-u-heading {
-  /* Harmonized section-heading scale + rhythm (identical to Scene 02). Capped
-     toward the smaller end so the pinned scene keeps vertical headroom. */
-  margin: 0 0 clamp(26px, 3.5vh, 40px);
-  max-width: 20ch;
+  margin: 0 0 clamp(32px, 4.5vh, 52px);
+  max-width: 34ch;
   font-family: var(--font-sans);
   font-size: clamp(28px, 3.2vw, 46px);
   font-weight: 600;
@@ -69,269 +54,99 @@
   letter-spacing: -0.01em;
   color: var(--rx-white);
 }
-/* The single permitted --rx-pink accent in this section. */
+/* The single permitted --rx-pink accent word in the heading. */
 .rx-u-accent {
   color: var(--rx-pink);
 }
 
-/* --- the stage: ONE full-width visual that transforms as the user scrolls.
-   Not three panels — a single instrument that changes state (raw files → the
-   knowledge graph). The SVG scales to this box; all geometry is in SVG user
-   units from the layout module. --- */
-.rx-u-stage-wrap {
-  position: relative;
-  margin-bottom: 16px;
+/* --- the three cards: source files → knowledge graph → build order --- */
+.rx-u-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 1.8vw, 22px);
 }
-.rx-u-stage {
-  display: block;
-  width: 100%;
-  /* Cap the height so the pinned section (heading + stage + readout) always fits
-     one viewport — the graph scales to fit (preserveAspectRatio meet). */
-  height: min(46vh, 470px);
-  overflow: visible;
+.rx-u-card {
+  border: 1px solid var(--rx-u-line);
+  border-radius: 14px;
+  padding: clamp(20px, 2.2vw, 28px);
+  background: rgba(255, 255, 255, 0.015);
 }
-.rx-understanding.is-reduced .rx-u-stage {
-  /* No pin in reduced motion, so the stage can take its natural size. */
-  height: auto;
-  aspect-ratio: 1120 / 470;
-}
-
-/* File paths (Beat 1) — mono, dim grey, inert and unread. */
-.rx-u-file {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  fill: rgba(255, 255, 255, 0.34);
-  dominant-baseline: middle;
-}
-/* Config / asset files that are not part of the dependency graph: a touch
-   dimmer so the eye reads them as secondary — they will fade rather than
-   collapse into a node (there is none to collapse into). */
-.rx-u-file.is-orphan {
-  fill: rgba(255, 255, 255, 0.2);
-}
-
-/* Graph nodes. Monochrome: file-import nodes read a step dimmer than the
-   component (entity) nodes, so the two subgraphs stay distinguishable without
-   colour. Sizing is degree-driven (set inline from layout data). */
-.rx-u-node circle {
-  fill: rgba(255, 255, 255, 0.5);
-}
-.rx-u-node.is-entity circle {
-  fill: rgba(255, 255, 255, 0.88);
-}
-/* Pre-animation resting state (motion mode): nodes are invisible until the
-   morph reveals them. Inline opacity from GSAP overrides this; reduced-motion
-   forces them visible below. */
-.rx-understanding:not(.is-reduced) .rx-u-node {
-  opacity: 0;
-}
-
-/* Edges are DRAWN (stroke-dashoffset), never faded on. Kinds differ by weight
-   and opacity only — never colour, never a pattern that would fight the draw. */
-.rx-u-edge,
-.rx-u-wave-edge {
-  stroke: #ffffff;
-  fill: none;
-}
-
-/* Beat 3: build-order wave columns. Guide line + engine index (W1…W9) + the
-   wave's own step kinds, so an empty column reads honestly as "this wave builds
-   scaffold / validation, not graph nodes". Hidden until the wave beat. */
-.rx-u-wave-col-line {
-  stroke: rgba(255, 255, 255, 0.06);
-  stroke-width: 1;
-}
-.rx-u-wave-col-label {
-  fill: rgba(255, 255, 255, 0.8);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  text-anchor: middle;
-}
-.rx-u-wave-col-kind {
-  fill: rgba(255, 255, 255, 0.4);
-  font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 0.04em;
-  text-anchor: middle;
-}
-/* Nodes that aren't a build unit settle to a dim periphery — present but quiet,
-   never implied to be in a wave. (Motion mode dims them via GSAP; this covers
-   reduced mode.) */
-.rx-understanding.is-reduced .rx-u-node.is-orphan {
-  opacity: 0.28;
-}
-
-/* Motion mode resting: wave scaffolding is invisible until the wave beat draws
-   it in (GSAP overrides inline). */
-.rx-understanding:not(.is-reduced) .rx-u-wave-col {
-  opacity: 0;
-}
-
-/* Reduced motion: the finished BUILD-ORDER arrangement, immediately — nodes in
-   their wave columns, build edges drawn, wave labels shown, nothing behind
-   scroll. */
-.rx-understanding.is-reduced .rx-u-node {
-  opacity: 1;
-}
-.rx-understanding.is-reduced .rx-u-wave-edge {
-  stroke-dashoffset: 0 !important;
-}
-
-/* Reduced-motion static file list, shown ABOVE the finished graph (no collapse
-   animation to carry the names into the nodes, so they're listed plainly). */
-.rx-u-filelist {
-  list-style: none;
-  margin: 0 0 24px;
-  padding: 0;
-  columns: 3;
-  column-gap: 32px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.9;
-  color: rgba(255, 255, 255, 0.34);
-}
-.rx-u-filelist li {
-  break-inside: avoid;
-}
-.rx-u-filelist li.is-orphan {
-  color: rgba(255, 255, 255, 0.2);
-}
-
-/* Honest note about the files that are not graph nodes. */
-.rx-u-stage-note {
-  margin: 0 0 4px;
+.rx-u-card-eyebrow {
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--rx-u-dim);
-}
-
-/* --- readout strip: mono, tabular numerals. An instrument reporting on what's
-   on screen — its beat-specific figures swap as the active beat changes, quietly
-   (a readout settling, not a feature reveal). The LLM metric is always present. */
-.rx-u-readout {
-  display: flex;
-  align-items: flex-start;
-  gap: 40px;
-  margin: 0 0 14px;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--rx-u-line);
-}
-/* The beat groups occupy the same footprint (stacked); only the active one is
-   visible. A fixed min-height reserves space so the strip never jumps. */
-.rx-u-readout-beats {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 70px;
-}
-.rx-u-rgroup {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px 40px;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-  pointer-events: none;
-}
-.rx-understanding[data-beat='0'] .rx-u-rgroup[data-group='0'],
-.rx-understanding[data-beat='1'] .rx-u-rgroup[data-group='1'],
-.rx-understanding[data-beat='2'] .rx-u-rgroup[data-group='2'] {
-  opacity: 1;
-  pointer-events: auto;
-}
-.rx-u-metric {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-/* The always-on understanding LLM metric sits apart from the swapping groups. */
-.rx-u-llm {
-  flex: 0 0 auto;
-}
-/* Its scope line — the whole-run count, so the phase figure is never misread. */
-.rx-u-llm-sub {
-  margin: 4px 0 0;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--rx-u-dim);
-}
-.rx-u-llm-sub .tnum {
-  color: var(--rx-light-silver);
-}
-.rx-u-readout-note {
-  flex-basis: 100%;
-  margin: 4px 0 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  color: var(--rx-u-dim);
-  text-transform: none;
-}
-/* Small edge-kind breakdown (beat 2). */
-.rx-u-kindrow {
-  flex-basis: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin-top: 2px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--rx-u-dim);
-}
-.rx-u-kindrow span {
-  white-space: nowrap;
-}
-/* Reduced motion: every beat group visible at once (nothing beat-dependent),
-   laid out in flow rather than stacked. */
-.rx-understanding.is-reduced .rx-u-readout-beats {
-  min-height: 0;
-}
-.rx-understanding.is-reduced .rx-u-rgroup {
-  position: static;
-  inset: auto;
-  opacity: 1;
-  pointer-events: auto;
-  margin-bottom: 18px;
-}
-.rx-u-metric-value {
-  font-family: var(--font-mono);
-  font-size: clamp(26px, 2.4vw, 34px);
   font-weight: 600;
-  line-height: 1;
-  color: var(--rx-white);
-}
-.rx-u-metric-label {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--rx-u-dim);
+  margin-bottom: 16px;
 }
-
-/* --- attribution: quiet prose, with the identifier in mono. A little space
-   above so it separates from the beat-specific readout note (they were glued). --- */
-.rx-u-attribution {
-  margin: 12px 0 0;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--rx-u-dim);
-}
-.rx-u-attribution .tnum {
+.rx-u-card-value {
   font-family: var(--font-mono);
+  font-size: clamp(32px, 3.4vw, 46px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--rx-white);
+}
+.rx-u-card-label {
+  margin-top: 6px;
+  font-size: 13px;
   color: var(--rx-light-silver);
 }
+.rx-u-card-detail {
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--rx-u-line);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--rx-u-dim);
+}
 
-/* ============================ reduced motion ============================ */
-/* No pin, no scrub: a normal-height block showing the file list AND the fully
-   drawn graph — nothing needs scrolling to be seen. (Node/edge visibility for
-   this mode is handled in the stage rules above.) */
-.rx-understanding.is-reduced {
-  min-height: auto;
+/* --- always-visible LLM readout, beneath the cards --- */
+.rx-u-llm {
+  margin-top: clamp(32px, 4.5vh, 48px);
+  padding-top: clamp(22px, 3vh, 34px);
+  border-top: 1px solid var(--rx-u-line);
+}
+.rx-u-llm-value {
+  font-family: var(--font-mono);
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--rx-pink);
+}
+.rx-u-llm-label {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rx-light-silver);
+}
+.rx-u-llm-sub {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--rx-u-dim);
+}
+
+.rx-u-attribution {
+  margin: clamp(26px, 3.5vh, 38px) 0 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--rx-u-dim);
+}
+
+/* ---- tablet: tighten the gap and padding, stay three across ---- */
+@media (max-width: 1024px) {
+  .rx-u-cards {
+    gap: 14px;
+  }
+}
+
+/* ---- phone: the three cards stack ---- */
+@media (max-width: 640px) {
+  .rx-u-cards {
+    grid-template-columns: 1fr;
+  }
 }
