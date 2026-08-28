@@ -112,6 +112,41 @@ not wall-clock. `npm run types:showcase` runs `json2ts` over
 JSON and the generated type are committed, so `npm run build` works on a fresh
 clone with no backend running.
 
+## Deploying
+
+```bash
+cp .env.example .env     # set REJOX_API_KEYS and GEMINI_API_KEY at minimum
+docker compose up --build
+```
+
+Three services, and the split is the architecture:
+
+| Service | Role |
+| --- | --- |
+| `redis` | the durable queue — a migration outlives an API restart because the job lives here, not in a thread inside the API |
+| `api` | accepts uploads, analyses, plans, enqueues. Never runs a migration. Owns the retention sweeper. |
+| `worker` | runs migrations. `docker compose up --scale worker=3` for more capacity. |
+
+The image carries both runtimes (Python for the pipeline, Node for the
+`parser-worker` / `codemod-worker` subprocesses) but **not** the toolchain for
+validating a migrated project — that runs in a throw-away sandbox container per
+stage (`REJOX_SANDBOX=docker`).
+
+Two settings the deployment refuses to start without: `REJOX_API_KEYS`, and real
+containment. The worker checks the same sandbox refusal the API does, so a
+misconfigured worker cannot become an un-sandboxed hole behind a correct front
+door. **Read [`docs/SECURITY.md`](docs/SECURITY.md) first** — including what the
+worker's Docker socket mount actually grants.
+
+**Retention.** A run workspace holds an uploaded project and the React Native
+project emitted from it, so it is deleted after `REJOX_RUN_TTL_SECONDS` (24h
+default). The API sweeps hourly; to drive it from cron instead, set
+`REJOX_RETENTION=off` and schedule `rejox sweep` (`--dry-run` lists what would go).
+
+**Scaling, honestly.** Workers scale freely — they sit behind the queue. The API
+does not yet: rate-limit counters are per process, so N API replicas mean N times
+the limit. Run one API container until that state is shared.
+
 ## CLI quick start
 
 ```bash
