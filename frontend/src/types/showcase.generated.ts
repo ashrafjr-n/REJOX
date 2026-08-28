@@ -96,9 +96,9 @@ export interface ShowcaseResults {
   repairRounds: number
   tscErrorCount: number
   tscPassed: boolean
-  validatedConfidence: number
-  validatedCoverage: number
-  validatedStrictCoverage: number
+  validatedCompilingCoverage?: number | null
+  validatedConfidence?: number | null
+  validatedStrictCoverage?: number | null
 }
 export interface ShowcaseContribution {
   delta: number
