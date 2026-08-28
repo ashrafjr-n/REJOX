@@ -759,6 +759,51 @@ def export_showcase(
     console.print(t)
 
 
+@app.command()
+def sweep(
+    ttl: Optional[int] = typer.Option(
+        None, "--ttl", help="Retention window in seconds (default: REJOX_RUN_TTL_SECONDS, else 24h)."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="List what would be reaped without deleting anything."
+    ),
+) -> None:
+    """Reap run workspaces past their retention window.
+
+    Each run holds an uploaded project and the React Native project emitted from
+    it, so this is a data-retention job, not just disk hygiene. The API sweeps on
+    its own schedule; this command is for a deployment that would rather drive it
+    from cron (set REJOX_RETENTION=off so the two do not both do it).
+    """
+    from app.pipeline import workspace  # noqa: PLC0415
+
+    window = ttl if ttl is not None else workspace.ttl_seconds()
+    _stage("Sweep — run workspace retention")
+
+    if dry_run:
+        import time as _time  # noqa: PLC0415
+
+        now = _time.time()
+        root = workspace.workspace_root()
+        stale = [
+            child.name
+            for child in sorted(root.iterdir())
+            if child.is_dir() and now - child.stat().st_mtime > window
+        ]
+        for run_id in stale:
+            console.print(f"  [dim]would reap[/] {run_id}")
+        console.print(
+            f"\n[bold]{len(stale)}[/] run(s) past a {window}s window "
+            f"[dim](dry run — nothing deleted)[/]"
+        )
+        return
+
+    removed = workspace.sweep(window)
+    for run_id in removed:
+        console.print(f"  [dim]reaped[/] {run_id}")
+    console.print(f"\n[bold]{len(removed)}[/] run(s) reaped past a {window}s window.")
+
+
 class _NullProvider:
     """Stand-in when AI is disabled — never called (guarded), keeps the counter simple."""
 
