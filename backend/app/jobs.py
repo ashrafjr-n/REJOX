@@ -50,12 +50,20 @@ def _now() -> float:
 
 
 def _persist(state: JobState) -> None:
-    """Write the job state to its run workspace. Best-effort; never fatal."""
+    """Write the job state to its run workspace.
+
+    Written atomically (temp file + rename): with the `rq` backend a worker
+    process writes this file while the API process reads it, and a reader must
+    never observe a half-written job. Best-effort; never fatal.
+    """
     if not state.runId:
         return
     try:
         run = workspace.get_run(state.runId)
-        (run.root / "job.json").write_text(state.model_dump_json())
+        target = run.root / "job.json"
+        tmp = target.with_suffix(".json.tmp")
+        tmp.write_text(state.model_dump_json())
+        tmp.replace(target)
     except Exception:  # pragma: no cover - persistence is a convenience
         pass
 
@@ -91,9 +99,11 @@ def _load_persisted(job_id: str) -> Optional[JobState]:
 def get_job(job_id: str) -> JobState:
     """Return the job's full state — the reconstructable source of truth.
 
-    In-memory first (live), returned as a deep copy so callers never observe a
-    half-applied mutation. Falls back to a persisted ``job.json`` so a completed
-    job survives a process restart.
+    In-memory first (this process is running it), returned as a deep copy so
+    callers never observe a half-applied mutation. Otherwise the persisted
+    ``job.json``, which is what makes the state readable across processes: with
+    the `rq` backend the worker owns the memory copy and the API only ever sees
+    the file.
     """
     with _LOCK:
         state = _REGISTRY.get(job_id)
@@ -105,7 +115,7 @@ def get_job(job_id: str) -> JobState:
     raise KeyError(job_id)
 
 
-def running_count() -> int:
+def local_running_count() -> int:
     """How many migrations are actually executing in THIS process right now.
 
     A migration installs a dependency tree and runs Metro, so the box — not the
@@ -156,7 +166,16 @@ def _emit_sink(job_id: str):
         error: Optional[MigrationError] = None,
     ) -> None:
         with _LOCK:
-            state = _REGISTRY[job_id]
+            # An `rq` worker executes a job the API process created, so this
+            # process may have no registry entry for it. Adopt the persisted
+            # state on first touch; from then on this process owns the memory
+            # copy and the file is the view everyone else reads.
+            state = _REGISTRY.get(job_id)
+            if state is None:
+                state = _load_persisted(job_id)
+                if state is None:
+                    raise KeyError(job_id)
+                _REGISTRY[job_id] = state
             seq = len(state.events) + 1
             event = MigrationEvent(
                 seq=seq, type=type, stage=stage, ts=_now(),  # type: ignore[arg-type]
@@ -177,9 +196,84 @@ def _emit_sink(job_id: str):
 
 
 def _has_terminal(job_id: str) -> bool:
+    try:
+        return get_job(job_id).status in ("succeeded", "failed")
+    except KeyError:
+        return False
+
+
+def run_job(
+    job_id: str,
+    *,
+    source_root: Path | str,
+    run_id: str,
+    out_dir: Path | str,
+    answers: dict[str, str],
+    install: bool,
+    run_bundle: bool,
+) -> None:
+    """Execute one migration to completion. THE unit of work.
+
+    A module-level function on purpose: with the `rq` backend this is resolved
+    by import path in a worker process that never saw the request, so it takes
+    plain, serializable arguments and re-hydrates them here. It is the same
+    function the `thread` backend runs, so there is exactly one migration code
+    path regardless of where it executes.
+
+    Never raises: every failure becomes a terminal ``failed`` event, because a
+    job that vanished without saying why is the one thing the event stream must
+    not allow.
+    """
+    source_root = Path(source_root)
+    out_dir = Path(out_dir)
+    emit = _emit_sink(job_id)
+
     with _LOCK:
         state = _REGISTRY.get(job_id)
-        return bool(state and state.status in ("succeeded", "failed"))
+        if state is None:
+            state = _load_persisted(job_id)
+            if state is None:
+                # Nothing to report progress against — the run workspace is
+                # gone (reaped, or never created). Fail loudly in the worker log
+                # rather than half-running a job nobody can observe.
+                raise KeyError(f"No such job: {job_id}")
+            _REGISTRY[job_id] = state
+        state.status = "running"
+        state.updatedAt = _now()
+        snapshot = state.model_copy(deep=True)
+    _persist(snapshot)
+
+    # The stage the job is actually in, advanced as each one is entered, so
+    # a failure before the Migration Engine is reported where it happened
+    # (parse/analyze/plan) instead of being blamed on emit.
+    stage: MigrationStage = "intelligence"
+    try:
+        kg = build_knowledge_graph(source_root)
+        stage = "analyze"
+        report = analyze_graph(kg)
+        stage = "plan"
+        plan = plan_migration(report, kg)
+        stage = "emit"
+        run_migration(
+            kg=kg, report=report, plan=plan, source_root=source_root,
+            answers=answers, out_dir=out_dir, run_id=run_id,
+            install=install, run_bundle=run_bundle, emit=emit,
+        )
+    except Exception as exc:  # noqa: BLE001 - report every failure honestly
+        # run_migration emits its own 'failed' (with its own current stage)
+        # for anything inside the Migration Engine; this covers the setup
+        # stages above it, and anything that escaped without a terminal.
+        if not _has_terminal(job_id):
+            emit(
+                "failed", stage, f"Migration failed during {stage}: {exc}",
+                error=MigrationError(type=type(exc).__name__, message=str(exc), stage=stage),
+            )
+
+
+def register_worker(job_id: str, thread: threading.Thread) -> None:
+    """Record a `thread`-backend worker so local concurrency can be measured."""
+    with _LOCK:
+        _WORKERS[job_id] = thread
 
 
 def start_job(
@@ -192,43 +286,19 @@ def start_job(
     install: bool,
     run_bundle: bool,
 ) -> None:
-    """Kick off the migration in a daemon thread. Returns immediately."""
-    emit = _emit_sink(job_id)
+    """Dispatch the migration to the configured queue backend (see app.queue).
 
-    def worker() -> None:
-        with _LOCK:
-            state = _REGISTRY[job_id]
-            state.status = "running"
-            state.updatedAt = _now()
-            snapshot = state.model_copy(deep=True)
-        _persist(snapshot)
-        # The stage the job is actually in, advanced as each one is entered, so
-        # a failure before the Migration Engine is reported where it happened
-        # (parse/analyze/plan) instead of being blamed on emit.
-        stage: MigrationStage = "intelligence"
-        try:
-            kg = build_knowledge_graph(source_root)
-            stage = "analyze"
-            report = analyze_graph(kg)
-            stage = "plan"
-            plan = plan_migration(report, kg)
-            stage = "emit"
-            run_migration(
-                kg=kg, report=report, plan=plan, source_root=source_root,
-                answers=answers, out_dir=out_dir, run_id=run_id,
-                install=install, run_bundle=run_bundle, emit=emit,
-            )
-        except Exception as exc:  # noqa: BLE001 - report every failure honestly
-            # run_migration emits its own 'failed' (with its own current stage)
-            # for anything inside the Migration Engine; this covers the setup
-            # stages above it, and anything that escaped without a terminal.
-            if not _has_terminal(job_id):
-                emit(
-                    "failed", stage, f"Migration failed during {stage}: {exc}",
-                    error=MigrationError(type=type(exc).__name__, message=str(exc), stage=stage),
-                )
+    Returns immediately; where the work actually runs — a thread here or a
+    worker process behind Redis — is a deployment choice made in one place.
+    """
+    from app import queue  # noqa: PLC0415 - queue imports jobs for the thread path
 
-    thread = threading.Thread(target=worker, name=f"migrate-{job_id[:8]}", daemon=True)
-    with _LOCK:
-        _WORKERS[job_id] = thread
-    thread.start()
+    queue.enqueue(
+        job_id,
+        source_root=source_root,
+        run_id=run_id,
+        out_dir=out_dir,
+        answers=answers,
+        install=install,
+        run_bundle=run_bundle,
+    )
