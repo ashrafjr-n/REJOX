@@ -15,10 +15,10 @@ Two modes, and the difference between them is stated plainly:
     ``npm install`` gets network). The run directory is the only writable mount.
 
 ``direct`` (development convenience — NOT a sandbox)
-    The command runs as the Rejox process itself. Fine for the CLI and the test
-    suite on a developer machine; unacceptable for a server that accepts
-    uploads. It applies what a plain process can (no core dumps, a file-size
-    ceiling, a timeout) and is honest that this is not containment.
+    The command runs as the Rejox process itself, with a timeout as its only
+    control. Fine for the CLI and the test suite on a developer machine;
+    unacceptable for a server that accepts uploads. It does not pretend to
+    contain anything.
 
 Because the weak mode must never be reached by accident, the API refuses to
 serve migrations in ``direct`` mode unless the operator has explicitly accepted
@@ -31,7 +31,6 @@ the risk (see :func:`assert_safe_for_untrusted_input`).
 from __future__ import annotations
 
 import os
-import resource
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -46,9 +45,6 @@ DEFAULT_IMAGE = "node:20-bookworm-slim"
 DEFAULT_MEMORY = "4g"
 DEFAULT_CPUS = "2"
 DEFAULT_PIDS = 512
-# Ceiling on any single file a sandboxed command may write (bundle output,
-# logs, a malicious dependency filling the disk). 2 GiB.
-DEFAULT_MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
 
 
 class SandboxError(RuntimeError):
@@ -78,7 +74,6 @@ class SandboxPolicy:
     memory: str = DEFAULT_MEMORY
     cpus: str = DEFAULT_CPUS
     pids: int = DEFAULT_PIDS
-    max_file_bytes: int = DEFAULT_MAX_FILE_BYTES
     # Operator has explicitly accepted running untrusted code un-contained.
     allow_unsandboxed: bool = False
 
@@ -95,7 +90,6 @@ class SandboxPolicy:
             memory=os.environ.get("REJOX_SANDBOX_MEMORY", DEFAULT_MEMORY).strip() or DEFAULT_MEMORY,
             cpus=os.environ.get("REJOX_SANDBOX_CPUS", DEFAULT_CPUS).strip() or DEFAULT_CPUS,
             pids=_env_int("REJOX_SANDBOX_PIDS", DEFAULT_PIDS),
-            max_file_bytes=_env_int("REJOX_SANDBOX_MAX_FILE_BYTES", DEFAULT_MAX_FILE_BYTES),
             allow_unsandboxed=_env_flag("REJOX_ALLOW_UNSANDBOXED"),
         )
 
@@ -138,28 +132,24 @@ def assert_safe_for_untrusted_input(policy: Optional[SandboxPolicy] = None) -> N
 # --- direct mode -------------------------------------------------------------
 
 
-def _rlimits(max_file_bytes: int):
-    """Limits a plain child process can carry. Deliberately excludes RLIMIT_AS:
-    V8 reserves a huge virtual address space, so an address-space cap kills Node
-    outright rather than limiting it. Real memory limits live in docker mode."""
-
-    def apply() -> None:  # pragma: no cover - runs in the forked child
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-        resource.setrlimit(resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes))
-
-    return apply
-
-
 def _run_direct(
-    cmd: list[str], cwd: Path, timeout: int, policy: SandboxPolicy
+    cmd: list[str], cwd: Path, timeout: int
 ) -> subprocess.CompletedProcess[str]:
+    """Run the command as this process. The ONLY control here is the timeout.
+
+    No ``preexec_fn`` rlimits: migrations run in a worker thread, and CPython
+    documents ``preexec_fn`` as unsafe in the presence of threads (it can
+    deadlock the child between fork and exec). Trading a deadlock risk for
+    limits that do not contain anything is a bad deal — real memory, CPU, pid
+    and filesystem limits are what docker mode is for, and this mode does not
+    pretend to offer them.
+    """
     return subprocess.run(
         cmd,
         cwd=str(cwd),
         capture_output=True,
         text=True,
         timeout=timeout,
-        preexec_fn=_rlimits(policy.max_file_bytes),
     )
 
 
@@ -245,4 +235,4 @@ def run(
     policy = policy or SandboxPolicy.from_env()
     if policy.mode == "docker":
         return _run_docker(cmd, cwd, timeout, network=network, policy=policy)
-    return _run_direct(cmd, cwd, timeout, policy)
+    return _run_direct(cmd, cwd, timeout)
