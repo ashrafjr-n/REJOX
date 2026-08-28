@@ -36,7 +36,7 @@ export function Tooltip({ content, children, className, width = 260 }: TooltipPr
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
-            style={{ width }}
+            style={{ width, maxWidth: 'calc(100vw - 32px)' }}
             className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-xl border border-line-strong bg-surface-2 px-3 py-2.5 text-[13px] leading-relaxed text-ink-2 shadow-[0_12px_32px_-8px_rgb(0_0_0/0.7)]"
           >
             {content}
