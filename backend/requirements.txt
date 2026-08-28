@@ -12,6 +12,11 @@ google-genai==1.15.0
 typer==0.26.8
 rich==13.9.4
 
+# Durable job queue (REJOX_QUEUE=rq): migrations survive an API restart and
+# scale across worker processes. Unused by the default `thread` backend.
+rq==2.1.0
+redis==5.2.1
+
 # Dev / test
 pytest==8.3.4
 httpx==0.28.1
