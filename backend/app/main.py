@@ -18,7 +18,8 @@ import os
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Optional, TypeVar
+from contextlib import asynccontextmanager
+from typing import AsyncIterator, Optional, TypeVar
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +27,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.background import BackgroundTask
 
-from app import jobs, queue
+from app import jobs, queue, retention
 from app.models.analysis import AnalysisReport
 from app.models.ingest import IngestedProject
 from app.models.jobs import JobCreated, JobState
@@ -41,10 +42,31 @@ from app.pipeline.sandbox import SandboxError, assert_safe_for_untrusted_input
 from app.queue import QueueError
 from app.security import guard, max_concurrent_migrations
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Start and stop the run-workspace reaper alongside the API.
+
+    Retention has to be owned by a running process or it does not happen — the
+    sweep existed for a long time with no caller, and no run was ever reaped.
+    A deployment that would rather schedule `rejox sweep` from cron sets
+    REJOX_RETENTION=off.
+    """
+    reaper = None
+    if not retention.disabled():
+        reaper = retention.Reaper()
+        reaper.start()
+    try:
+        yield
+    finally:
+        if reaper is not None:
+            reaper.stop()
+
+
 app = FastAPI(
     title="Rejox AI",
     description="AI migration engineer: React → React Native.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # --- CORS --------------------------------------------------------------------
