@@ -38,6 +38,11 @@ export default defineConfig({
         GEMINI_API_KEY: '',
         REJOX_AI_PROVIDER: 'fake',
         REJOX_CORS_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173',
+        // Same local-only posture as dev.sh: this server binds to 127.0.0.1
+        // and migrates a fixture we control, so it opts out of the API key and
+        // the containment requirement. Never a production setting.
+        REJOX_ALLOW_ANONYMOUS: '1',
+        REJOX_ALLOW_UNSANDBOXED: '1',
       },
     },
     {
