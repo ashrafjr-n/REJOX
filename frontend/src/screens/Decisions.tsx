@@ -35,13 +35,12 @@ import { formatScorePercent } from '../lib/display'
  *          secondary treatment, each labelled with the lens it measures.
  *
  * Every value comes from showcase.json via the generated type; no figure, name,
- * or question text is hard-coded. Unlike Scene 01 this section is NOT pinned —
- * it's dense, revealed on scroll (restrained fade-up, house language). Its
- * ScrollTriggers are created inside a gsap.context scoped to the section, so
- * cleanup kills only its own triggers and it coexists with the Scene 01 pin and
- * the CTA's ScrollReveal. Reduced motion shows everything at once.
- *
- * Desktop only.
+ * or question text is hard-coded. Not pinned — it's dense, revealed on scroll
+ * (restrained fade-up, house language). Its ScrollTriggers are created inside a
+ * gsap.context scoped to the section, so cleanup kills only its own triggers
+ * and it coexists with Scene 01's reveal and the CTA's ScrollReveal. Reduced
+ * motion shows everything at once. Responsive down to phone widths — see the
+ * tablet/phone rules in Decisions.css.
  */
 
 gsap.registerPlugin(ScrollTrigger, CustomEase)
@@ -79,8 +78,8 @@ export default function Decisions() {
 
     // All triggers are created inside this context (scoped to the section), so
     // ctx.revert() on cleanup kills ONLY the triggers/tweens this section made —
-    // never ScrollReveal's or the Scene 01 pin's. The plugin is registered in
-    // this module; we rely on no other component's registration.
+    // never ScrollReveal's. The plugin is registered in this module; we rely on
+    // no other component's registration.
     const ctx = gsap.context(() => {
       const els = gsap.utils.toArray<HTMLElement>('.rx-d-reveal')
       els.forEach((el) => {
