@@ -7,7 +7,8 @@ name = "rejox"
 version = "0.1.0"
 description = "Rejox — AI migration engineer: React → React Native. CLI + pipeline."
 requires-python = ">=3.11"
-license = { file = "../LICENSE" }
+# Proprietary — see LICENSE at the repo root. Not redistributable.
+license = "LicenseRef-Proprietary"
 dependencies = [
     "fastapi==0.115.6",
     "uvicorn[standard]==0.34.0",
@@ -16,6 +17,10 @@ dependencies = [
     "google-genai==1.15.0",
     "typer==0.26.8",
     "rich==13.9.4",
+    # Durable job queue: migrations outlive an API restart and scale across
+    # worker processes (REJOX_QUEUE=rq). The `thread` backend needs neither.
+    "rq==2.1.0",
+    "redis==5.2.1",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +28,7 @@ dev = ["pytest==8.3.4", "httpx==0.28.1"]
 
 [project.scripts]
 rejox = "app.cli:app"
+rejox-worker = "app.worker:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
