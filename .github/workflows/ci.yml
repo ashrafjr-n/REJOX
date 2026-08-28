@@ -1,0 +1,156 @@
+name: CI
+
+# Runs on every push and PR to master. The point is the one thing this repo has
+# already failed at once: a red test sitting unnoticed on the main branch.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# A new push supersedes an in-flight run for the same ref — except on master,
+# where every commit's result is worth having.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+env:
+  # Both refusals are opted out of deliberately: CI binds nothing to a network
+  # and migrates only fixtures from this repo. Never a production posture.
+  REJOX_ALLOW_ANONYMOUS: "1"
+  REJOX_ALLOW_UNSANDBOXED: "1"
+  # No network, no key, deterministic: the offline provider makes the one
+  # navigator-shape call so a run is byte-reproducible.
+  REJOX_AI_PROVIDER: fake
+
+jobs:
+  # The gate: everything except the 10 tests that npm-install and run Metro.
+  # ~5 minutes against ~13 for the whole suite — most of that is the Node
+  # parser/codemod workers, which nearly every test genuinely exercises, so this
+  # split buys less than the marker name suggests. It is still the difference
+  # between a PR verdict inside a coffee break and one after a quarter of an hour.
+  backend:
+    name: Backend (fast)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # The Project Intelligence Engine and the Deterministic Transformer are
+      # Node workers, so the "Python" job needs Node to run at all.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            backend/parser-worker/package-lock.json
+            backend/codemod-worker/package-lock.json
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+
+      - name: Build the Node workers
+        working-directory: backend
+        run: |
+          for worker in parser-worker codemod-worker; do
+            (cd "$worker" && npm ci --no-audit --no-fund && npm run build)
+          done
+
+      - name: Test
+        working-directory: backend
+        run: pytest -q -m "not slow"
+
+  # The real thing: emit → npm install → tsc → Metro on the benchmark app.
+  # Slow and network-bound, so it does not gate a PR's first feedback — but it
+  # does have to pass before anything lands.
+  integration:
+    name: Backend (integration — npm + tsc + Metro)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            backend/parser-worker/package-lock.json
+            backend/codemod-worker/package-lock.json
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+
+      - name: Build the Node workers
+        working-directory: backend
+        run: |
+          for worker in parser-worker codemod-worker; do
+            (cd "$worker" && npm ci --no-audit --no-fund && npm run build)
+          done
+
+      - name: Test (slow)
+        working-directory: backend
+        run: pytest -q -m slow
+
+  frontend:
+    name: Frontend (types + lint + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      # tsconfig.json covers the e2e specs too, which `npm run build` does not,
+      # so a spec left referencing a renamed field is caught here rather than in
+      # a Playwright run nobody triggered.
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # The image has to keep building, or the deployment path rots silently while
+  # every test stays green.
+  docker:
+    name: Backend image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
