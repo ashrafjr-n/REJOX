@@ -193,7 +193,10 @@ class AnalysisReport(AnalysisBase):
     coverage: float = Field(ge=0, le=100)
     # Confidence: how sure we are that what WAS migrated is correct —
     # computed from provenance (ConfidenceSource), never estimated.
-    confidence: float = Field(ge=0, le=100)
+    # None when NOTHING migrates (every component blocked): the question has no
+    # answer over an empty population, and an empty mean must not fall back to
+    # 100. Coverage still carries the shortfall; this renders as "n/a".
+    confidence: Optional[float] = Field(default=None, ge=0, le=100)
     # Risk: worst detected functional-domain risk ("low" when none detected).
     risk: RiskLevel
     # Explainable breakdown; deltas sum exactly to `coverage`.

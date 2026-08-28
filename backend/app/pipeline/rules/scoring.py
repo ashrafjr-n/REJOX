@@ -32,6 +32,7 @@ Per-component difficulty/score is unchanged; it feeds the components area.
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Optional
 
 from app.models.analysis import (
     CONFIDENCE_BY_SOURCE,
@@ -102,11 +103,17 @@ PROVENANCE_BY_CODE: dict[str, ConfidenceSource] = {
 }
 
 
-def compute_confidence(findings: list[ComponentFinding]) -> float:
+def compute_confidence(findings: list[ComponentFinding]) -> Optional[float]:
     """Provenance-weighted mean over migrated units (residue excluded).
 
     A blocked component is not migrated at all, so it contributes NO units —
     its shortfall is Coverage's business, not Confidence's.
+
+    Returns None when no component migrates at all (every one is blocked).
+    Confidence answers "how sure are we about what migrates"; with nothing
+    migrating the question has no answer, and the empty mean must not fall back
+    to 100 — that turned "not one component can be converted" into a perfect
+    score. Coverage still reports the shortfall; Confidence reports "n/a".
     """
     values: list[int] = []
     for finding in findings:
@@ -120,7 +127,7 @@ def compute_confidence(findings: list[ComponentFinding]) -> float:
             if value is not None:
                 values.append(value)
     if not values:
-        return 100.0
+        return None
     return round(sum(values) / len(values), 1)
 
 
