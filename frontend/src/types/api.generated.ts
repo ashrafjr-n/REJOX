@@ -237,7 +237,7 @@ export interface components {
             /** Coverage */
             coverage: number;
             /** Confidence */
-            confidence: number;
+            confidence?: number | null;
             /**
              * Risk
              * @enum {string}
@@ -1300,11 +1300,11 @@ export interface components {
          */
         ValidatedScores: {
             /** Coverage */
-            coverage: number;
+            coverage?: number | null;
             /** Confidence */
-            confidence: number;
+            confidence?: number | null;
             /** Workingcoverage */
-            workingCoverage: number;
+            workingCoverage?: number | null;
             /**
              * Workingfilecount
              * @default 0
