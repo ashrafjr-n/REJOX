@@ -6,6 +6,7 @@ import { CustomEase } from 'gsap/CustomEase'
 import './Decisions.css'
 import showcase from '../data/showcase.json' with { type: 'json' }
 import type { ShowcaseData } from '../types/showcase.generated'
+import { formatScorePercent } from '../lib/display'
 
 /**
  * Scene 02 — "Only when needed".
@@ -27,10 +28,11 @@ import type { ShowcaseData } from '../types/showcase.generated'
  *          on the right, and this is the pivot between them. The exact call
  *          count beneath the statement is read from the data, never written here.
  *   Right  the proof the rest was mechanical: tsc + Metro verdicts and the
- *          validated (working, compiles+bundles) headline in one row; the
- *          analyzer's conservative pre-migration prediction and the stricter
- *          residue-free figure kept visible in a quiet secondary treatment —
- *          both genuinely present, neither merged into the headline.
+ *          validated STRICT coverage as the headline — a file counts only when
+ *          nothing was left unresolved in it, so the lead figure is the one that
+ *          cannot flatter. The analyzer's pre-migration prediction and the more
+ *          forgiving compiles-and-bundles figure stay visible in a quiet
+ *          secondary treatment, each labelled with the lens it measures.
  *
  * Every value comes from showcase.json via the generated type; no figure, name,
  * or question text is hard-coded. Unlike Scene 01 this section is NOT pinned —
@@ -229,27 +231,29 @@ export default function Decisions() {
                 </div>
                 <div className="rx-d-metric rx-d-verified rx-d-headline">
                   <div className="rx-d-metric-value" data-testid="validated-coverage">
-                    {r.validatedCoverage}%
+                    {formatScorePercent(r.validatedStrictCoverage)}
                   </div>
                   <div className="rx-d-metric-label">
                     Validated coverage
                     <span className="rx-d-lens" data-testid="validated-lens">
-                      working · compiles &amp; bundles
+                      strict · nothing left unresolved
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Secondary treatment — the prediction and the stricter lens both kept
-                  visible (never merged into the headline, never behind a hover). */}
+              {/* Secondary treatment — the prediction and the forgiving lens both kept
+                  visible (never merged into the headline, never behind a hover). The
+                  strict figure leads because it is the one that cannot flatter: a file
+                  counts only when no REJOX-TODO survived in it. */}
               <div className="rx-d-proof-secondary">
                 <p className="rx-d-sub">
                   predicted <span className="tnum" data-testid="predicted-coverage">{r.predictedCoverage}%</span>{' '}
                   before migrating
                 </p>
-                <p className="rx-d-sub" data-testid="strict-coverage">
-                  strict · no leftover TODOs{' '}
-                  <span className="tnum">{r.validatedStrictCoverage}%</span>
+                <p className="rx-d-sub" data-testid="compiling-coverage">
+                  compiles &amp; bundles · soft residue allowed{' '}
+                  <span className="tnum">{formatScorePercent(r.validatedCompilingCoverage)}</span>
                 </p>
               </div>
 

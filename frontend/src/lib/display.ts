@@ -100,6 +100,18 @@ export function formatScore(value: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
 }
 
+/**
+ * A validated score as a percentage, or "n/a" when it was never measured.
+ *
+ * The backend reports `null` for a score whose population was empty — a
+ * migration that emitted nothing has no coverage, and rendering that as "0%" or
+ * "100%" would both be inventions. Anything showing a validated figure must go
+ * through here so an unmeasured score can never be printed as a number.
+ */
+export function formatScorePercent(value: number | null | undefined): string {
+  return value == null ? 'n/a' : `${formatScore(value)}%`
+}
+
 /** Signed delta for the score breakdown, e.g. +40 / −4. Uses a real minus. */
 export function formatDelta(value: number): string {
   const rounded = Math.round(value * 10) / 10
