@@ -435,8 +435,29 @@
   font-weight: 600;
 }
 
+/* ---- tablet + phone: shrink the frame inset ----
+   Mirrors the `.rx-home` / `:root` breakpoints (Home.css / index.css) so the
+   shared <SiteHeader/> capsule — nested in `.rx-arch`, which inherits from
+   this local token copy rather than either of those — shrinks its insets in
+   step with the rest of the site, and the reading column gets its width back
+   on narrow viewports instead of losing a fixed 48px to padding on both sides. */
+@media (max-width: 1024px) {
+  .rx-arch {
+    --rx-frame-inset: 28px;
+    --rx-frame-inset-top: 72px;
+    --rx-frame-pad: 18px;
+  }
+}
+@media (max-width: 640px) {
+  .rx-arch {
+    --rx-frame-inset: 16px;
+    --rx-frame-inset-top: 64px;
+    --rx-frame-pad: 12px;
+  }
+}
+
 /* ---- narrow screens: collapse the two-column blocks ---- */
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .rx-arch-workers,
   .rx-arch-kinds,
   .rx-arch-cols {
