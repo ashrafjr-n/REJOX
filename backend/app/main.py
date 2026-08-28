@@ -33,7 +33,7 @@ from app.models.jobs import JobCreated, JobState
 from app.models.knowledge_graph import KnowledgeGraph
 from app.models.plan import MigrationPlan, PlanResponse
 from app.pipeline import workspace
-from app.pipeline.analyzer import AnalyzerError, analyze_graph
+from app.pipeline.analyzer import AnalyzerError, NothingToMigrate, analyze_graph
 from app.pipeline.ingest import IngestError, ingest_github, ingest_zip
 from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
 from app.pipeline.planner import PlannerError, plan_migration
@@ -142,6 +142,10 @@ def _build_kg(source: Path) -> KnowledgeGraph:
 def _analyze(kg: KnowledgeGraph) -> AnalysisReport:
     try:
         return analyze_graph(kg)
+    except NothingToMigrate as exc:
+        # A statement about the upload, not a defect: 422, and the message says
+        # what was expected. Ordered before AnalyzerError, which it subclasses.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except AnalyzerError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

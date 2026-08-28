@@ -39,6 +39,15 @@ class AnalyzerError(RuntimeError):
     """
 
 
+class NothingToMigrate(AnalyzerError):
+    """The graph holds nothing this pipeline can migrate or meaningfully score.
+
+    Distinct from :class:`AnalyzerError` precisely because it is NOT our defect:
+    it is a statement about the uploaded project, so the HTTP layer reports it
+    as a 4xx explaining what was expected, never a 500.
+    """
+
+
 def _kg_context(kg: KnowledgeGraph) -> str:
     """The KG facts worth embedding in a failure message."""
     return (
@@ -62,6 +71,25 @@ def _rule(label: str, kg: KnowledgeGraph) -> Iterator[None]:
         ) from exc
 
 
+def _assert_something_to_migrate(kg: KnowledgeGraph) -> None:
+    """Refuse to score a graph with no components.
+
+    Every area score is a budget awarded for evidence. With no components there
+    is no evidence anywhere, and the budgets are handed out for the *absence* of
+    problems: an empty graph scores Coverage 95, Confidence 100, Risk low. That
+    number is not conservative or optimistic, it is meaningless — so it is not
+    produced at all. A directory with no React components is not a project this
+    pipeline can migrate, and saying so is the honest answer.
+    """
+    if not kg.components:
+        raise NothingToMigrate(
+            f"No React components found in {_kg_context(kg)}. Rejox migrates "
+            "React components to React Native; there is nothing here to score "
+            "or migrate. Check that the uploaded root is the app directory "
+            "(not a wrapper folder), and that it contains .jsx/.tsx sources."
+        )
+
+
 def _summary(kg: KnowledgeGraph) -> Summary:
     page_names = {r.componentName for r in kg.routes if r.componentName}
     return Summary(
@@ -77,8 +105,11 @@ def analyze_graph(kg: KnowledgeGraph) -> AnalysisReport:
     """Analyze a Knowledge Graph into a Migration Report.
 
     Raises:
+        NothingToMigrate: if the graph holds no React components to score.
         AnalyzerError: if any rule fails on this graph.
     """
+    _assert_something_to_migrate(kg)
+
     with _rule("library rules", kg):
         libraries = analyze_libraries(kg)
     with _rule("component rules", kg):
