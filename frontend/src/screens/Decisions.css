@@ -113,35 +113,6 @@
   max-width: var(--rx-d-col);
 }
 
-/* Tablet + phone: the two-column composition (decision · proof+join) was
-   tuned for the desktop spine width and has no room to keep both columns
-   side by side once it shrinks. Below 1024px the grid's single explicit
-   column stacks the two items into rows in DOM order (decision, then proof +
-   join) instead — everything else about the two panels is unchanged. */
-@media (max-width: 1024px) {
-  .rx-d-stage {
-    grid-template-columns: 1fr;
-  }
-  .rx-d-join {
-    margin-top: clamp(28px, 5vh, 44px);
-  }
-}
-
-/* Phone: the evidence row's fixed 128px label column crowds the value column
-   at narrow widths, and the three proof metrics no longer fit one row once
-   the right column is full page width but the viewport itself is this
-   narrow — both switch to stacking/wrapping instead of squeezing. */
-@media (max-width: 640px) {
-  .rx-d-ev-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-  .rx-d-proof-row {
-    flex-wrap: wrap;
-    row-gap: 18px;
-  }
-}
-
 /* --- shared beat panel: a quiet hairline frame (the join line between them is
    deliberately unframed). --- */
 .rx-d-beat {
@@ -522,4 +493,49 @@
 .rx-decisions.is-reduced .rx-d-reveal {
   opacity: 1;
   transform: none;
+}
+
+/* ===================== tablet + phone ===================== *
+ * Placed last on purpose: every rule below overrides a same-specificity base
+ * rule declared earlier in this file (.rx-d-ev-row, .rx-d-proof-row), and CSS
+ * breaks same-specificity ties by source order, not by whichever is inside a
+ * @media block — a media query earlier in the file loses to a plain rule
+ * later in the file even while its condition matches. Keeping every
+ * responsive override in one block at the end is what guarantees it always
+ * wins, matching the convention the rest of the site's stylesheets already
+ * use (Home.css, Architecture.css, Docs.css). */
+
+/* Tablet + phone: the two-column composition (decision · proof+join) was
+   tuned for the desktop spine width and has no room to keep both columns
+   side by side once it shrinks. Below 1024px the grid's single explicit
+   column stacks the two items into rows in DOM order (decision, then proof +
+   join) instead — everything else about the two panels is unchanged. */
+@media (max-width: 1024px) {
+  .rx-d-stage {
+    /* minmax(0, 1fr), not a bare 1fr: a grid track's implicit minimum is
+       `auto` (content-based), so a bare `1fr` still refuses to shrink below
+       whatever its widest unbreakable descendant needs — the evidence row's
+       badge strip, in practice — and silently overflows the viewport instead
+       of wrapping. minmax(0, 1fr) is what actually lets the column shrink to
+       the container width. */
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rx-d-join {
+    margin-top: clamp(28px, 5vh, 44px);
+  }
+}
+
+/* Phone: the evidence row's fixed 128px label column crowds the value column
+   at narrow widths, and the three proof metrics no longer fit one row once
+   the right column is full page width but the viewport itself is this
+   narrow — both switch to stacking/wrapping instead of squeezing. */
+@media (max-width: 640px) {
+  .rx-d-ev-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .rx-d-proof-row {
+    flex-wrap: wrap;
+    row-gap: 18px;
+  }
 }
