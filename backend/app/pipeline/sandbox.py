@@ -105,6 +105,17 @@ class SandboxPolicy:
         return self.mode == "docker"
 
 
+def npm_scripts_allowed() -> bool:
+    """Whether dependency lifecycle scripts may run during install.
+
+    Off by default in every mode. A dependency's ``postinstall`` is arbitrary
+    code from a tree the uploader influences, and Rejox only needs the package
+    files to typecheck and bundle. Kept as an escape hatch for a project that
+    genuinely cannot install without them — never for untrusted input.
+    """
+    return _env_flag("REJOX_NPM_ALLOW_SCRIPTS")
+
+
 def assert_safe_for_untrusted_input(policy: Optional[SandboxPolicy] = None) -> None:
     """Refuse to accept stranger-supplied projects without real containment.
 

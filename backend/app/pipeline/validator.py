@@ -4,8 +4,14 @@ The Validator proves the *deterministic* output is sound BEFORE any AI exists:
 it runs REAL tools (never heuristics) against the emitted React Native project
 and parses their output into structured, machine-readable diagnostics.
 
-  1. **Install** — ``npm install`` in the emitted project (cached across runs:
-     skipped when ``node_modules`` already exists, unless ``force_install``).
+Everything here executes code derived from an uploaded project, so **no command
+is spawned directly** — all of them go through ``app.pipeline.sandbox``, which
+contains them (docker mode) and grants network access only to the one stage
+that needs it.
+
+  1. **Install** — ``npm install --ignore-scripts`` in the emitted project
+     (cached across runs: skipped when ``node_modules`` already exists, unless
+     ``force_install``). The only stage allowed to reach the network.
   2. **Typecheck** — the project's own ``tsc --noEmit`` (invoked via the local
      ``typescript`` binary, never ``npx tsc`` — ``npx`` will try to fetch an
      unrelated ``tsc`` package if it can't find the local one). Output is parsed
@@ -45,6 +51,8 @@ def _emit(on_progress: Optional[ProgressFn], stage: str, phase: str, **payload: 
 
 from app.models.analysis import ConfidenceSource
 from app.models.emission import EmittedFile, EmittedProject
+from app.pipeline import sandbox
+from app.pipeline.sandbox import SandboxPolicy
 from app.models.validation import (
     Diagnostic,
     MappedDiagnostic,
@@ -78,11 +86,30 @@ class ValidatorError(RuntimeError):
     """Raised when the Validator cannot run its tools at all (missing node…)."""
 
 
-def _run(cmd: list[str], cwd: Path, timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
+def _run(
+    cmd: list[str],
+    cwd: Path,
+    timeout: int,
+    *,
+    network: bool = False,
+    policy: Optional[SandboxPolicy] = None,
+) -> subprocess.CompletedProcess[str]:
+    """Every external command the Validator runs goes through the sandbox.
+
+    ``network`` is opt-in per stage: only dependency installation needs it, so
+    typecheck and bundle run with the network switched off in docker mode.
+    """
+    return sandbox.run(cmd, cwd, timeout, network=network, policy=policy)
 
 
-def _which(name: str) -> str:
+def _tool(name: str, policy: SandboxPolicy) -> str:
+    """Resolve a toolchain binary for the configured sandbox mode.
+
+    In docker mode the command runs inside the image, so the bare name is what
+    must be passed — a host absolute path would not exist in the container.
+    """
+    if policy.mode == "docker":
+        return name
     found = shutil.which(name)
     if found is None:
         raise ValidatorError(f"`{name}` was not found on PATH; the Validator needs it.")
@@ -97,21 +124,23 @@ def _tail(text: str, n: int = 40) -> str:
 # --- Tool versions -----------------------------------------------------------
 
 
-def _tool_versions(out_dir: Path, node: str, npm: str) -> dict[str, str]:
+def _tool_versions(
+    out_dir: Path, node: str, npm: str, policy: SandboxPolicy
+) -> dict[str, str]:
     versions: dict[str, str] = {}
     try:
-        versions["node"] = _run([node, "--version"], out_dir, 30).stdout.strip()
+        versions["node"] = _run([node, "--version"], out_dir, 30, policy=policy).stdout.strip()
     except Exception:  # pragma: no cover - defensive
         pass
     try:
-        versions["npm"] = _run([npm, "--version"], out_dir, 30).stdout.strip()
+        versions["npm"] = _run([npm, "--version"], out_dir, 30, policy=policy).stdout.strip()
     except Exception:  # pragma: no cover
         pass
     tsc = _local_tsc(out_dir)
     if tsc:
         try:
             versions["typescript"] = _run(
-                [node, str(tsc), "--version"], out_dir, 30
+                [node, tsc, "--version"], out_dir, 30, policy=policy
             ).stdout.strip().replace("Version ", "")
         except Exception:  # pragma: no cover
             pass
@@ -121,12 +150,20 @@ def _tool_versions(out_dir: Path, node: str, npm: str) -> dict[str, str]:
 # --- Install -----------------------------------------------------------------
 
 
-def _install(out_dir: Path, npm: str, force: bool) -> tuple[bool, Optional[str], bool]:
+def _install(
+    out_dir: Path, npm: str, force: bool, policy: SandboxPolicy
+) -> tuple[bool, Optional[str], bool]:
     """Return (installed, skipped_reason, ran_npm). Caches node_modules across
     runs, but invalidates the cache when ``package.json`` changes (e.g. a new
     dependency) so a stale ``node_modules`` never hides a newly-added package
     from Metro. ``ran_npm`` records whether ``npm install`` actually executed
-    (vs a cache hit) — an observed fact, so the event stream never guesses."""
+    (vs a cache hit) — an observed fact, so the event stream never guesses.
+
+    Runs with ``--ignore-scripts``: dependency lifecycle scripts (pre/post
+    install) are arbitrary code from a tree the uploader influences, and Rejox
+    only needs the package *files* to typecheck and bundle. This holds in both
+    sandbox modes, so even the un-contained developer path does not execute a
+    dependency's install hooks."""
     node_modules = out_dir / "node_modules"
     pkg = out_dir / "package.json"
     want = hashlib.sha256(pkg.read_bytes()).hexdigest() if pkg.is_file() else ""
@@ -134,7 +171,10 @@ def _install(out_dir: Path, npm: str, force: bool) -> tuple[bool, Optional[str],
     fresh = stamp.is_file() and stamp.read_text().strip() == want
     if node_modules.is_dir() and fresh and not force:
         return True, None, False
-    proc = _run([npm, "install", "--no-audit", "--no-fund"], out_dir, INSTALL_TIMEOUT_SECONDS)
+    cmd = [npm, "install", "--no-audit", "--no-fund"]
+    if not sandbox.npm_scripts_allowed():
+        cmd.append("--ignore-scripts")
+    proc = _run(cmd, out_dir, INSTALL_TIMEOUT_SECONDS, network=True, policy=policy)
     if proc.returncode != 0:
         return node_modules.is_dir(), f"npm install failed:\n{_tail(proc.stderr or proc.stdout)}", True
     if node_modules.is_dir():
@@ -145,11 +185,16 @@ def _install(out_dir: Path, npm: str, force: bool) -> tuple[bool, Optional[str],
 # --- Typecheck ---------------------------------------------------------------
 
 
-def _local_tsc(out_dir: Path) -> Optional[Path]:
+def _local_tsc(out_dir: Path) -> Optional[str]:
+    """Return the compiler path *relative to the project root*.
+
+    Relative on purpose: the command is executed with the project root as its
+    working directory, so the same string resolves both on the host (direct
+    mode) and inside the container, where the root is mounted at ``/work``.
+    """
     for rel in ("node_modules/typescript/bin/tsc", "node_modules/.bin/tsc"):
-        p = out_dir / rel
-        if p.exists():
-            return p
+        if (out_dir / rel).exists():
+            return rel
     return None
 
 
@@ -173,14 +218,15 @@ def _parse_tsc(output: str) -> list[Diagnostic]:
     return diagnostics
 
 
-def _typecheck(out_dir: Path, node: str) -> StageResult:
+def _typecheck(out_dir: Path, node: str, policy: SandboxPolicy) -> StageResult:
     tsc = _local_tsc(out_dir)
     if tsc is None:
         return StageResult(
             ran=False, passed=False,
             skippedReason="local typescript compiler not found (was the project installed?)",
         )
-    proc = _run([node, str(tsc), "--noEmit"], out_dir, TYPECHECK_TIMEOUT_SECONDS)
+    # No network: typechecking reads the installed tree and nothing else.
+    proc = _run([node, tsc, "--noEmit"], out_dir, TYPECHECK_TIMEOUT_SECONDS, policy=policy)
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
     diagnostics = _parse_tsc(combined)
     errors = [d for d in diagnostics if d.severity == "error"]
@@ -197,6 +243,11 @@ def _typecheck(out_dir: Path, node: str) -> StageResult:
 
 
 def _relativize(path: str, out_dir: Path) -> str:
+    # In docker mode the toolchain reports container paths, where the project
+    # root is mounted at /work — strip that prefix so diagnostics name the same
+    # project-relative file in both modes.
+    if path.startswith("/work/"):
+        return path[len("/work/"):]
     try:
         return str(Path(path).resolve().relative_to(out_dir.resolve()))
     except (ValueError, OSError):
@@ -241,17 +292,27 @@ def _parse_metro(output: str, out_dir: Path) -> list[Diagnostic]:
     return diagnostics
 
 
-def _bundle(out_dir: Path, node: str, npm: str) -> StageResult:
-    npx = shutil.which("npx")
-    if npx is None:
-        return StageResult(ran=False, passed=False, skippedReason="`npx` not found; cannot run Metro.")
-    export_dir = out_dir / ".rejox-bundle"
+def _bundle(out_dir: Path, node: str, npm: str, policy: SandboxPolicy) -> StageResult:
+    if policy.mode == "docker":
+        npx = "npx"
+    else:
+        found = shutil.which("npx")
+        if found is None:
+            return StageResult(
+                ran=False, passed=False, skippedReason="`npx` not found; cannot run Metro."
+            )
+        npx = found
+    export_rel = ".rejox-bundle"
+    export_dir = out_dir / export_rel
     if export_dir.exists():
         shutil.rmtree(export_dir, ignore_errors=True)
+    # No network: Metro bundles the installed tree. `--output-dir` stays
+    # relative so it resolves under /work inside the container too.
     proc = _run(
-        [npx, "expo", "export", "--platform", "ios", "--output-dir", str(export_dir)],
+        [npx, "expo", "export", "--platform", "ios", "--output-dir", export_rel],
         out_dir,
         BUNDLE_TIMEOUT_SECONDS,
+        policy=policy,
     )
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
     diagnostics = _parse_metro(combined, out_dir)
@@ -283,6 +344,7 @@ def validate_project(
     run_bundle: bool = True,
     run_lint: bool = False,
     on_progress: Optional[ProgressFn] = None,
+    policy: Optional[SandboxPolicy] = None,
 ) -> ValidationResult:
     """Run the real toolchain against the emitted project and structure the result.
 
@@ -295,13 +357,16 @@ def validate_project(
         on_progress: optional sink fired at each real sub-stage boundary
             (install → typecheck → bundle), start and completion, with the
             counts observed there. Defaults to ``None`` (no-op) for sync callers.
+        policy: how untrusted commands are executed. Defaults to the
+            environment's :class:`SandboxPolicy`.
     """
     out_dir = Path(out_dir)
     if not (out_dir / "package.json").is_file():
         raise ValidatorError(f"No package.json in {out_dir}; nothing to validate.")
 
-    node = _which("node")
-    npm = _which("npm")
+    policy = policy or SandboxPolicy.from_env()
+    node = _tool("node", policy)
+    npm = _tool("npm", policy)
     started = time.monotonic()
 
     # --- install ---
@@ -310,7 +375,7 @@ def validate_project(
     install_reason: Optional[str] = None
     ran_npm = False
     if install:
-        installed, install_reason, ran_npm = _install(out_dir, npm, force_install)
+        installed, install_reason, ran_npm = _install(out_dir, npm, force_install, policy)
     # installSkipped reflects whether npm actually ran (observed), not just the flag.
     _emit(on_progress, "install", "completed", installed=installed, installSkipped=not ran_npm)
 
@@ -330,12 +395,12 @@ def validate_project(
         return ValidationResult(
             passed=False, installed=False, typecheck=typecheck, bundle=bundle,
             durationSeconds=round(time.monotonic() - started, 2),
-            toolVersions=_tool_versions(out_dir, node, npm),
+            toolVersions=_tool_versions(out_dir, node, npm, policy),
         )
 
     # --- typecheck ---
     _emit(on_progress, "typecheck", "started")
-    typecheck = _typecheck(out_dir, node)
+    typecheck = _typecheck(out_dir, node, policy)
     _emit(on_progress, "typecheck", "completed", ran=typecheck.ran, passed=typecheck.passed,
           errorCount=typecheck.errorCount, diagnosticsFound=len(typecheck.diagnostics),
           skippedReason=typecheck.skippedReason)
@@ -343,7 +408,7 @@ def validate_project(
     # --- bundle ---
     _emit(on_progress, "bundle", "started")
     if run_bundle:
-        bundle = _bundle(out_dir, node, npm)
+        bundle = _bundle(out_dir, node, npm, policy)
     else:
         bundle = StageResult(ran=False, passed=False, skippedReason="run_bundle=False")
     _emit(on_progress, "bundle", "completed", ran=bundle.ran, passed=bundle.passed,
@@ -357,7 +422,7 @@ def validate_project(
         typecheck=typecheck,
         bundle=bundle,
         durationSeconds=round(time.monotonic() - started, 2),
-        toolVersions=_tool_versions(out_dir, node, npm),
+        toolVersions=_tool_versions(out_dir, node, npm, policy),
     )
 
 
