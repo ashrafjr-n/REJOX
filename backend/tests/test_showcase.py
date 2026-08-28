@@ -131,8 +131,10 @@ def test_exported_values_equal_the_live_engine(tmp_path, monkeypatch) -> None:
     r = data["results"]
 
     # Validated coverage / confidence come from the post-validation scorer.
-    assert r["validatedCoverage"] == scores.workingCoverage
+    # Two named lenses, never one figure standing in for both: strict is the
+    # headline (nothing left unresolved), compiling is the forgiving one.
     assert r["validatedStrictCoverage"] == scores.coverage
+    assert r["validatedCompilingCoverage"] == scores.workingCoverage
     assert r["validatedConfidence"] == scores.confidence
     # tsc + Metro verdicts.
     assert r["tscPassed"] == validation.typecheck.passed

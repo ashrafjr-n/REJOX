@@ -78,34 +78,36 @@ test.describe('Home / Decisions section', () => {
     await page.locator('.rx-d-proof').screenshot({ path: 'test-results/decisions-beatB.png' })
   })
 
-  test('validated figure, its lens, and the strict figure all match the data and are visible', async ({ page }) => {
+  test('the headline is the STRICT figure, labelled, with the forgiving lens beside it', async ({ page }) => {
     await gotoHome(page)
     await page.locator('.rx-d-proof').scrollIntoViewIfNeeded()
     await page.waitForTimeout(700)
 
-    // The headline validated figure matches the data's working-coverage lens.
+    // The headline is the strict lens — the figure that cannot flatter. This is
+    // the assertion that stops the page quietly leading with the 100% again.
     const validated = page.getByTestId('validated-coverage')
     await expect(validated).toBeVisible()
-    expect((await validated.textContent())?.trim()).toBe(`${r.validatedCoverage}%`)
+    expect((await validated.textContent())?.trim()).toBe(`${r.validatedStrictCoverage}%`)
 
-    // Its lens is labelled explicitly (so 100% is never an unqualified claim).
+    // Its lens is labelled explicitly, so the number is never an unqualified claim.
     const lens = page.getByTestId('validated-lens')
     await expect(lens).toBeVisible()
-    expect((await lens.textContent())?.toLowerCase()).toContain('working')
+    expect((await lens.textContent())?.toLowerCase()).toContain('strict')
 
-    // The stricter, lower figure is present in the DOM and genuinely visible —
-    // not behind a hover or tooltip, not omitted.
-    const strict = page.getByTestId('strict-coverage')
-    await expect(strict).toBeVisible()
-    expect(await strict.textContent()).toContain(String(r.validatedStrictCoverage))
-    // …and it is a DIFFERENT, lower number than the headline.
-    expect(r.validatedStrictCoverage).toBeLessThan(r.validatedCoverage)
+    // The more forgiving figure is present and genuinely visible — not behind a
+    // hover or tooltip, not omitted — and labelled with what it measures.
+    const compiling = page.getByTestId('compiling-coverage')
+    await expect(compiling).toBeVisible()
+    expect(await compiling.textContent()).toContain(String(r.validatedCompilingCoverage))
+    expect((await compiling.textContent())?.toLowerCase()).toContain('compiles')
+    // …and the headline is the LOWER of the two, never the flattering one.
+    expect(r.validatedStrictCoverage).toBeLessThan(r.validatedCompilingCoverage!)
 
     // Predicted is a distinct measurement, shown separately.
     const predicted = page.getByTestId('predicted-coverage')
     await expect(predicted).toBeVisible()
     expect((await predicted.textContent())?.trim()).toBe(`${r.predictedCoverage}%`)
-    expect(r.predictedCoverage).not.toBe(r.validatedCoverage)
+    expect(r.predictedCoverage).not.toBe(r.validatedStrictCoverage)
   })
 
   test('coexists with the Scene 01 pin and the CTA ScrollReveal', async ({ page }) => {
