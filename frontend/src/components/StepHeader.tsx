@@ -38,19 +38,19 @@ export function StepHeader({
       <div className="eyebrow mb-2">
         {stageEyebrow(stage, plan, downloadReady)}
       </div>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <h1 className="truncate text-[24px] leading-tight font-semibold tracking-tight text-ink">
+          <h1 className="truncate text-[20px] leading-tight font-semibold tracking-tight text-ink sm:text-[24px]">
             {title}
           </h1>
           {badge}
         </div>
         {actions && (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
         )}
       </div>
       {description && (
-        <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-ink-3">
+        <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-ink-3 sm:text-[15px]">
           {description}
         </p>
       )}
