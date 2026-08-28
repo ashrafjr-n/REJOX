@@ -22,7 +22,15 @@ else
   echo "!! backend/venv not found — run the install steps in README.md first." >&2
   exit 1
 fi
+# A local dev server binds to 127.0.0.1 and migrates projects you chose
+# yourself, so it opts out of the two refusals a public server must keep:
+# API keys, and containment for the uploaded project's toolchain. Never export
+# these for anything reachable from outside this machine — see docs/SECURITY.md.
+export REJOX_ALLOW_ANONYMOUS=1
+export REJOX_ALLOW_UNSANDBOXED=1
+
 echo ">> backend  → http://localhost:8000  (docs at /docs)"
+echo "   (dev posture: no API key, no sandbox — local only)"
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload &
 BACKEND_PID=$!
 
