@@ -45,6 +45,15 @@ Then open **http://localhost:5173** and upload a React project (try
 starts uvicorn and Vite together and stops both on Ctrl+C. CORS origins are
 controlled by `REJOX_CORS_ORIGINS` (default `http://localhost:5173,http://127.0.0.1:5173`).
 
+> **`dev.sh` is a local-only posture.** Validating a migration runs the uploaded
+> project's `npm install`, `tsc` and Metro, so a server that accepts uploads
+> must run them contained (`REJOX_SANDBOX=docker`) and behind an API key
+> (`REJOX_API_KEYS`). `dev.sh` sets `REJOX_ALLOW_ANONYMOUS=1` and
+> `REJOX_ALLOW_UNSANDBOXED=1` because it binds to `127.0.0.1` and migrates
+> projects you chose yourself. Without those, the API returns 503 and explains
+> what to set. Read **[`docs/SECURITY.md`](docs/SECURITY.md)** before deploying
+> this anywhere — it lists both the guarantees and the known gaps.
+
 **End-to-end browser test** (real stack, real backend numbers)
 
 ```bash
