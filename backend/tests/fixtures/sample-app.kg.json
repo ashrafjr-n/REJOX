@@ -354,7 +354,7 @@
       "textNodes": [
         {
           "jsxParentTag": "Link",
-          "text": "🛒",
+          "text": "\ud83d\uded2",
           "isBare": true
         },
         {
@@ -444,7 +444,7 @@
         },
         {
           "jsxParentTag": "button",
-          "text": "✕",
+          "text": "\u2715",
           "isBare": true
         }
       ],
@@ -718,7 +718,7 @@
       "textNodes": [
         {
           "jsxParentTag": "span",
-          "text": "© 2026 Sample Store — a Rejox migration benchmark.",
+          "text": "\u00a9 2026 Sample Store \u2014 a Rejox migration benchmark.",
           "isBare": false
         },
         {
@@ -1139,7 +1139,7 @@
       "textNodes": [
         {
           "jsxParentTag": "button",
-          "text": "−",
+          "text": "\u2212",
           "isBare": true
         },
         {
@@ -1199,7 +1199,7 @@
       "textNodes": [
         {
           "jsxParentTag": "span",
-          "text": "★",
+          "text": "\u2605",
           "isBare": false
         }
       ],
@@ -1447,7 +1447,7 @@
       "textNodes": [
         {
           "jsxParentTag": "Link",
-          "text": "← Back to products",
+          "text": "\u2190 Back to products",
           "isBare": true
         },
         {
@@ -1752,12 +1752,7 @@
       "referencedBy": []
     },
     {
-      "path": "src/assets/hero.png",
-      "type": "png",
-      "referencedBy": []
-    },
-    {
-      "path": "src/assets/vite.svg",
+      "path": "src/assets/rejox-logo.svg",
       "type": "svg",
       "referencedBy": []
     }
