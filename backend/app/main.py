@@ -37,6 +37,8 @@ from app.pipeline.analyzer import AnalyzerError, analyze_graph
 from app.pipeline.ingest import IngestError, ingest_github, ingest_zip
 from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
 from app.pipeline.planner import PlannerError, plan_migration
+from app.pipeline.sandbox import SandboxError, assert_safe_for_untrusted_input
+from app.security import guard, max_concurrent_migrations
 
 app = FastAPI(
     title="Rejox AI",
@@ -155,8 +157,9 @@ def _plan(report: AnalysisReport, kg: KnowledgeGraph) -> MigrationPlan:
 
 
 @app.post("/api/upload", response_model=IngestedProject)
-async def upload(file: UploadFile = File(...)) -> IngestedProject:
+async def upload(request: Request, file: UploadFile = File(...)) -> IngestedProject:
     """Upload stage: land a ZIP into a fresh run workspace and detect the root."""
+    guard(request, "upload")
     run = workspace.new_run()
     try:
         data = await file.read()
@@ -177,8 +180,9 @@ class GithubUploadRequest(BaseModel):
 
 
 @app.post("/api/upload/github", response_model=IngestedProject)
-def upload_github(req: GithubUploadRequest) -> IngestedProject:
+def upload_github(request: Request, req: GithubUploadRequest) -> IngestedProject:
     """Upload stage: shallow-clone a public GitHub repo into a fresh run."""
+    guard(request, "upload")
     run = workspace.new_run()
     try:
         return ingest_github(req.url, run, ref=req.ref)
@@ -223,14 +227,16 @@ def _write_cache(run: workspace.Run, name: str, value: BaseModel) -> None:
 
 
 @app.post("/api/parse", response_model=KnowledgeGraph)
-def parse(req: SourceRequest) -> KnowledgeGraph:
+def parse(request: Request, req: SourceRequest) -> KnowledgeGraph:
     """Parse stage: run the Node worker and return the Knowledge Graph JSON."""
+    guard(request, "pipeline")
     return _build_kg(_source_for(req))
 
 
 @app.post("/api/analyze", response_model=AnalysisReport)
-def analyze(req: SourceRequest) -> AnalysisReport:
+def analyze(request: Request, req: SourceRequest) -> AnalysisReport:
     """Analysis stage: parse the project, then analyze migratability (cached per run)."""
+    guard(request, "pipeline")
     run = _run_for(req)
     if run is not None:
         cached = _read_cache(run, _ANALYSIS_CACHE, AnalysisReport)
@@ -247,8 +253,9 @@ def analyze(req: SourceRequest) -> AnalysisReport:
 
 
 @app.post("/api/plan", response_model=PlanResponse)
-def plan(req: SourceRequest) -> PlanResponse:
+def plan(request: Request, req: SourceRequest) -> PlanResponse:
     """Plan stage: parse + analyze + plan (cached per run — a 2nd call is a read)."""
+    guard(request, "pipeline")
     run = _run_for(req)
     if run is not None:
         cached = _read_cache(run, _PLAN_CACHE, PlanResponse)
@@ -279,7 +286,7 @@ class MigrateRequest(SourceRequest):
 
 
 @app.post("/api/migrate", response_model=JobCreated, status_code=202)
-def migrate(req: MigrateRequest) -> JobCreated:
+def migrate(request: Request, req: MigrateRequest) -> JobCreated:
     """Migrate stage: start a background job and return immediately (``202``).
 
     The migration (emit → npm install → tsc → Metro → repair → done) runs in the
@@ -287,6 +294,25 @@ def migrate(req: MigrateRequest) -> JobCreated:
     ``GET /api/jobs/{jobId}``. The RN project is emitted into the run's
     ``output/`` dir, so ``GET /api/runs/{runId}/download`` can package it after.
     """
+    guard(request, "migrate")
+    # The migration executes the uploaded project's toolchain. Refuse to do that
+    # without real containment rather than discovering it in production.
+    try:
+        assert_safe_for_untrusted_input()
+    except SandboxError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    running = jobs.running_count()
+    if running >= max_concurrent_migrations():
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"{running} migration(s) already running (limit "
+                f"{max_concurrent_migrations()}). Try again shortly."
+            ),
+            headers={"Retry-After": "30"},
+        )
+
     source = _source_for(req)
 
     # Every job is hosted by a run workspace (so its state + output have a home).
@@ -320,9 +346,10 @@ def _get_job_or_404(job_id: str) -> JobState:
 
 
 @app.get("/api/jobs/{job_id}", response_model=JobState)
-def job_state(job_id: str) -> JobState:
+def job_state(request: Request, job_id: str) -> JobState:
     """The full, reconstructable job state — a late joiner rebuilds the whole
     picture (events so far + final result/error) from this alone."""
+    guard(request, "read")
     return _get_job_or_404(job_id)
 
 
@@ -338,6 +365,7 @@ async def job_events(job_id: str, request: Request) -> StreamingResponse:
     client's ``Last-Event-ID`` (or from the start), then streams live until the
     terminal event, then closes. The stream is a convenience over
     ``GET /api/jobs/{id}`` — never the source of truth."""
+    guard(request, "read")
     _get_job_or_404(job_id)
 
     header_id = request.headers.get("last-event-id")
@@ -388,8 +416,9 @@ def _zip_output(out_dir: Path) -> Path:
 
 
 @app.get("/api/runs/{run_id}/download")
-def download(run_id: str) -> FileResponse:
+def download(request: Request, run_id: str) -> FileResponse:
     """Download stage: stream the emitted React Native project back as a ZIP."""
+    guard(request, "read")
     run = _get_run_or_404(run_id)
     out_dir = run.output_dir
     if not out_dir.is_dir() or not any(out_dir.iterdir()):
