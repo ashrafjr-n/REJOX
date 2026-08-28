@@ -112,6 +112,14 @@ not wall-clock. `npm run types:showcase` runs `json2ts` over
 JSON and the generated type are committed, so `npm run build` works on a fresh
 clone with no backend running.
 
+## Learning the codebase
+
+[`rejox-docs.md`](rejox-docs.md) is a complete walkthrough of the backend written
+for readers new to React and to backend engineering: the eight-stage pipeline,
+the Knowledge Graph, the rules-before-AI design, the scoring model, the sandbox,
+and an honest assessment of the system's strengths and weaknesses. Start there
+before `docs/ARCHITECTURE.md`, which assumes more.
+
 ## Deploying
 
 ```bash
