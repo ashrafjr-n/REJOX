@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import './Understanding.css'
 import showcase from '../data/showcase.json' with { type: 'json' }
 import type { ShowcaseData } from '../types/showcase.generated'
+import { useMediaQuery } from '../lib/useMediaQuery'
 import { graphLayout, WAVE_GEOM } from './understandingLayout'
 
 /**
@@ -29,7 +30,10 @@ import { graphLayout, WAVE_GEOM } from './understandingLayout'
  * gsap.context().revert(). Reduced motion renders the settled build-order
  * arrangement with the file list and the full readout — nothing behind scroll.
  *
- * Desktop only.
+ * The pin/scrub timeline is desktop only: below 1024px it renders the same
+ * settled arrangement (no pin, no scroll-jack) rather than adapting the
+ * timeline to a viewport size it was never laid out for; GSAP's ScrollTrigger
+ * pin also fights mobile browsers' dynamic toolbar chrome.
  */
 
 gsap.registerPlugin(ScrollTrigger)
@@ -94,7 +98,12 @@ function prefersReducedMotion(): boolean {
 export default function Understanding() {
   const sectionRef = useRef<HTMLElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
-  const [reduced] = useState(prefersReducedMotion)
+  const [reducedMotion] = useState(prefersReducedMotion)
+  // Tablet and phone: the pinned/scrubbed timeline was laid out for desktop
+  // viewports and never adapted, so it renders the same static "reduced"
+  // arrangement below 1024px too, not just under prefers-reduced-motion.
+  const isNarrowViewport = useMediaQuery('(max-width: 1024px)')
+  const reduced = reducedMotion || isNarrowViewport
   const [pinned, setPinned] = useState(false)
 
   useLayoutEffect(() => {
