@@ -113,6 +113,35 @@
   max-width: var(--rx-d-col);
 }
 
+/* Tablet + phone: the two-column composition (decision · proof+join) was
+   tuned for the desktop spine width and has no room to keep both columns
+   side by side once it shrinks. Below 1024px the grid's single explicit
+   column stacks the two items into rows in DOM order (decision, then proof +
+   join) instead — everything else about the two panels is unchanged. */
+@media (max-width: 1024px) {
+  .rx-d-stage {
+    grid-template-columns: 1fr;
+  }
+  .rx-d-join {
+    margin-top: clamp(28px, 5vh, 44px);
+  }
+}
+
+/* Phone: the evidence row's fixed 128px label column crowds the value column
+   at narrow widths, and the three proof metrics no longer fit one row once
+   the right column is full page width but the viewport itself is this
+   narrow — both switch to stacking/wrapping instead of squeezing. */
+@media (max-width: 640px) {
+  .rx-d-ev-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .rx-d-proof-row {
+    flex-wrap: wrap;
+    row-gap: 18px;
+  }
+}
+
 /* --- shared beat panel: a quiet hairline frame (the join line between them is
    deliberately unframed). --- */
 .rx-d-beat {
