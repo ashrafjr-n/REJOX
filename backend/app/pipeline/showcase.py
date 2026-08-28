@@ -183,12 +183,17 @@ class ShowcaseResults(ShowcaseBase):
     # Analyzer prediction (pre-migration).
     predictedCoverage: float
     predictedConfidence: float
-    # Validated reality (post tsc + Metro). ``validatedCoverage`` is the
-    # working-coverage lens (compiles + bundles) directly comparable to the
-    # prediction; ``validatedStrictCoverage`` is the residue-free lens.
-    validatedCoverage: float
-    validatedStrictCoverage: float
-    validatedConfidence: float
+    # Validated reality (post tsc + Metro), reported as two named lenses so
+    # neither can be mistaken for "the" coverage:
+    #   validatedStrictCoverage    — the HEADLINE. A unit counts only when
+    #                                NOTHING was left unresolved in it.
+    #   validatedCompilingCoverage — the forgiving lens: units that compile and
+    #                                bundle, soft residue included. Directly
+    #                                comparable to the Analyzer's prediction.
+    # None where nothing was emitted: an empty population has no score.
+    validatedStrictCoverage: Optional[float] = None
+    validatedCompilingCoverage: Optional[float] = None
+    validatedConfidence: Optional[float] = None
     tscPassed: bool
     tscErrorCount: int
     metroPassed: bool
@@ -306,7 +311,7 @@ def _build_results(
     return ShowcaseResults(
         predictedCoverage=report.coverage,
         predictedConfidence=report.confidence,
-        validatedCoverage=scores.workingCoverage,
+        validatedCompilingCoverage=scores.workingCoverage,
         validatedStrictCoverage=scores.coverage,
         validatedConfidence=scores.confidence,
         tscPassed=validation.typecheck.passed,
