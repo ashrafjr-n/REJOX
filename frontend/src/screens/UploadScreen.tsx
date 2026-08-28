@@ -247,7 +247,7 @@ function InputView() {
       </AnimatePresence>
 
       {/* Security limits, stated plainly */}
-      <div className="mt-8 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
+      <div className="mt-8 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-line bg-line text-center sm:grid-cols-3">
         {[
           { label: 'Max archive', value: formatBytes(LIMITS.maxArchiveBytes) },
           { label: 'Max expanded', value: formatBytes(LIMITS.maxUncompressedBytes) },
