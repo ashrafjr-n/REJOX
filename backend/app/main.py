@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.background import BackgroundTask
 
-from app import jobs
+from app import jobs, queue
 from app.models.analysis import AnalysisReport
 from app.models.ingest import IngestedProject
 from app.models.jobs import JobCreated, JobState
@@ -38,6 +38,7 @@ from app.pipeline.ingest import IngestError, ingest_github, ingest_zip
 from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
 from app.pipeline.planner import PlannerError, plan_migration
 from app.pipeline.sandbox import SandboxError, assert_safe_for_untrusted_input
+from app.queue import QueueError
 from app.security import guard, max_concurrent_migrations
 
 app = FastAPI(
@@ -306,12 +307,16 @@ def migrate(request: Request, req: MigrateRequest) -> JobCreated:
     except SandboxError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    running = jobs.running_count()
-    if running >= max_concurrent_migrations():
+    # Concurrency is a property of the fleet, not of this process: with the rq
+    # backend the count spans every worker. None means the queue could not be
+    # reached to ask — the enqueue below will then fail loudly with the real
+    # reason, which beats rejecting here with a guessed number.
+    running = queue.running_count()
+    if running is not None and running >= max_concurrent_migrations():
         raise HTTPException(
             status_code=429,
             detail=(
-                f"{running} migration(s) already running (limit "
+                f"{running} migration(s) already running or queued (limit "
                 f"{max_concurrent_migrations()}). Try again shortly."
             ),
             headers={"Retry-After": "30"},
@@ -327,15 +332,20 @@ def migrate(request: Request, req: MigrateRequest) -> JobCreated:
     out_dir = run.output_dir
 
     job = jobs.create_job(run.runId)
-    jobs.start_job(
-        job.jobId,
-        source_root=source,
-        run_id=run.runId,
-        out_dir=out_dir,
-        answers=req.answers,
-        install=req.install,
-        run_bundle=req.runBundle,
-    )
+    try:
+        jobs.start_job(
+            job.jobId,
+            source_root=source,
+            run_id=run.runId,
+            out_dir=out_dir,
+            answers=req.answers,
+            install=req.install,
+            run_bundle=req.runBundle,
+        )
+    except QueueError as exc:
+        # Never answer 202 for work nobody accepted: the client would poll a job
+        # that will never start. 503 says the service cannot take it right now.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return JobCreated(jobId=job.jobId, status=job.status)
 
 
