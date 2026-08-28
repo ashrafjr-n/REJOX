@@ -51,11 +51,17 @@ _CORE_QUESTION_IDS = ["project-type", "styling-engine", "navigation-library", "i
 # --- small render helpers ----------------------------------------------------
 
 
-def _pct(value: float) -> str:
+def _pct(value: float | None) -> str:
+    """Render a score. ``None`` means the population was empty — say so rather
+    than printing a number that was never measured."""
+    if value is None:
+        return "n/a"
     return f"{value:.0f}%"
 
 
-def _score_color(value: float) -> str:
+def _score_color(value: float | None) -> str:
+    if value is None:
+        return "dim"
     return "green" if value >= 80 else "yellow" if value >= 55 else "red"
 
 
@@ -357,8 +363,12 @@ def _render_validation(validation, scores, repair=None) -> None:
 
     if scores is not None:
         console.print(
-            f"\n[dim]Validated[/]  Coverage [bold {_score_color(scores.workingCoverage)}]"
-            f"{_pct(scores.workingCoverage)}[/]  (strict {_pct(scores.coverage)})   "
+            # Strict Coverage leads: it is the number that counts a file as
+            # migrated only when NOTHING was left unresolved in it. The
+            # compiles-and-bundles figure follows it, labelled, never in its place.
+            f"\n[dim]Validated[/]  Coverage [bold {_score_color(scores.coverage)}]"
+            f"{_pct(scores.coverage)}[/] [dim]strict[/]  "
+            f"([dim]compiles[/] {_pct(scores.workingCoverage)})   "
             f"Confidence [bold {_score_color(scores.confidence)}]{_pct(scores.confidence)}[/]"
         )
 
@@ -377,8 +387,10 @@ def _render_final(emission, validation, scores, out_dir, counter, cache, proposa
     t.add_row("Files skipped", str(len(emission.skipped)))
     t.add_row("Residue TODOs", f"[bold]{emission.todoCount}[/]")
     if validation is not None and scores is not None:
-        t.add_row("Validated coverage", f"[bold]{_pct(scores.workingCoverage)}[/]")
+        t.add_row("Validated coverage (strict)", f"[bold]{_pct(scores.coverage)}[/]")
+        t.add_row("  … compiles + bundles", _pct(scores.workingCoverage))
         t.add_row("Validated confidence", f"[bold]{_pct(scores.confidence)}[/]")
+        t.add_row("Units measured", str(scores.totalUnitCount))
         t.add_row("Validation", "[green]PASS[/]" if validation.passed else "[yellow]see diagnostics[/]")
     stats = cache.stats()
     t.add_row("LLM calls", f"[bold magenta]{counter.calls}[/] [dim](tokens {counter.tokensIn}→{counter.tokensOut})[/]")
@@ -740,7 +752,8 @@ def export_showcase(
     t.add_row("Schema", str(schema_path))
     t.add_row("AI provider", "fake (offline, deterministic)")
     t.add_row("LLM calls", f"[bold magenta]{counter.calls}[/]")
-    t.add_row("Validated coverage", _pct(scores.workingCoverage))
+    t.add_row("Validated coverage (strict)", _pct(scores.coverage))
+    t.add_row("  … compiles + bundles", _pct(scores.workingCoverage))
     t.add_row("tsc / Metro", f"{'PASS' if validation.typecheck.passed else 'FAIL'} / "
                              f"{'PASS' if validation.bundle.passed else ('SKIP' if not validation.bundle.ran else 'FAIL')}")
     console.print(t)
