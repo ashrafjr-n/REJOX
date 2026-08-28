@@ -224,14 +224,14 @@ function StreamStatus({ status }: { status: JobStatus }) {
 
 function LlmCallout({ llmCalls }: { llmCalls: number }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-ai/25 bg-ai/8 px-5 py-3.5">
+    <div className="flex flex-col gap-3 rounded-xl border border-ai/25 bg-ai/8 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <div className="eyebrow text-ai/80">AI Resolution Engine</div>
         <p className="mt-0.5 text-[13px] text-ink-3">
           Rules did the rest — the LLM is a scalpel, used only where reasoning is required.
         </p>
       </div>
-      <div className="text-right">
+      <div className="sm:text-right">
         <div className="tnum text-[34px] leading-none font-semibold text-ai tabular-nums">
           <span data-testid="migrate-llm-calls">{llmCalls}</span>
         </div>
@@ -450,13 +450,13 @@ function ResultPanel({
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+      <div className="mt-4 grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
         <Stat label="Files converted" value={result.filesConverted} />
         <Stat label="Residue TODOs" value={result.todoCount} />
         <Stat label="Repair rounds" value={result.repairRounds} />
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <span className="text-[13px] text-ink-3">
           {runId ? 'The React Native project is ready to download.' : 'Migration finished.'}
         </span>
