@@ -80,14 +80,18 @@ run fails rather than falling back.
 
 Stated plainly, because a security document that only lists wins is marketing:
 
-- **Rate-limit and job state are per process.** Behind more than one worker each
-  enforces its own share of the limit. Until a shared store (Redis) exists, run
-  a single worker.
+- **Rate limits are per API process.** Behind more than one API container each
+  enforces its own share of the limit, so the effective ceiling is the limit
+  times the number of API replicas. A shared store is the fix; until then run
+  one API container (migration *workers* scale freely — they are behind the
+  queue, not the rate limiter).
 - **A shared API key is not user accounts.** There is no per-user isolation,
   quota, or audit trail; every holder of a key is the same principal.
-- **Run workspaces are not garbage-collected on a schedule.** Uploaded sources
-  and emitted output accumulate on local disk. There is no retention policy and
-  no encryption at rest.
+- **Run workspaces are deleted on a TTL, but are not encrypted at rest.**
+  `REJOX_RUN_TTL_SECONDS` (24h default) is enforced by a sweeper the API starts
+  and by `rejox sweep` for cron-driven deployments. What remains open: the data
+  sits unencrypted on the shared volume for the length of that window, and
+  nothing verifies a deletion actually completed.
 - **The container image is not pinned by digest** by default. Pin
   `REJOX_SANDBOX_IMAGE` to a digest in production.
 - **`ingest_github` clones a URL the caller supplies.** The clone itself is
@@ -108,7 +112,17 @@ REJOX_CORS_ORIGINS=https://your-frontend.example
 #              REJOX_NPM_ALLOW_SCRIPTS
 ```
 
-Run one worker. Put a reverse proxy in front for TLS and a request-body cap.
+Run one API container and as many `rejox-worker` containers as the box can take
+(`docker compose up --scale worker=N`). Put a reverse proxy in front for TLS and
+a request-body cap.
+
+**The worker's Docker socket.** In the compose deployment the worker mounts
+`/var/run/docker.sock` so the Validator can start a sandbox container per stage.
+That mount grants the worker control of the host's Docker daemon — effectively
+host root. It is the deliberate trade that makes containment possible at all,
+and it is why the worker runs nothing but queued migrations and exposes no
+ports. On a host where that trade is unacceptable, run the workers on a
+dedicated node, or use a rootless/nested Docker daemon instead of the host's.
 
 ## Reporting
 
