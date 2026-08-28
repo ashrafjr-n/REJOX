@@ -80,6 +80,12 @@
   color: var(--rx-u-dim);
   margin-bottom: 16px;
 }
+/* Browser default <dl>/<dd> margins reset — a value+label pair, described
+   semantically (dt/dd) rather than with generic divs, but laid out exactly
+   like one. */
+.rx-u-card-stat {
+  margin: 0;
+}
 .rx-u-card-value {
   font-family: var(--font-mono);
   font-size: clamp(32px, 3.4vw, 46px);
@@ -89,7 +95,7 @@
   color: var(--rx-white);
 }
 .rx-u-card-label {
-  margin-top: 6px;
+  margin: 6px 0 0;
   font-size: 13px;
   color: var(--rx-light-silver);
 }
@@ -108,6 +114,9 @@
   padding-top: clamp(22px, 3vh, 34px);
   border-top: 1px solid var(--rx-u-line);
 }
+.rx-u-llm-stat {
+  margin: 0;
+}
 .rx-u-llm-value {
   font-family: var(--font-mono);
   font-size: clamp(28px, 3vw, 38px);
@@ -116,7 +125,7 @@
   color: var(--rx-pink);
 }
 .rx-u-llm-label {
-  margin-top: 6px;
+  margin: 6px 0 0;
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -124,7 +133,7 @@
   color: var(--rx-light-silver);
 }
 .rx-u-llm-sub {
-  margin-top: 4px;
+  margin: 4px 0 0;
   font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--rx-u-dim);

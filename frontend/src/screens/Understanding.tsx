@@ -122,8 +122,10 @@ export default function Understanding() {
               }}
             >
               <div className="rx-u-card-eyebrow">{c.eyebrow}</div>
-              <div className="rx-u-card-value tnum">{c.value}</div>
-              <div className="rx-u-card-label">{c.label}</div>
+              <dl className="rx-u-card-stat">
+                <dt className="rx-u-card-value tnum">{c.value}</dt>
+                <dd className="rx-u-card-label">{c.label}</dd>
+              </dl>
               <p className="rx-u-card-detail">{c.detail}</p>
             </motion.div>
           ))}
@@ -140,11 +142,13 @@ export default function Understanding() {
           viewport={{ once: true, amount: 0.4 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: reduceMotion ? 0 : 0.34 }}
         >
-          <div className="rx-u-llm-value tnum">{understandingLlmCalls}</div>
-          <div className="rx-u-llm-label">LLM calls · understanding</div>
-          <div className="rx-u-llm-sub">
-            whole run · <span className="tnum">{data.results.llmCalls}</span>
-          </div>
+          <dl className="rx-u-llm-stat">
+            <dt className="rx-u-llm-value tnum">{understandingLlmCalls}</dt>
+            <dd className="rx-u-llm-label">LLM calls · understanding</dd>
+            <dd className="rx-u-llm-sub">
+              whole run · <span className="tnum">{data.results.llmCalls}</span>
+            </dd>
+          </dl>
         </motion.div>
 
         <p className="rx-u-attribution">
