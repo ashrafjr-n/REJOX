@@ -637,9 +637,17 @@ def validated_scores(
 
     total = len(units)
     working = sum(1 for f in units if f.path not in error_files)
-    confidence = round(sum(confidence_values) / len(confidence_values), 1) if confidence_values else 100.0
-    coverage = round(100.0 * migrated / total, 1) if total else 100.0
-    working_coverage = round(100.0 * working / total, 1) if total else 100.0
+    # An empty population is NOT a perfect score. If nothing was emitted there
+    # is nothing to be right about, so every ratio is None ("not measured")
+    # rather than the 100% that a `x if total else 100.0` would invent — the
+    # exact shape that let a migration emitting zero files report 100% coverage.
+    confidence = (
+        round(sum(confidence_values) / len(confidence_values), 1)
+        if confidence_values
+        else None
+    )
+    coverage = round(100.0 * migrated / total, 1) if total else None
+    working_coverage = round(100.0 * working / total, 1) if total else None
 
     return ValidatedScores(
         coverage=coverage,
