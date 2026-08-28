@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useLocation } from 'react-router-dom'
 import { gsap } from 'gsap'
@@ -50,6 +51,19 @@ export function SiteHeader() {
   const headerHidden = useHeaderAutoHide()
   const { pathname } = useLocation()
   const onHome = pathname === '/'
+  // Phone-only nav dropdown (`.rx-nav` collapses to a toggle below the
+  // 640px breakpoint — see the `.rx-nav-toggle`/`.rx-nav-panel` rules in
+  // Home.css). Closed on every route change so it never lingers after a link
+  // is followed, and whenever the header itself auto-hides.
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (headerHidden) setMenuOpen(false)
+  }, [headerHidden])
 
   // Logo → back to the hero, but only when we are already on the home page.
   // Smooth, house-eased scroll that matches the page's motion language;
@@ -117,9 +131,50 @@ export function SiteHeader() {
         })}
       </nav>
 
+      {/* Phone-only stand-in for `.rx-nav`: a single toggle that opens the same
+          three links as a stacked dropdown (`.rx-nav-panel` below). CSS alone
+          decides which of the two is visible per breakpoint. */}
+      <button
+        type="button"
+        className="rx-nav-toggle"
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={menuOpen}
+        aria-controls="rx-nav-panel"
+        onClick={() => setMenuOpen((v) => !v)}
+      >
+        <span className="rx-nav-toggle-bar" />
+        <span className="rx-nav-toggle-bar" />
+      </button>
+
       <button type="button" className="rx-cta-pill">
         Login
       </button>
+
+      {menuOpen && (
+        <nav id="rx-nav-panel" className="rx-nav-panel" aria-label="Primary">
+          {NAV_ITEMS.map((item) => {
+            const active = item.to !== null && pathname === item.to
+            const className = 'rx-nav-item ' + (active ? 'is-active' : 'is-inactive')
+            if (item.to === null) {
+              return (
+                <button key={item.label} type="button" className={className}>
+                  {item.label}
+                </button>
+              )
+            }
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                className={className}
+                aria-current={active ? 'page' : undefined}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
+      )}
     </motion.header>
   )
 }
