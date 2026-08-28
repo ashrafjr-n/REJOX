@@ -345,22 +345,43 @@
         "tscPassed": {
           "type": "boolean"
         },
-        "validatedConfidence": {
-          "type": "number"
+        "validatedCompilingCoverage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
-        "validatedCoverage": {
-          "type": "number"
+        "validatedConfidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "validatedStrictCoverage": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
         "predictedCoverage",
         "predictedConfidence",
-        "validatedCoverage",
-        "validatedStrictCoverage",
-        "validatedConfidence",
         "tscPassed",
         "tscErrorCount",
         "metroPassed",

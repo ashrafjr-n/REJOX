@@ -1003,8 +1003,8 @@
     "repairRounds": 0,
     "tscErrorCount": 0,
     "tscPassed": true,
+    "validatedCompilingCoverage": 100.0,
     "validatedConfidence": 97.3,
-    "validatedCoverage": 100.0,
     "validatedStrictCoverage": 57.7
   },
   "waves": [
