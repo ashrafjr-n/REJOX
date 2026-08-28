@@ -59,6 +59,24 @@
   --text-lead: 16px;
 }
 
+/* Mirrors the `.rx-home` tablet/phone frame overrides in Home.css, so /app's
+   capsule header and step bar shrink their insets in step with the marketing
+   pages instead of drifting to a second set of numbers. */
+@media (max-width: 1024px) {
+  :root {
+    --rx-frame-inset: 28px;
+    --rx-frame-inset-top: 72px;
+    --rx-frame-pad: 18px;
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --rx-frame-inset: 16px;
+    --rx-frame-inset-top: 64px;
+    --rx-frame-pad: 12px;
+  }
+}
+
 /*
  * The pipeline theme. Same instrument structure as before — a surface ladder,
  * four ink levels, semantic status — but every value now resolves to a brand
