@@ -314,9 +314,10 @@ export function Home() {
         </div>
       </div>
 
-      {/* Scene 01 — "Understanding": the first scroll-driven section below the
-          hero. Pinned; drives a beat index over three placeholder slots wired to
-          real showcase.json figures. Sits between the hero and the closing CTA. */}
+      {/* Scene 01 — "Understanding": the section below the hero. Three cards —
+          source files, knowledge graph, build order — wired to real
+          showcase.json figures. Reveal-on-scroll, not pinned. Sits between the
+          hero and the closing CTA. */}
       <Understanding />
 
       {/* Scene 02 — "Decisions": how Rejox decides once it understands. Two beats
