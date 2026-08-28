@@ -124,7 +124,7 @@ export function AskScreen() {
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t border-line pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <span className="text-[13px] text-ink-3">
           {questions.length > 0 && unanswered.length > 0
             ? `${unanswered.length} required decision${unanswered.length === 1 ? '' : 's'} left`
