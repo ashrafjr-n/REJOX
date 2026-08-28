@@ -36,7 +36,21 @@ _DEFAULT_WORKSPACE_ROOT = Path(__file__).resolve().parents[2] / ".rejox-workspac
 _RUN_ID_RE = re.compile(r"^[0-9a-f]{8,64}$")
 
 # Default TTL for the sweep: runs older than this are eligible for reaping.
+# A run holds someone's uploaded source and the project emitted from it, so this
+# is a data-retention window, not a disk-space convenience. Override with
+# REJOX_RUN_TTL_SECONDS.
 DEFAULT_TTL_SECONDS = 24 * 60 * 60
+
+
+def ttl_seconds() -> int:
+    """The configured retention window for run workspaces."""
+    raw = os.environ.get("REJOX_RUN_TTL_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_TTL_SECONDS
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_TTL_SECONDS
 
 
 class WorkspaceError(RuntimeError):
