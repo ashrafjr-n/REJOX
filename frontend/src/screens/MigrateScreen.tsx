@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 
 import { ApiError, getJob } from '../api/rejox'
 import { downloadUrl, jobEventsUrl } from '../lib/api'
@@ -8,7 +9,7 @@ import { Button } from '../components/ui/Button'
 import { Panel } from '../components/ui/Panel'
 import { AlertIcon, CheckIcon, FileZipIcon } from '../components/icons'
 import { cn } from '../lib/cn'
-import { formatScore } from '../lib/display'
+import { formatScore, formatScorePercent } from '../lib/display'
 import { usePipelineStore } from '../store/pipelineStore'
 import type {
   AnalysisReport,
@@ -423,12 +424,28 @@ function ResultPanel({
           confidenceTestId="predicted-confidence"
           tone="ink"
         />
+        {/* Strict coverage is the validated headline: a file counts only when
+            nothing was left unresolved in it. The more forgiving
+            compiles-and-bundles figure sits beneath, labelled — never swapped
+            in for the headline. */}
         <AxisCard
           eyebrow="Validated · tsc + Metro"
-          coverage={scores ? scores.workingCoverage : null}
-          confidence={scores ? scores.confidence : null}
+          coverageLabel="Coverage · strict"
+          coverage={scores?.coverage ?? null}
+          confidence={scores?.confidence ?? null}
           coverageTestId="validated-coverage"
           confidenceTestId="validated-confidence"
+          footnote={
+            scores ? (
+              <>
+                compiles &amp; bundles{' '}
+                <span className="tnum" data-testid="validated-compiling-coverage">
+                  {formatScorePercent(scores.workingCoverage)}
+                </span>{' '}
+                · {scores.totalUnitCount} units measured
+              </>
+            ) : null
+          }
           tone="signal"
         />
       </div>
@@ -467,15 +484,19 @@ function AxisCard({
   eyebrow,
   coverage,
   confidence,
+  coverageLabel = 'Coverage',
   coverageTestId,
   confidenceTestId,
+  footnote,
   tone,
 }: {
   eyebrow: string
   coverage: number | null
   confidence: number | null
+  coverageLabel?: string
   coverageTestId: string
   confidenceTestId: string
+  footnote?: ReactNode
   tone: 'ink' | 'signal'
 }) {
   const color = tone === 'signal' ? 'text-signal' : 'text-ink'
@@ -483,23 +504,37 @@ function AxisCard({
     <div className="rounded-lg border border-line bg-surface-0 p-4">
       <div className="eyebrow">{eyebrow}</div>
       <div className="mt-3 flex gap-6">
-        <div>
-          <div className={cn('tnum text-[26px] leading-none font-semibold tabular-nums', color)}>
-            <span data-testid={coverageTestId}>{coverage != null ? formatScore(coverage) : '—'}</span>
-            <span className="text-sm text-ink-4">%</span>
-          </div>
-          <div className="eyebrow mt-1.5">Coverage</div>
-        </div>
-        <div>
-          <div className={cn('tnum text-[26px] leading-none font-semibold tabular-nums', color)}>
-            <span data-testid={confidenceTestId}>
-              {confidence != null ? formatScore(confidence) : '—'}
-            </span>
-            <span className="text-sm text-ink-4">%</span>
-          </div>
-          <div className="eyebrow mt-1.5">Confidence</div>
-        </div>
+        <AxisValue label={coverageLabel} value={coverage} testId={coverageTestId} color={color} />
+        <AxisValue label="Confidence" value={confidence} testId={confidenceTestId} color={color} />
       </div>
+      {footnote != null && <div className="mt-3 text-xs text-ink-4">{footnote}</div>}
+    </div>
+  )
+}
+
+/**
+ * One 0–100 axis. A null value means the score was never measured (an empty
+ * population), and it renders as "n/a" with NO percent sign — a bare "—%" would
+ * still read as a measurement that came out empty rather than one never taken.
+ */
+function AxisValue({
+  label,
+  value,
+  testId,
+  color,
+}: {
+  label: string
+  value: number | null
+  testId: string
+  color: string
+}) {
+  return (
+    <div>
+      <div className={cn('tnum text-[26px] leading-none font-semibold tabular-nums', color)}>
+        <span data-testid={testId}>{value != null ? formatScore(value) : 'n/a'}</span>
+        {value != null && <span className="text-sm text-ink-4">%</span>}
+      </div>
+      <div className="eyebrow mt-1.5">{label}</div>
     </div>
   )
 }

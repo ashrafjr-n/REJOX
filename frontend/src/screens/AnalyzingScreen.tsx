@@ -6,7 +6,7 @@ import { StepHeader } from '../components/StepHeader'
 import { Button } from '../components/ui/Button'
 import { AlertIcon, CheckIcon, CircuitIcon } from '../components/icons'
 import { cn } from '../lib/cn'
-import { formatScore } from '../lib/display'
+import { formatScorePercent } from '../lib/display'
 import { DUR, HOUSE_EASE } from '../lib/motion'
 import { usePipelineStore } from '../store/pipelineStore'
 import type { AnalysisReport, SourceRequest } from '../types/api'
@@ -121,7 +121,7 @@ function buildFindings(report: AnalysisReport): Finding[] {
   findings.push({
     id: 'ready',
     label: 'Ready',
-    detail: `Coverage ${formatScore(report.coverage)} · Confidence ${formatScore(report.confidence)}`,
+    detail: `Coverage ${formatScorePercent(report.coverage)} · Confidence ${formatScorePercent(report.confidence)}`,
     tone: 'ready',
   })
 

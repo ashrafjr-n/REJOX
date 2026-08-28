@@ -51,7 +51,7 @@ export function MetricsHeader({ report }: { report: AnalysisReport }) {
         <ScoreMetric
           label="Confidence"
           testId="metric-confidence"
-          value={report.confidence}
+          value={report.confidence ?? null}
           tone="ai"
           caption="How sure we are that what migrated is correct."
           aside={

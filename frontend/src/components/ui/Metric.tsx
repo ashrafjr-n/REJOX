@@ -27,8 +27,12 @@ const TONE_BAR: Record<Tone, string> = {
 
 interface ScoreMetricProps {
   label: ReactNode
-  /** 0–100 value; rendered large and counted up. */
-  value: number
+  /**
+   * 0–100 value; rendered large and counted up. `null` means the score was
+   * never measured (an empty population) — it renders as "n/a" with an empty
+   * track, never as a number and never as 0%.
+   */
+  value: number | null
   tone: Tone
   caption?: ReactNode
   /** Right slot in the label row — typically an info tooltip. */
@@ -39,7 +43,11 @@ interface ScoreMetricProps {
 
 /** A 0–100 axis (Coverage / Confidence): big mono readout + a baseline track. */
 export function ScoreMetric({ label, value, tone, caption, aside, testId }: ScoreMetricProps) {
-  const animated = useCountUp(value)
+  // The hook must be called unconditionally (rules of hooks), so an unmeasured
+  // score counts up from a 0 that is never rendered — the readout below
+  // branches on `value`, not on the animated number.
+  const animated = useCountUp(value ?? 0)
+  const measured = value != null
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-between">
@@ -54,14 +62,14 @@ export function ScoreMetric({ label, value, tone, caption, aside, testId }: Scor
             TONE_TEXT[tone],
           )}
         >
-          {formatScore(animated)}
+          {measured ? formatScore(animated) : 'n/a'}
         </span>
-        <span className="text-xl font-medium text-ink-4">%</span>
+        {measured && <span className="text-xl font-medium text-ink-4">%</span>}
       </div>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-3">
         <div
           className={cn('h-full rounded-full transition-[width] duration-700 ease-out', TONE_BAR[tone])}
-          style={{ width: `${Math.max(0, Math.min(100, animated))}%` }}
+          style={{ width: measured ? `${Math.max(0, Math.min(100, animated))}%` : '0%' }}
         />
       </div>
       {caption && (

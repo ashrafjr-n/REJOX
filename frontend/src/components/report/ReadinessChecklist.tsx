@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Panel } from '../ui/Panel'
 import { AlertIcon, CheckIcon, InfoIcon } from '../icons'
 import { cn } from '../../lib/cn'
-import { LIBRARY_STATUS_LABEL, RISK_LABEL, formatScore } from '../../lib/display'
+import { LIBRARY_STATUS_LABEL, RISK_LABEL, formatScorePercent } from '../../lib/display'
 import { rowEntry } from '../../lib/motion'
 import type {
   AnalysisReport,
@@ -326,8 +326,8 @@ export function ReadinessChecklist({
         {...row(lines.length + 1)}
         className="border-t border-line/60 px-5 py-2.5 font-mono text-[11.5px] tracking-wide text-ink-4"
       >
-        Coverage {formatScore(report.coverage)} · Confidence{' '}
-        {formatScore(report.confidence)} · Risk {RISK_LABEL[report.risk]} ·{' '}
+        Coverage {formatScorePercent(report.coverage)} · Confidence{' '}
+        {formatScorePercent(report.confidence)} · Risk {RISK_LABEL[report.risk]} ·{' '}
         {warnings.length} {warnings.length === 1 ? 'warning' : 'warnings'}
       </motion.p>
     </Panel>
