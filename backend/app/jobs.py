@@ -39,6 +39,9 @@ from app.pipeline.migrate import run_migration
 from app.pipeline.planner import plan_migration
 
 _REGISTRY: dict[str, JobState] = {}
+# Live worker threads, so concurrency is measured from what is actually running
+# rather than from a status a dead thread can no longer update.
+_WORKERS: dict[str, threading.Thread] = {}
 _LOCK = threading.Lock()
 
 
@@ -100,6 +103,28 @@ def get_job(job_id: str) -> JobState:
     if persisted is not None:
         return persisted
     raise KeyError(job_id)
+
+
+def running_count() -> int:
+    """How many migrations are actually executing in THIS process right now.
+
+    A migration installs a dependency tree and runs Metro, so the box — not the
+    per-minute rate limit — is the real ceiling on how many may run at once.
+
+    Counted from **live worker threads**, never from stored status. A job whose
+    thread died without writing a terminal event keeps ``status == "running"``
+    forever; counting that would wedge the endpoint permanently at its
+    concurrency limit. A thread that is gone is not consuming the box, whatever
+    its last recorded status says.
+    """
+    with _LOCK:
+        alive = [job_id for job_id, t in _WORKERS.items() if t.is_alive()]
+        # Finished threads are dropped here rather than in the worker, so the
+        # bookkeeping cannot be skipped by a worker that dies abruptly.
+        for job_id in list(_WORKERS):
+            if job_id not in alive:
+                del _WORKERS[job_id]
+        return len(alive)
 
 
 def events_after(job_id: str, after_seq: int) -> tuple[list[MigrationEvent], str]:
@@ -203,4 +228,7 @@ def start_job(
                     error=MigrationError(type=type(exc).__name__, message=str(exc), stage=stage),
                 )
 
-    threading.Thread(target=worker, name=f"migrate-{job_id[:8]}", daemon=True).start()
+    thread = threading.Thread(target=worker, name=f"migrate-{job_id[:8]}", daemon=True)
+    with _LOCK:
+        _WORKERS[job_id] = thread
+    thread.start()
