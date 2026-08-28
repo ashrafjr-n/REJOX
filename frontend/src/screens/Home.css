@@ -227,6 +227,91 @@
   box-shadow: 0 8px 24px rgba(201, 201, 206, 0.55);
 }
 
+/* Phone-only nav toggle: two short bars standing in for `.rx-nav`. Hidden by
+   default — the >640px rule below is what actually shows it, `.rx-nav` is
+   what actually hides. Sized/positioned to match the other two header
+   controls so the row's vertical rhythm doesn't shift when it appears. */
+.rx-nav-toggle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 38px;
+  height: 38px;
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  background: var(--rx-nav-item-bg);
+  cursor: pointer;
+}
+.rx-nav-toggle-bar {
+  display: block;
+  width: 16px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: var(--rx-light-silver);
+}
+
+/* Dropdown the toggle opens: the same `.rx-nav-item` pills, stacked, docked
+   under the capsule header at the same left/right insets. */
+.rx-nav-panel {
+  position: fixed;
+  top: 68px;
+  left: calc(var(--rx-frame-inset) + 1px + var(--rx-frame-pad));
+  right: calc(var(--rx-frame-inset) + 1px + var(--rx-frame-pad));
+  z-index: 49;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 20px;
+  background: var(--rx-dark-silver);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+}
+.rx-nav-panel .rx-nav-item {
+  width: 100%;
+  text-align: center;
+}
+
+/* ============================ header: tablet + phone ============================
+   Two steps down from the desktop frame geometry (48/78/26): the capsule's
+   own insets shrink so the logo + nav + Login row keeps its margins on
+   narrower viewports instead of crowding the edges. */
+@media (max-width: 1024px) {
+  .rx-home {
+    --rx-frame-inset: 28px;
+    --rx-frame-inset-top: 72px;
+    --rx-frame-pad: 18px;
+  }
+  .rx-logo {
+    height: 36px;
+  }
+  .rx-nav-item {
+    padding: 6px 12px;
+  }
+}
+
+/* Below 640px the logo + three nav links + Login pill no longer fit one row
+   (the links alone need ~290px before insets). `.rx-nav` is replaced by the
+   toggle + dropdown panel above; everything else in the row is untouched. */
+@media (max-width: 640px) {
+  .rx-home {
+    --rx-frame-inset: 16px;
+    --rx-frame-inset-top: 64px;
+    --rx-frame-pad: 12px;
+  }
+  .rx-nav {
+    display: none;
+  }
+  .rx-nav-toggle {
+    display: flex;
+  }
+  .rx-nav-panel {
+    display: flex;
+  }
+}
+
 /* ============================ mid: left block ============================ */
 .rx-mid {
   flex: 1 1 auto;
