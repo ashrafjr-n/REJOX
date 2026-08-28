@@ -564,6 +564,51 @@ The two figures are deliberately different — the project is deterministic-
 heavy (high confidence in what converts) while hover/grid/CSS-Module residue
 drags Coverage down. A single conflated score hid exactly that distinction.
 
+### The empty-population rule
+
+> **An empty population is never a perfect score.** Any ratio whose denominator
+> can be zero reports **`None`** ("n/a"), never a fallback number.
+
+This is a rule and not a detail because the alternative was already shipped, in
+three places at once, and every one of them read as success:
+
+| Where | What it did | What it means |
+| --- | --- | --- |
+| `validated_scores` | `100.0` when no unit was emitted | a migration that wrote **nothing** reported 100% coverage |
+| `analyze_graph` | area budgets granted for having no findings | an **empty directory** scored Coverage 95, Confidence 100, Risk low |
+| `compute_confidence` | `100.0` when every component was blocked | "not one component can convert" reported **total certainty** |
+
+None of these was a rounding choice; each turned an absence of evidence into
+evidence of success. The rule now holds at three levels:
+
+1. **Refuse what cannot be scored.** A graph with no components raises
+   `NothingToMigrate` (a 422, not a 500 — it is a statement about the upload,
+   not a defect) rather than producing a meaningless number.
+2. **Report `None` for an empty population.** `ValidatedScores.coverage` /
+   `.workingCoverage` / `.confidence` and `AnalysisReport.confidence` are all
+   `Optional[float]`.
+3. **Render `None` as "n/a".** `_pct` (CLI) and `formatScorePercent` (web) are
+   the only ways a validated figure reaches a human, and both print `n/a`
+   without a `%` rather than a number nobody measured.
+
+`test_honest_scores.py` pins all three.
+
+### Two coverage lenses, both always shown
+
+Validated coverage is reported through two named lenses, because one number
+alone is a choice about which truth to tell:
+
+| Field | A unit counts when it… | Role |
+| --- | --- | --- |
+| `coverage` (strict) | migrated with **zero** residue — no `REJOX-TODO` survives | **the headline** |
+| `workingCoverage` | type-checks and bundles; soft residue allowed | the comparison to the prediction |
+
+Strict leads everywhere it is shown (CLI, `showcase.json`, the web UI, the
+README) because it is the figure that cannot flatter: one unresolved `hover:`
+excludes a whole file. The forgiving figure is never dropped and never
+unlabelled — on `sample-app` they are **58%** and **100%**, and publishing only
+the second would be true and misleading at once.
+
 ---
 
 ## Planner stage — implementation
