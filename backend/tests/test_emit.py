@@ -177,15 +177,26 @@ def test_resolvers_run_in_emit_and_clear_resolvable_residue(emitted: EmittedProj
 
 def test_web_only_assets_skipped(emitted: EmittedProject) -> None:
     out = _out(emitted)
-    skipped = {s.path for s in emitted.skipped}
-    assert "public/favicon.svg" in skipped
-    assert "src/assets/vite.svg" in skipped
-    assert "index.html" in skipped
+    reasons = {s.path: s.reason for s in emitted.skipped}
+    assert "public/favicon.svg" in reasons
+    assert "public/icons.svg" in reasons
+    assert "index.html" in reasons
     # No favicon or web entry leaked into the RN tree.
     assert not (out / "public").exists()
     assert not (out / "index.html").exists()
-    # The real asset (hero.png) is carried over.
-    assert (out / "src" / "assets" / "hero.png").is_file()
+    # The real asset is carried over.
+    assert (out / "src" / "assets" / "rejox-logo.svg").is_file()
+
+
+def test_no_asset_is_skipped_for_being_missing(emitted: EmittedProject) -> None:
+    """A skip must be a DECISION, never a silent "the file wasn't there".
+
+    Guards against the fixture drifting out of sync with the sample project on
+    disk: a stale asset path would be skipped as "not found" and quietly pass
+    the web-only assertions above for the wrong reason.
+    """
+    not_found = [s.path for s in emitted.skipped if "not found" in s.reason]
+    assert not_found == []
 
 
 def test_todo_count_matches_emitted_markers(emitted: EmittedProject) -> None:
