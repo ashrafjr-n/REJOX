@@ -159,7 +159,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main
-          className="mx-auto w-full max-w-[1240px] flex-1 px-6 pb-14"
+          className="mx-auto w-full max-w-[1240px] flex-1 px-4 pb-14 sm:px-6"
           style={{ paddingTop: 40 }}
         >
           {children}
