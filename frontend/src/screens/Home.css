@@ -616,6 +616,61 @@
   }
 }
 
+/* ============================ hero: tablet + phone ============================
+   The desktop hero is a fixed 100vh composition: `.rx-frame` absolutely insets
+   the viewport, `.rx-cards` floats absolutely over the top-right corner, and
+   `.rx-left` is nudged up by a fixed transform — all tuned for one row of
+   left-content-beside-cards-above-wordmark. That composition has no room to
+   reflow, so below 1024px it is replaced with a normal, auto-height stacked
+   column instead: left content, then the cards (now in their natural DOM
+   position between `.rx-mid` and the wordmark), then the wordmark. Nothing
+   about the cards' own styling changes — only how they're positioned. */
+@media (max-width: 1024px) {
+  .rx-hero {
+    height: auto;
+    min-height: 100svh;
+    /* overflow:hidden stays (inherited from the base .rx-hero rule) — it's
+       what keeps the vw-sized wordmark from ever creating a horizontal
+       scrollbar, exactly as on desktop; only the vertical dimension goes from
+       a fixed 100vh to auto/grow-to-fit here. */
+  }
+  .rx-frame {
+    position: static;
+    inset: auto;
+    padding: var(--rx-frame-inset-top) var(--rx-frame-pad) var(--rx-frame-inset);
+  }
+  .rx-mid {
+    flex: 0 0 auto;
+    align-items: flex-start;
+  }
+  .rx-left {
+    max-width: 100%;
+    margin-left: 0;
+    transform: none;
+  }
+  .rx-cards {
+    position: static;
+    z-index: auto;
+    top: auto;
+    right: auto;
+    width: 100%;
+    max-width: 420px;
+    margin: 40px 0 0;
+  }
+  .rx-wordmark-wrap {
+    margin-top: 56px;
+  }
+}
+
+/* Phone: the stacked cards go full-width instead of capping at 420px (the
+   wordmark's vw-based sizing already scales down with the viewport and needs
+   no separate adjustment here). */
+@media (max-width: 640px) {
+  .rx-cards {
+    max-width: none;
+  }
+}
+
 /* ============================ bottom wordmark ============================ */
 /* Static outlined (stroke) wordmark, flush to the frame's bottom padding. */
 .rx-wordmark-wrap {
