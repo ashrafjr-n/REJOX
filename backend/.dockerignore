@@ -1,0 +1,20 @@
+# Build context hygiene: everything here is either rebuilt in the image, huge,
+# or must never reach it.
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+test-results/
+
+# node_modules are reinstalled with `npm ci` in the workers stage; copying the
+# host's would bake in platform-specific binaries.
+parser-worker/node_modules/
+parser-worker/dist/
+codemod-worker/node_modules/
+codemod-worker/dist/
+
+# Run workspaces hold uploaded projects — never build them into an image.
+.rejox-workspaces/
+.rejox-ai-cache.sqlite3
