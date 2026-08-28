@@ -259,7 +259,31 @@
   background: var(--rx-pink);
 }
 
-/* ---- narrow screens: sidebar stacks above the content ---- */
+/* ---- tablet + phone: shrink the frame inset ----
+   Mirrors the `.rx-home` / `:root` / `.rx-arch` breakpoints so the shared
+   <SiteHeader/> capsule — nested in `.rx-docs`, which inherits from this local
+   token copy rather than any of those — shrinks its insets in step with the
+   rest of the site, and the two-column grid gets its width back on narrower
+   viewports instead of losing a fixed 48px to padding on both sides. */
+@media (max-width: 1024px) {
+  .rx-docs {
+    --rx-frame-inset: 28px;
+    --rx-frame-inset-top: 72px;
+    --rx-frame-pad: 18px;
+  }
+}
+@media (max-width: 640px) {
+  .rx-docs {
+    --rx-frame-inset: 16px;
+    --rx-frame-inset-top: 64px;
+    --rx-frame-pad: 12px;
+  }
+}
+
+/* ---- narrow screens: sidebar stacks above the content ----
+   720px (not the 640px phone breakpoint above) — the sidebar's own 200px
+   column plus its gap is what forces this one, wider than where the header
+   collapses to its hamburger. */
 @media (max-width: 720px) {
   .rx-docs-main {
     grid-template-columns: 1fr;
@@ -268,5 +292,8 @@
   .rx-docs-sidebar {
     position: static;
     top: auto;
+  }
+  .rx-docs-content {
+    max-width: 100%;
   }
 }
