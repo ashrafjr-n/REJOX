@@ -126,6 +126,85 @@ def test_npm_scripts_can_be_re_enabled_explicitly(monkeypatch: pytest.MonkeyPatc
     assert sandbox.npm_scripts_allowed() is True
 
 
+# --- The Validator actually uses the sandbox ---------------------------------
+
+
+def test_validator_containerizes_every_command_it_runs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The wiring, not just the argv builder: in docker mode the Validator must
+    issue `docker run` for each stage — and only the install stage may have a
+    network. A stage that escaped the seam would show up here as a bare `npm`."""
+    from app.pipeline import validator
+
+    (tmp_path / "package.json").write_text('{"name":"x"}')
+    # A local tsc, so the typecheck stage really runs instead of skipping.
+    tsc = tmp_path / "node_modules" / "typescript" / "bin" / "tsc"
+    tsc.parent.mkdir(parents=True)
+    tsc.write_text("")
+
+    issued: list[list[str]] = []
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(argv, **kwargs):
+        issued.append(argv)
+        return _Proc()
+
+    monkeypatch.setattr(sandbox.subprocess, "run", fake_run)
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    validator.validate_project(tmp_path, install=True, run_bundle=True, policy=DOCKER)
+
+    assert issued, "the Validator ran nothing"
+    for argv in issued:
+        assert argv[:2] == ["docker", "run"], f"escaped the sandbox: {argv}"
+
+    # All three stages went through, and only install was given a network.
+    flat = [" ".join(a) for a in issued]
+    assert any("npm install" in c for c in flat)
+    assert any("tsc --noEmit" in c for c in flat)
+    assert any("expo export" in c for c in flat)
+
+    networked = [a for a in issued if a[a.index("--network") + 1] != "none"]
+    assert len(networked) == 1, "exactly one stage may reach the network"
+    assert "install" in networked[0], networked[0]
+
+    # Paths handed to the container must be relative, or they would point at
+    # host locations that do not exist under /work.
+    for argv in issued:
+        payload = argv[argv.index(DOCKER.image) + 1:]
+        assert not any(part.startswith("/") for part in payload[1:]), payload
+
+
+def test_install_ignores_dependency_lifecycle_scripts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.pipeline import validator
+
+    (tmp_path / "package.json").write_text('{"name":"x"}')
+    issued: list[list[str]] = []
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.delenv("REJOX_NPM_ALLOW_SCRIPTS", raising=False)
+    monkeypatch.setattr(
+        sandbox.subprocess, "run", lambda argv, **kw: (issued.append(argv), _Proc())[1]
+    )
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    validator.validate_project(tmp_path, install=True, run_bundle=False, policy=DOCKER)
+
+    install = next(a for a in issued if "install" in a)
+    assert "--ignore-scripts" in install
+
+
 # --- Carried-over dependency versions ----------------------------------------
 
 
