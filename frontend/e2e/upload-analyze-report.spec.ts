@@ -177,8 +177,13 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
     const r = Math.round(v * 10) / 10
     return Number.isInteger(r) ? String(r) : r.toFixed(1)
   }
+  // The validated headline is the STRICT lens; the forgiving compiles-and-bundles
+  // figure is shown beside it, labelled, never in its place.
   await expect(page.getByTestId('validated-coverage')).toHaveText(
-    fmt(result.validatedScores.workingCoverage),
+    fmt(result.validatedScores.coverage),
+  )
+  await expect(page.getByTestId('validated-compiling-coverage')).toHaveText(
+    `${fmt(result.validatedScores.workingCoverage)}%`,
   )
   await expect(page.getByTestId('validated-confidence')).toHaveText(
     fmt(result.validatedScores.confidence),
@@ -188,7 +193,7 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
   const predictedCov = await page.getByTestId('predicted-coverage').textContent()
   const validatedCov = await page.getByTestId('validated-coverage').textContent()
   expect(predictedCov).not.toBeNull()
-  expect(predictedCov).not.toBe(validatedCov) // sample-app: 82.x predicted vs 100 validated
+  expect(predictedCov).not.toBe(validatedCov) // sample-app: 82.x predicted vs 58 strict
 
   await page.screenshot({ path: path.join(SHOTS, '08-validated.png'), fullPage: true })
 
@@ -204,7 +209,7 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
   console.log(
     `[e2e] plan ${steps.length}/${expectedWaves}; ask ${questions.length}; ` +
       `migrate tsc=${result.typecheckPassed} metro=${result.bundlePassed} ` +
-      `llm=${result.llmCalls} validatedCov=${result.validatedScores.workingCoverage} ` +
+      `llm=${result.llmCalls} strictCov=${result.validatedScores.coverage} ` +
       `predictedCov=${report.coverage}`,
   )
 })
