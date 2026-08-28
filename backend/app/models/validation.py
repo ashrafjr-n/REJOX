@@ -103,16 +103,23 @@ class ValidatedScores(ValidationBase):
     unresolved REJOX-TODO — that file counts against Coverage instead.
     """
 
+    # Every score below is None when there was nothing to measure
+    # (``totalUnitCount == 0``). A migration that emitted no units has no
+    # coverage of 100% — it has no coverage at all, and an empty population must
+    # never round up into a perfect score. Callers render None as "n/a".
+    #
     # Strict, spec-literal Coverage: fraction of units with ZERO residue
     # (any unresolved REJOX-TODO counts against it). Comparable to Confidence's
     # population; conservative because a single `hover:` utility excludes a file.
-    coverage: float = Field(ge=0, le=100)
-    confidence: float = Field(ge=0, le=100)
-    # A second, fairer lens: fraction of units that actually COMPILE + BUNDLE.
-    # Soft residue (hover/grid/gradient) does not stop a file from working, so
-    # this is the number directly comparable to the Analyzer's area-weighted
-    # Coverage prediction.
-    workingCoverage: float = Field(ge=0, le=100)
+    # This is the HEADLINE number — the one Rejox leads with.
+    coverage: Optional[float] = Field(default=None, ge=0, le=100)
+    confidence: Optional[float] = Field(default=None, ge=0, le=100)
+    # A second, more forgiving lens: fraction of units that actually COMPILE +
+    # BUNDLE. Soft residue (hover/grid/gradient) does not stop a file from
+    # working, so this is the number directly comparable to the Analyzer's
+    # area-weighted Coverage prediction. Always reported ALONGSIDE the strict
+    # figure, never instead of it.
+    workingCoverage: Optional[float] = Field(default=None, ge=0, le=100)
     workingFileCount: int = 0       # units with no tsc/bundle error
     migratedFileCount: int          # units that migrated cleanly (no residue)
     residueFileCount: int           # units excluded from Confidence (residue)
