@@ -3,8 +3,8 @@ import { test, expect, type Page } from '@playwright/test'
 /**
  * Home page — the page chrome refinements:
  *   (1) the auto-hiding header (hide on scroll down, reveal on scroll up),
- *       including correct behaviour while the Scene 01 section is pinned, and the
- *       resolution of the old nav-capsule ↔ Scene 02 heading overlap;
+ *       including scrolling through the Scene 01 section, and the resolution
+ *       of the old nav-capsule ↔ Scene 02 heading overlap;
  *   (2) the header logo as a real, focusable scroll-to-top control;
  *   (3) the CTA word reveal — sharp (zero blur, full opacity) through the middle
  *       band of the viewport, blurred only near the edges;
@@ -40,7 +40,6 @@ async function gotoHome(page: Page) {
 
 const header = (page: Page) => page.locator('.rx-header')
 const hiddenAttr = (page: Page) => header(page).getAttribute('data-hidden')
-const understanding = (page: Page) => page.locator('[data-rx-understanding]')
 
 async function scrollTo(page: Page, y: number) {
   await page.evaluate((yy) => window.scrollTo({ top: yy, behavior: 'instant' as ScrollBehavior }), y)
@@ -85,23 +84,20 @@ test.describe('Home / header auto-hide', () => {
     expect(await hiddenAttr(page)).toBe(before)
   })
 
-  test('behaves correctly WHILE the Scene 01 section is pinned', async ({ page }) => {
+  test('auto-hide keeps working while scrolling through the Understanding section', async ({ page }) => {
     await gotoHome(page)
     const uTop = await scrollYOf(page, '[data-rx-understanding]')
 
-    // Deep into the pin, arrived scrolling down → hidden, and the pin is active.
+    // Scrolled down into (and past) the section, arrived scrolling down → hidden.
     await scrollTo(page, uTop + 400)
-    await expect(understanding(page)).toHaveAttribute('data-pinned', 'true')
     expect(await hiddenAttr(page)).toBe('true')
 
-    // Scroll up while STILL inside the pin range → header returns, pin still active.
+    // Scroll up → header returns.
     await scrollBy(page, -150)
-    await expect(understanding(page)).toHaveAttribute('data-pinned', 'true')
     expect(await hiddenAttr(page)).toBe('false')
 
-    // Scroll down again inside the pin → hides again.
+    // Scroll down again → hides again.
     await scrollBy(page, 300)
-    await expect(understanding(page)).toHaveAttribute('data-pinned', 'true')
     expect(await hiddenAttr(page)).toBe('true')
   })
 

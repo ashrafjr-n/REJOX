@@ -7,8 +7,9 @@ import showcase from '../src/data/showcase.json' with { type: 'json' }
  *
  * Proves: (1) the three parts reveal on scroll (beat A, the joining LLM line,
  * beat B); (2) the validated figure, its lens label, and the stricter figure all
- * match the data and are genuinely visible; (3) the section coexists with the
- * Scene 01 pin and the CTA's ScrollReveal; (4) reduced motion shows everything.
+ * match the data and are genuinely visible; (3) the CTA's ScrollReveal still
+ * fires after scrolling past both Scene 01 and this section; (4) reduced
+ * motion shows everything.
  */
 
 const DESKTOP = { width: 1440, height: 900 }
@@ -110,28 +111,18 @@ test.describe('Home / Decisions section', () => {
     expect(r.predictedCoverage).not.toBe(r.validatedStrictCoverage)
   })
 
-  test('coexists with the Scene 01 pin and the CTA ScrollReveal', async ({ page }) => {
+  test('the CTA ScrollReveal still fires after scrolling past Understanding and Decisions', async ({ page }) => {
     await gotoHome(page)
 
-    // Scene 01 pin still engages (Decisions sits after it, not disturbing it).
-    const understanding = page.locator('[data-rx-understanding]')
-    const uTop = await understanding.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)
-    await page.evaluate((y) => window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }), uTop + 10)
-    await page.waitForTimeout(300)
-    await expect(understanding).toHaveAttribute('data-pinned', 'true')
-    await expect(page.locator('.pin-spacer')).toHaveCount(1)
-    await page.screenshot({ path: 'test-results/decisions-coexist-pin.png', animations: 'disabled' })
-
-    // The CTA's ScrollReveal still fires after scrolling past BOTH sections.
-    // Park the first word in its sharp hold zone (top ~45% of the viewport: the
-    // entrance is complete and the exit fade has not begun), which is robust to
-    // the page height — the footer added below the CTA extends max-scroll, so an
-    // old fixed offset near the very top would land in the exit fade instead.
+    // Park the first CTA word in its sharp hold zone (top ~45% of the viewport:
+    // the entrance is complete and the exit fade has not begun), which is robust
+    // to the page height — the footer added below the CTA extends max-scroll, so
+    // an old fixed offset near the very top would land in the exit fade instead.
+    // Reaching here necessarily scrolls through both Understanding and Decisions.
     const firstWord = page.locator('.rx-cta-word .word').first()
     const wordTop = await firstWord.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)
     await page.evaluate((y) => window.scrollTo({ top: y - window.innerHeight * 0.45, behavior: 'instant' as ScrollBehavior }), wordTop)
     await page.waitForTimeout(400)
-    await expect(understanding).toHaveAttribute('data-pinned', 'false') // scrolled past the pin
     await expect
       .poll(() => firstWord.evaluate((el) => parseFloat(getComputedStyle(el).opacity)), { timeout: 8000 })
       .toBeGreaterThan(0.9)
