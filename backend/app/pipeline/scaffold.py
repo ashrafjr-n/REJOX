@@ -40,7 +40,20 @@ _BASE_DEV_DEPS = {
 # Source deps that carry over unchanged when present.
 _CARRY_OVER = ("zustand", "axios")
 
+# A carried-over version comes from an uploaded `package.json`, so it is
+# untrusted input, not a constant. npm accepts far more than semver in that
+# position — `https://…/x.tgz`, `git+ssh://…`, `file:../../` — each of which
+# makes `npm install` fetch and place code of the uploader's choosing. Only
+# plain registry ranges carry over; anything else falls back to our pin.
+_SEMVER_RANGE_RE = re.compile(r"^[\^~]?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?$")
+
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _safe_version(spec: str) -> str | None:
+    """Return ``spec`` when it is a plain registry range, else ``None``."""
+    spec = spec.strip()
+    return spec if _SEMVER_RANGE_RE.match(spec) else None
 
 
 @dataclass
@@ -111,8 +124,15 @@ def _build_dependencies(
         deps["expo-constants"] = "~17.0.0"
 
     for lib in _CARRY_OVER:
-        if lib in source_deps:
-            deps[lib] = source_deps[lib]
+        spec = source_deps.get(lib)
+        if spec is None:
+            continue
+        safe = _safe_version(spec)
+        # An unsafe spec (tarball / git / file) is never carried over. The
+        # dependency is simply left out, so the failure surfaces loudly as an
+        # unresolved module instead of quietly installing what was asked for.
+        if safe is not None:
+            deps[lib] = safe
 
     return dict(sorted(deps.items())), dict(sorted(dev.items())), dict(sorted(overrides.items()))
 
