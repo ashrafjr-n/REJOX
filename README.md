@@ -187,14 +187,16 @@ Emitted 27 files → /tmp/rejox-cli-demo
  Install          PASS
  Typecheck (tsc)  PASS    0 error(s)
  Bundle (Metro)   PASS
-Validated  Coverage 100%  (strict 58%)   Confidence 97%
+Validated  Coverage 58% strict  (compiles 100%)   Confidence 97%
 
 ────────────────────────────── Done — migration summary ──────────────────────────
-Files converted        27
-Residue TODOs          13
-Validated coverage     100%
-Validated confidence   97%
-Validation             PASS
+Files converted             27
+Residue TODOs               13
+Validated coverage (strict) 58%
+  … compiles + bundles      100%
+Validated confidence        97%
+Units measured              26
+Validation                  PASS
 LLM calls              1 (tokens 132→30)
 Navigator shape        proposed tabs · emitted tabs
 
@@ -211,6 +213,26 @@ Engine runs *inside* emit: CSS Modules become inline `StyleSheet`s (the
 unsupported-Tailwind residue is rewritten — all before validation. The only
 residue that survives is genuinely unresolvable (a runtime `<Link to>`), and it
 does not break the build.
+
+### Reading the two coverage figures
+
+Rejox reports coverage through two named lenses, and always both. One number
+alone would be a choice about which truth to tell:
+
+| Lens | What a file must do to count | On `sample-app` |
+| --- | --- | --- |
+| **Strict** *(the headline)* | Migrate with **nothing** left unresolved — not one `REJOX-TODO` survives in it. | **58%** (15 of 26 units) |
+| Compiles + bundles | Type-check and bundle cleanly. Soft residue (a `hover:` utility, a gradient) is allowed, because it does not stop the file working. | 100% (26 of 26) |
+
+Strict leads because it is the figure that cannot flatter: a single unresolved
+`hover:` excludes an entire file. The compiling figure is the one comparable to
+the Analyzer's pre-migration prediction, and it is what "the app runs" means —
+so both are shown, each labelled with what it measures.
+
+Neither is ever reported as a percentage when there was nothing to measure. A
+run that emitted zero units reports **`n/a`**, not `100%` — an empty population
+has no score, and rounding it up to a perfect one is the easiest way for a tool
+to lie about itself.
 
 **One LLM call.** That number is the whole thesis: the AI is a scalpel used once,
 for the one decision that is genuinely design (the navigator shape). Everything
