@@ -36,6 +36,9 @@ DEFAULT_QUEUE_NAME = "rejox-migrations"
 # A migration installs a dependency tree and runs Metro; well over the RQ
 # default of 180s. Matches the Validator's own stage ceilings with headroom.
 DEFAULT_JOB_TIMEOUT_SECONDS = 3600
+# Redis connect/read ceiling. Small on purpose: this is a local-network hop, and
+# a slow answer here must surface as a 503, not as a request that never returns.
+DEFAULT_REDIS_TIMEOUT_SECONDS = 5
 # How long a finished job's RQ record is kept. The real state lives in
 # job.json, so this only affects the queue's own bookkeeping.
 DEFAULT_RESULT_TTL_SECONDS = 24 * 60 * 60
@@ -83,9 +86,20 @@ def get_queue():
             "REJOX_QUEUE=rq needs the `rq` and `redis` packages. "
             "Install them, or use REJOX_QUEUE=thread."
         ) from exc
+    # Bounded timeouts, and no retry-on-timeout. redis-py's defaults wait
+    # essentially forever, which turns an unreachable Redis into a POST
+    # /api/migrate that hangs for minutes instead of answering 503 — the client
+    # cannot tell "queue is down" from "still thinking".
+    timeout = _env_int("REJOX_REDIS_TIMEOUT", DEFAULT_REDIS_TIMEOUT_SECONDS)
+    connection = Redis.from_url(
+        redis_url(),
+        socket_connect_timeout=timeout,
+        socket_timeout=timeout,
+        retry_on_timeout=False,
+    )
     return Queue(
         queue_name(),
-        connection=Redis.from_url(redis_url()),
+        connection=connection,
         default_timeout=_env_int("REJOX_JOB_TIMEOUT", DEFAULT_JOB_TIMEOUT_SECONDS),
     )
 
