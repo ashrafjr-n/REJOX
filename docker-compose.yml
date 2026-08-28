@@ -1,0 +1,88 @@
+# Rejox — a reproducible deployment of the whole backend.
+#
+#   cp .env.example .env      # then set REJOX_API_KEYS and GEMINI_API_KEY
+#   docker compose up --build
+#
+# Three services, and the split is the architecture:
+#
+#   redis    the durable queue. A migration outlives an API restart because the
+#            job is here, not in a thread inside the API process.
+#   api      accepts uploads, analyses, plans, enqueues. Never runs a migration.
+#   worker   runs migrations. Scale with `docker compose up --scale worker=3`.
+#
+# The worker mounts the host Docker socket so the Validator can start a
+# throw-away sibling container per stage (REJOX_SANDBOX=docker). That mount is
+# the trade being made: it gives the worker control of the host's Docker daemon,
+# which is why the worker runs nothing but queued migrations and why the sandbox
+# containers themselves are capability-less, non-root, and network-denied except
+# during install. Read docs/SECURITY.md before deploying this.
+
+name: rejox
+
+x-backend: &backend
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+  environment: &backend-env
+    REJOX_QUEUE: rq
+    REJOX_REDIS_URL: redis://redis:6379/0
+    REJOX_WORKSPACE_ROOT: /data/workspaces
+    # Real containment for the uploaded project's toolchain. Without this the
+    # API and the worker both refuse to run migrations at all.
+    REJOX_SANDBOX: docker
+    REJOX_SANDBOX_IMAGE: ${REJOX_SANDBOX_IMAGE:-node:20-bookworm-slim}
+    REJOX_SANDBOX_MEMORY: ${REJOX_SANDBOX_MEMORY:-4g}
+    REJOX_SANDBOX_CPUS: ${REJOX_SANDBOX_CPUS:-2}
+    REJOX_API_KEYS: ${REJOX_API_KEYS:?set REJOX_API_KEYS in .env — the API refuses to serve without keys}
+    REJOX_CORS_ORIGINS: ${REJOX_CORS_ORIGINS:-http://localhost:5173}
+    REJOX_RUN_TTL_SECONDS: ${REJOX_RUN_TTL_SECONDS:-86400}
+    REJOX_AI_PROVIDER: ${REJOX_AI_PROVIDER:-gemini}
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  volumes:
+    # The API writes uploads here and the worker reads them: one workspace,
+    # shared, or a worker could not see the job it was handed.
+    - workspaces:/data
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  redis:
+    image: redis:7-alpine
+    # Queued jobs must survive a Redis restart, so persistence is on.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    ports:
+      - "${REJOX_PORT:-8000}:8000"
+    # Retention is owned by the API process (one sweeper, not one per worker).
+    environment:
+      <<: *backend-env
+      REJOX_RETENTION: "on"
+
+  worker:
+    <<: *backend
+    command: ["rejox-worker"]
+    environment:
+      <<: *backend-env
+      # Only the API sweeps; N workers sweeping the same directory would race.
+      REJOX_RETENTION: "off"
+    volumes:
+      - workspaces:/data
+      # The worker starts sandbox containers for the Validator's stages.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # No ports: a worker is reached through the queue, never over HTTP.
+
+volumes:
+  workspaces:
+  redis-data:
