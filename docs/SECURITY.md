@@ -91,6 +91,13 @@ reintroducing it quietly.
   `REJOX_ALLOW_ANONYMOUS=1` opts a dev machine out.
 - **Budgets**: fixed-window per-identity limits, separate per bucket, strictest
   on the stages that cost money (`migrate`) or CPU (`upload`, `pipeline`).
+- **Where the counters live** is one setting, `REJOX_RATE_STORE`. `memory`
+  (default) counts in the API process — correct for a single container, and
+  N times the configured ceiling behind N replicas. `redis` counts in the Redis
+  the queue already uses, so the limit is the fleet's. A shared store that
+  cannot be reached answers **503**; it never falls back to counting locally,
+  because that would restore the per-replica ceiling and look like a working
+  server. Compose sets `redis`.
 - **Concurrency**: `REJOX_MAX_CONCURRENT_MIGRATIONS` caps simultaneous
   migrations, counted from live worker threads so a wedged job cannot block the
   endpoint forever.
@@ -125,11 +132,13 @@ Enforced by `tests/test_run_ownership.py` and gate C3 in
 
 Stated plainly, because a security document that only lists wins is marketing:
 
-- **Rate limits are per API process.** Behind more than one API container each
-  enforces its own share of the limit, so the effective ceiling is the limit
-  times the number of API replicas. A shared store is the fix; until then run
-  one API container (migration *workers* scale freely — they are behind the
-  queue, not the rate limiter).
+- **Rate limits are only shared where `REJOX_RATE_STORE=redis`.** Compose sets
+  it, so the documented deployment is correct. A hand-rolled deployment that
+  leaves the default `memory` and runs more than one API container gets the
+  configured limit *per container* — the ceiling multiplies, silently. What
+  remains open even on `redis`: the window is fixed, not sliding, so an identity
+  can spend a full budget at the end of one window and another at the start of
+  the next; and the limit is per API key, so everyone sharing a key shares it.
 - **A shared API key is still not user accounts.** Runs now have an owner (see
   *Ownership* above), so one key holder can no longer read another's run — the
   hole verified live on 2026-08-31, when a second key received `200` for another
@@ -167,9 +176,11 @@ REJOX_CORS_ORIGINS=https://your-frontend.example
 #              REJOX_NPM_ALLOW_SCRIPTS, REJOX_ALLOW_LOCAL_PATH
 ```
 
-Run one API container and as many `rejox-worker` containers as the box can take
+Run as many `rejox-worker` containers as the box can take
 (`docker compose up --scale worker=N`). Put a reverse proxy in front for TLS and
-a request-body cap.
+a request-body cap. The API scales too — its budgets are shared through Redis —
+but past one replica the proxy has to be the thing publishing the port, since
+the base compose file maps a single fixed one.
 
 The workspace root must be a bind mount at an **identical path** on the host and
 inside the containers (`REJOX_DATA_DIR`), for the reason given under *the mount
