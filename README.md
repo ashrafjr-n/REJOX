@@ -124,6 +124,13 @@ before `docs/ARCHITECTURE.md`, which assumes more.
 
 ```bash
 cp .env.example .env     # set REJOX_API_KEYS and GEMINI_API_KEY at minimum
+
+# Run workspaces live on the host and are bind-mounted at the SAME path inside
+# the containers — see below for why that is not optional. 10001 is the uid the
+# image runs as.
+sudo mkdir -p /srv/rejox-data && sudo chown -R 10001:10001 /srv/rejox-data
+echo 'REJOX_DATA_DIR=/srv/rejox-data' >> .env
+
 docker compose up --build
 ```
 
@@ -139,6 +146,16 @@ The image carries both runtimes (Python for the pipeline, Node for the
 `parser-worker` / `codemod-worker` subprocesses) but **not** the toolchain for
 validating a migrated project — that runs in a throw-away sandbox container per
 stage (`REJOX_SANDBOX=docker`).
+
+**Why `REJOX_DATA_DIR` is a bind mount and not a named volume.** That sandbox
+container is a *sibling*: the worker asks the host's daemon for it, so the
+`-v {run dir}:/work` it requests is resolved against the **host's** filesystem
+while the path came from inside the worker's container. If those two disagree,
+Docker does not fail — it creates an empty directory of that name and mounts
+that, and every stage then validates nothing and reports success. Mounting the
+workspace root at an identical path on both sides keeps them in agreement; the
+sandbox also proves the mount with a canary before running anything, so a
+misconfiguration is an error rather than a green run against an empty folder.
 
 Two settings the deployment refuses to start without: `REJOX_API_KEYS`, and real
 containment. The worker checks the same sandbox refusal the API does, so a
