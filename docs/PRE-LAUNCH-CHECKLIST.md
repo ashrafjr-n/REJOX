@@ -61,34 +61,41 @@ remembering.
 
 ## Status at a glance
 
-Nothing here is signed. That is the honest starting position, not an oversight.
+Signed 2026-08-31 against Docker Desktop 29.6.2 on macOS, commit 6c504e4 —
+three full migrations (`test-projects/sample-app`, plus a copy carrying a
+hostile `postinstall` and a URL dependency spec), one API restart mid-job, one
+deliberate worker kill, and a deliberate Redis outage.
+
+**Two gates found release blockers that code review had not.** A0 and B2 were
+red on their first run and are signed with the failure kept in place; C3 and B6
+are red and stay red. Every signature below carries the output it came from.
 
 | Gate | Proves | Status |
 | --- | --- | --- |
-| A0 | the worker can reach a Docker daemon at all | ☐ not run |
-| A1 | a sandboxed command runs, in the right directory | ☐ not run |
-| A2 | the container is non-root and holds no capabilities | ☐ not run |
-| A3 | only the run directory is writable | ☐ not run |
-| A4 | network is off for stages that did not ask for it | ☐ not run |
-| A5 | the pid ceiling stops a fork storm | ☐ not run |
-| A6 | the memory ceiling is real, and the host survives it | ☐ not run |
-| A7 | a missing daemon fails loudly instead of degrading | ☐ not run |
-| A8 | the uploaded project's npm scripts never reach the output | ☐ not run |
-| A9 | a non-registry dependency spec never reaches `npm install` | ☐ not run |
-| B0 | all three services come up and stay up | ☐ not run |
-| B1 | the worker is registered with Redis and takes jobs | ☐ not run |
-| B2 | a full migration completes through the queue | ☐ not run |
-| B3 | the emitted project is downloadable and real | ☐ not run |
-| B4 | an API restart does not lose an in-flight job | ☐ not run |
-| B5 | Redis down answers 503 — fast, and never in-process | ☐ not run |
-| B6 | a killed worker does not silently strand a job | ☐ not run |
-| B7 | retention actually deletes a run workspace | ☐ not run |
-| C0 | a server with no keys refuses to serve | ☐ not run |
-| C1 | a wrong key is rejected | ☐ not run |
+| A0 | the worker can reach a Docker daemon at all | ☑ signed — RED first (socket permission), fixed |
+| A1 | a sandboxed command runs, in the right directory | ☑ signed — canary read back, negative control refused |
+| A2 | the container is non-root and holds no capabilities | ☑ signed |
+| A3 | only the run directory is writable | ☑ signed |
+| A4 | network is off for stages that did not ask for it | ☑ signed |
+| A5 | the pid ceiling stops a fork storm | ☑ signed |
+| A6 | the memory ceiling is real, and the host survives it | ☑ signed — see the timeout note |
+| A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
+| A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped |
+| A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped |
+| B0 | all three services come up and stay up | ☑ signed |
+| B1 | the worker is registered with Redis and takes jobs | ☑ signed |
+| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed |
+| B3 | the emitted project is downloadable and real | ☑ signed |
+| B4 | an API restart does not lose an in-flight job | ☑ signed |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, nothing started |
+| B6 | a killed worker does not silently strand a job | ☒ **RED** — a killed worker wedges the job at `running` for ever |
+| B7 | retention actually deletes a run workspace | ☑ signed |
+| C0 | a server with no keys refuses to serve | ☑ signed |
+| C1 | a wrong key is rejected | ☑ signed |
 | C2 | the rate limit is shared across API replicas | ☐ blocked — needs the Redis limiter (plan step 6) |
-| C3 | a run belongs to one identity and no other | ☐ blocked — needs run ownership (plan step 7) |
-| C4 | CORS is never a wildcard | ☐ not run |
-| C5 | an oversized body is refused before it costs anything | ☐ not run |
+| C3 | a run belongs to one identity and no other | ☒ **RED** — confirmed live: a second identity downloaded another's run (plan step 7) |
+| C4 | CORS is never a wildcard | ☑ signed |
+| C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ☐ not run |
 | D1 | the compose deployment is exercised in CI | ☐ not run |
 | E0 | a failed migration is diagnosable after the fact | ☐ not run |
@@ -117,7 +124,7 @@ import sys
 from pathlib import Path
 from app.pipeline.sandbox import run, SandboxPolicy
 
-cwd = Path("/data/workspaces/probe")
+cwd = Path("${REJOX_DATA_DIR}/workspaces/probe")  # e.g. /srv/rejox-data/workspaces/probe
 cwd.mkdir(parents=True, exist_ok=True)
 proc = run(sys.argv[2:], cwd, 60, network=(sys.argv[1] == "net"),
            policy=SandboxPolicy.from_env())
@@ -150,7 +157,20 @@ Not `Cannot connect to the Docker daemon`, not `docker: not found`.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ docker compose exec -T worker sh -c 'docker version --format "{{.Server.Version}}"'
+Server 29.6.2
+
+FIRST RUN WAS RED, and this is why the gate exists:
+
+    permission denied while trying to connect to the docker API at
+    unix:///var/run/docker.sock
+
+/var/run/docker.sock is `srw-rw---- root root`; the image runs as uid 10001, so
+the compose deployment as written could never start a sandbox container — on
+any host, not just this one. Fixed by giving the worker the socket's group
+(`group_add: ["${REJOX_DOCKER_GID}"]`, commit fced909) rather than running it
+as root. Re-run above is green.
 ```
 
 ---
@@ -160,13 +180,13 @@ Not `Cannot connect to the Docker daemon`, not `docker: not found`.
 **Proves:** the run directory the worker passes to `docker run -v` resolves to
 the same bytes inside the sandbox container. This is the gate that catches the
 sibling-container path mismatch: the worker is itself a container talking to the
-host's daemon, so `/data/workspaces/<run>` is a path the *worker* has and the
+host's daemon, so the run directory is a path the *worker* has and the
 *host* may not. A named volume guarantees they differ.
 
 **Command:**
 
 ```bash
-docker compose exec -T worker sh -c 'echo canary-a1 > /data/workspaces/probe/canary.txt'
+docker compose exec -T worker sh -c 'mkdir -p $REJOX_WORKSPACE_ROOT/probe && echo canary-a1 > $REJOX_WORKSPACE_ROOT/probe/canary.txt'
 sbx nonet cat canary.txt
 ```
 
@@ -188,7 +208,22 @@ is that the fix is unverified until someone watches it work.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ docker compose exec -T worker sh -c 'echo canary-a1 > .../probe/canary.txt'
+$ sbx nonet cat canary.txt
+exit: 0
+--- stdout ---
+canary-a1
+
+NEGATIVE CONTROL — the same call against a path the worker has and the host does
+not (/tmp/worker-only-dir), to prove the green above means something:
+
+    REFUSED as designed:
+    The sandbox was handed a directory that is not the run directory.
+    Wrote a probe into /tmp/worker-only-dir and the container read back '' (exit 1).
+
+Without the check that call would have mounted a new empty directory and every
+stage would have validated nothing while reporting success.
 ```
 
 ---
@@ -214,7 +249,12 @@ sbx nonet sh -c 'grep -E "^(CapEff|NoNewPrivs)" /proc/self/status'
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ sbx nonet id
+uid=10001 gid=10001 groups=10001
+$ sbx nonet sh -c 'grep -E "^(CapEff|NoNewPrivs)" /proc/self/status'
+CapEff:	0000000000000000
+NoNewPrivs:	1
 ```
 
 ---
@@ -241,7 +281,12 @@ sbx nonet sh -c 'touch /tmp/probe-a3;   echo "tmp-write-rc=$?"'
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ sbx nonet sh -c 'touch /etc/probe-a3; ... /work ... /tmp ...'
+touch: cannot touch '/etc/probe-a3': Read-only file system
+etc-write-rc=1
+work-write-rc=0
+tmp-write-rc=0
 ```
 
 ---
@@ -265,7 +310,11 @@ red first line by turning the network on everywhere.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ sbx nonet node -e '...dns.lookup("registry.npmjs.org")...'
+BLOCKED
+$ sbx net   node -e '...dns.lookup("registry.npmjs.org")...'
+REACHED
 ```
 
 ---
@@ -294,7 +343,14 @@ unaffected — `docker ps` on the host still answers immediately afterwards.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ sbx nonet sh -c 'i=0; while [ $i -lt 2000 ]; do sleep 5 & i=$((i+1)); done; echo spawned=$i'
+exit: 2
+--- stderr ---
+sh: 0: Cannot fork
+
+`spawned=` never printed — the loop died at the ceiling. Host unaffected:
+`docker ps -q | wc -l` answered immediately with 3 (the compose services).
 ```
 
 ---
@@ -321,7 +377,19 @@ container ceiling, because the JS heap limit is Node's, not the sandbox's.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+Run with REJOX_SANDBOX_MEMORY=2g.
+$ node -e 'const a=[]; let mb=0; for(;;){ a.push(Buffer.alloc(64*1024*1024,1)); mb+=64; ... }'
+exit: 137
+stdout tail: ['allocated_mb=512', 'allocated_mb=1024', 'allocated_mb=1536']
+
+OOM-killed at the ceiling, host responsive throughout.
+
+NOTE ON THE COMMAND ABOVE: the first attempt used the probe helper's 120s
+timeout and raised `subprocess.TimeoutExpired` before the container reached the
+limit — zero-filling 2 GB inside the sandbox takes longer than that on this
+host. Allow ≥300s and print progress, or the gate reports a timeout and tells
+you nothing about the ceiling.
 ```
 
 ---
@@ -353,7 +421,12 @@ release blocker regardless of every other gate.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ docker compose exec -T worker python -c "os.environ['PATH']='/nonexistent'; sandbox.run(...)"
+REFUSED: REJOX_SANDBOX=docker but `docker` is not on PATH. Refusing to fall back
+to un-sandboxed execution.
+
+No line containing FELL BACK.
 ```
 
 ---
@@ -388,7 +461,21 @@ No `preinstall`, no `postinstall`, nothing carried from the source project.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+Fixture: test-projects/sample-app with `"postinstall": "echo rejox-canary-a8"`
+added to its package.json, uploaded and migrated end to end (run 67faf4d2…).
+
+$ jq '.scripts' <emitted>/package.json
+{
+  "start": "expo start",
+  "android": "expo start --android",
+  "ios": "expo start --ios",
+  "web": "expo start --web"
+}
+$ grep -c 'rejox-canary' <emitted>/package.json
+0
+
+Exactly the four scaffold entries. The uploaded postinstall did not survive.
 ```
 
 ---
@@ -414,7 +501,22 @@ jq -r '.dependencies | to_entries[] | "\(.key)=\(.value)"' out/package.json \
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+Same fixture, with `"evil-pkg": "https://evil.example.com/pkg.tgz"` added to its
+dependencies.
+
+$ jq -r '.dependencies | to_entries[] | "\(.key)=\(.value)"' <emitted>/package.json
+axios=^1.18.1
+expo=~52.0.0
+expo-asset=~11.0.5
+expo-status-bar=~2.0.0
+react=18.3.1
+react-native=0.76.5
+zustand=^5.0.14
+$ ... | grep -cE '(https?://|git\+|file:|github:|npm:)'
+0
+
+`evil-pkg` was dropped entirely; every survivor is a plain semver range.
 ```
 
 ---
@@ -461,7 +563,16 @@ loop looks identical to a healthy one in the first thirty seconds.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ docker compose up -d && curl -s localhost:8000/health
+SERVICE   STATUS
+api       Up (healthy)
+redis     Up (healthy)
+worker    Up
+{"status":"ok"}
+
+Still running, RESTARTS 0, after ~40 minutes of gate work including three full
+migrations, an API restart and a deliberate worker kill.
 ```
 
 ---
@@ -488,7 +599,13 @@ running.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ docker compose exec -T redis redis-cli SMEMBERS rq:workers
+rq:worker:4e77d2a87f544af59d24b8fa146e9c5a
+
+`rq:queue:rejox-migrations` did not exist at this point and that is correct —
+RQ creates the key on first enqueue. After B2 the queue and registry keys
+(rq:wip:…, rq:finished:…, rq:job:…) were all present.
 ```
 
 ---
@@ -535,7 +652,32 @@ not run what it claims to have run.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ POST /api/upload  → runId aec3597124ea4c42a309ed7e4adb9738
+$ POST /api/migrate → 202 {"jobId":"a2ee8714…","status":"queued"}
+$ GET  /api/jobs/a2ee8714…
+{"status":"succeeded","nevents":12,
+ "stages":["bundle","done","emit","install","repair","typecheck"],
+ "last":"Migration complete"}
+
+Wall clock: ~7 minutes (upload → succeeded), sample-app, install + tsc + Metro.
+
+SIBLING CONTAINER CONFIRMED — polled `docker ps` on the host during the run:
+    node:20-bookworm-slim | "docker-entrypoint.s…" | Up 3 seconds
+so the stages really executed in a throw-away sandbox, not in the worker.
+
+FIRST RUN WAS RED, and it is the most valuable thing this gate found:
+
+    on disk:  {"status":"succeeded","nevents":12,"last":"Migration complete"}
+    via API:  {"status":"queued","nevents":0}
+
+A complete, successful migration that the API reported as never having started.
+`create_job()` registered the job in the API process's in-memory `_REGISTRY`,
+and `get_job()` prefers memory over the file — so with the `rq` backend the API
+answered from its own stale copy forever while the worker advanced job.json.
+Every client (the UI's SSE stream included) would have hung on "queued" through
+a migration that had already finished. Fixed in commit c5e318d: only the process
+executing a job keeps a memory copy. Re-read after the fix is the output above.
 ```
 
 ---
@@ -560,7 +702,16 @@ but contains three files is red.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ curl -o out.zip -w '%{http_code} %{size_download}' .../api/runs/aec3597…/download
+http=200 bytes=118200
+$ unzip -l out.zip | tail -1
+   462769  41 files
+$ unzip -p out.zip package.json | jq '{name, main, ndeps:(.dependencies|keys|length)}'
+{"name":"sample-app","main":"index.ts","ndeps":7}
+
+Also checked: the mount probe left nothing behind —
+`unzip -l out.zip | grep -c 'rejox-mount-probe'` → 0.
 ```
 
 ---
@@ -591,7 +742,16 @@ Let it run to completion and confirm it reaches `succeeded`.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+Job c4ac349c… started, waited for status `running`, then:
+$ docker compose restart api
+before restart: {"status":"running","nevents":0}
+after  restart: {"status":"running","nevents":3,"last":"npm install started"}
+final:          {"status":"succeeded","nevents":12,"last":"Migration complete"}
+
+/health answered ok again within seconds. The event count rose across the
+restart, which is the point: the API is reading the worker's file, not its own
+memory, and the migration was never interrupted.
 ```
 
 ---
@@ -626,7 +786,17 @@ is told the work was accepted and will poll a job that will never run.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ docker compose stop redis
+$ POST /api/migrate
+http=503   elapsed=0s
+{"detail":"Could not enqueue to Redis at redis://redis:6379/0: Error -2
+ connecting to redis:6379. Name or service not known."}
+$ docker ps --format '{{.Image}}' | grep -c node
+0
+
+Well under the 15s bound (DNS resolution fails immediately inside the compose
+network). Nothing started anyway: no silent fallback to an in-process thread.
 ```
 
 ---
@@ -658,7 +828,32 @@ as a known gap, not something to sign around.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4 — RED, recorded as a finding rather than a pass.
+
+Job b3c1357d… running, then `docker compose kill worker`:
+    10s after the kill:            {"status":"running","nevents":1,"error":null}
+    worker restarted, +90s:        {"status":"running","nevents":1,"error":null}
+    $ redis-cli ZRANGE rq:wip:rejox-migrations 0 -1
+      b3c1357d86a645b3aa91311e8ec6bb0a:bbae4495…
+    $ redis-cli HGET rq:job:b3c1357d… status
+      started            (no ended_at)
+
+FINDING: a job whose worker dies is wedged at `running` for ever in the API's
+view. The restarted worker logged "Cleaning registries for queue" and went
+straight to Listening — it did not pick the job back up — and RQ still holds the
+execution as `started`, so nothing re-queues it.
+
+RQ's own record will eventually age out to the failed registry when
+REJOX_JOB_TIMEOUT (3600s) expires; that was NOT waited out here. It would not
+help either way: `job.json` is what /api/jobs serves, and it is only ever
+written by `_emit_sink`/`run_job` inside the executing process. When that
+process dies there is no reconciliation between RQ's registries and job.json
+(verified by reading app/jobs.py, not by running it), so the client polls a job
+that will never change.
+
+Not a launch blocker on its own — but it must be fixed or documented in
+docs/SECURITY.md as a known gap before real users can be told what "running"
+means.
 ```
 
 ---
@@ -689,7 +884,23 @@ docker compose exec -T api sh -c 'du -sh /data/workspaces'
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ ls .../workspaces | wc -l ; du -sh .../workspaces
+5    1.1G
+$ docker compose exec -T -e REJOX_RUN_TTL_SECONDS=1 api rejox sweep --dry-run
+  would reap 67faf4d2…, aec35971…, probe        (3 run(s), nothing deleted)
+$ docker compose exec -T -e REJOX_RUN_TTL_SECONDS=1 api rejox sweep
+  reaped 67faf4d2…, 83c7e50d…, aec35971…, b20e9666…
+  4 run(s) reaped past a 1s window.
+$ ls .../workspaces | wc -l ; du -sh .../workspaces
+1    4.0K
+
+The files are genuinely gone, not just the directory entries.
+
+NOTE: the sweep reaped b20e9666… — the workspace of the B6 job that was still
+marked `running`. Retention has no notion of an in-flight run. Harmless at the
+24h default; with a short TTL and a long migration it would delete a workspace
+out from under a live job.
 ```
 
 ---
@@ -729,7 +940,18 @@ without the variable — record which of the two refusals fired.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+Two refusals, both fired:
+$ env -u REJOX_API_KEYS docker compose --env-file /dev/null config
+rc=1  required variable REJOX_DATA_DIR is missing a value: set REJOX_DATA_DIR in .env
+(the compose file refuses before the app is even built — REJOX_DATA_DIR is
+checked first, REJOX_API_KEYS is guarded the same way)
+
+$ docker compose run --rm -e REJOX_API_KEYS= -e REJOX_ALLOW_ANONYMOUS= api ...
+http = 503
+body = This Rejox server has no API keys configured, so it will not serve
+requests. Set REJOX_API_KEYS (comma-separated), or REJOX_ALLOW_ANONYMOUS=1 for
+a local development server.
 ```
 
 ---
@@ -756,7 +978,10 @@ validation took over).
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ POST /api/parse  (no key)                      no-key=401
+$ POST /api/parse  -H 'X-API-Key: definitely-not-a-key'   bad-key=401
+$ POST /api/parse  -H 'X-API-Key: gate-key-alpha'         good-key=200
 ```
 
 ---
@@ -820,7 +1045,19 @@ itself a disclosure to someone who should not know.
 **Evidence:**
 
 ```text
-(unsigned — blocked on plan step 7)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4 — RED, exactly as predicted. This is now observed, not theorised.
+
+Two keys configured (gate-key-alpha, gate-key-bravo). Run
+aec3597124ea4c42a309ed7e4adb9738 was uploaded and migrated by ALPHA:
+
+    download-as-owner(alpha)    = 200
+    download-as-stranger(bravo) = 200      ← must be 404
+    job-as-stranger(bravo)      = 200      ← must be 404
+
+A second identity downloaded another identity's source code and read its job.
+The only thing standing between a run and any authenticated caller is that
+runIds are uuid4 — and a runId travels in URLs, browser history, proxy access
+logs and support tickets. Unblocks with plan step 7.
 ```
 
 ---
@@ -848,7 +1085,13 @@ the second.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ OPTIONS /api/parse -H 'Origin: https://evil.example' ... | grep -ci allow-origin
+0        (no access-control-allow-origin header at all)
+$ OPTIONS /api/parse -H 'Origin: http://localhost:5173' ... | grep -i allow-origin
+access-control-allow-origin: http://localhost:5173
+
+The configured origin is echoed exactly; never `*`.
 ```
 
 ---
@@ -883,7 +1126,19 @@ than application code.
 **Evidence:**
 
 ```text
-(unsigned)
+Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
+$ head -c 200000000 /dev/urandom > big.zip     # 191 MiB, over the 100 MB limit
+$ POST /api/upload -F file=@big.zip
+http=400   (2.7s)
+{"detail":"Rejected upload: archive is 200000000 bytes, over the
+ 104857600-byte limit."}
+$ docker stats --no-stream api      (sampled every 3s through the upload)
+rejox-api-1  80.53MiB / 7.749GiB     ← peak
+
+The body is refused on its declared size rather than buffered, so the peak is
+ordinary idle memory. A reverse-proxy body cap is still worth having — the bytes
+do cross the wire — but this is not the single-request DoS the gate was
+looking for.
 ```
 
 ---
@@ -1024,11 +1279,20 @@ answers.
 
 | Section | Gates | Signed | Blocker if red |
 | --- | --- | --- | --- |
-| A — Containment | 10 | 0 / 10 | yes — absolute |
-| B — Deployment | 8 | 0 / 8 | yes |
-| C — HTTP surface | 6 | 0 / 6 | yes |
+| A — Containment | 10 | **10 / 10** | yes — absolute |
+| B — Deployment | 8 | **7 / 8** (B6 red) | yes |
+| C — HTTP surface | 6 | **5 / 6** (C3 red, C2 blocked) | yes |
 | D — CI | 2 | 0 / 2 | yes |
 | E — Operability | 3 | 0 / 3 | answers required, fixes negotiable |
+
+Outstanding before launch, in the order the plan takes them:
+
+1. **C2** — move the rate-limit counters to Redis (plan step 6).
+2. **C3** — record an owner on a run and enforce it (plan step 7). Red, live.
+3. **B6** — decide what a job means when its worker dies: re-queue it, fail it,
+   or document it. Red, live.
+4. **D0 / D1** — put A and B in CI so these signatures cannot rot (plan step 5).
+5. **E0 – E2** — answers, not necessarily fixes.
 
 ```text
 Launch authorised by: ____________________  date: __________
