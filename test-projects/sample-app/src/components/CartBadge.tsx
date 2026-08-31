@@ -1,14 +1,20 @@
 import { Link } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
 
+interface CartBadgeProps {
+  darkMode?: boolean
+}
+
 /** Cart icon with a live item-count badge, links to Settings/cart area. */
-export default function CartBadge() {
+export default function CartBadge({ darkMode = false }: CartBadgeProps) {
   const count = useCartStore((s) => s.count())
 
   return (
     <Link
       to="/settings"
-      className="relative rounded-md px-2 py-1 text-slate-700 hover:bg-slate-100"
+      className={`relative rounded-md px-2 py-1 transition-colors ${
+        darkMode ? 'text-slate-200 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100'
+      }`}
     >
       🛒
       {count > 0 && (
