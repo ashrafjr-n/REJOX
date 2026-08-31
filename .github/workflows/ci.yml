@@ -24,7 +24,8 @@ env:
   REJOX_AI_PROVIDER: fake
 
 jobs:
-  # The gate: everything except the 10 tests that npm-install and run Metro.
+  # The gate: everything except the tests that npm-install and run Metro, and
+  # the containment gates that need a live daemon (both have their own job).
   # ~5 minutes against ~13 for the whole suite — most of that is the Node
   # parser/codemod workers, which nearly every test genuinely exercises, so this
   # split buys less than the marker name suggests. It is still the difference
@@ -63,9 +64,12 @@ jobs:
             (cd "$worker" && npm ci --no-audit --no-fund && npm run build)
           done
 
+      # `sandbox_live` is deselected here, not skipped: it needs a daemon, and a
+      # red containment gate deserves its own job name rather than being one
+      # line in a 300-test run. It is the `containment` job below.
       - name: Test
         working-directory: backend
-        run: pytest -q -m "not slow"
+        run: pytest -q -m "not slow and not sandbox_live"
 
   # The real thing: emit → npm install → tsc → Metro on the benchmark app.
   # Slow and network-bound, so it does not gate a PR's first feedback — but it
@@ -105,6 +109,77 @@ jobs:
       - name: Test (slow)
         working-directory: backend
         run: pytest -q -m slow
+
+  # Section A of docs/PRE-LAUNCH-CHECKLIST.md, against the runner's own daemon.
+  # Until this existed, every containment claim in docs/SECURITY.md rested on
+  # unit tests of the `docker run` argv — which prove the flags were *passed*,
+  # never that they took effect. Notably: this job does NOT set
+  # REJOX_ALLOW_UNSANDBOXED, unlike every other job here.
+  containment:
+    name: Containment (live daemon — section A)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      REJOX_SANDBOX: docker
+      # Emptied, not omitted: the workflow-level env above sets these for every
+      # job, and a job that claims to assert containment while inheriting the
+      # opt-out would be asserting nothing.
+      REJOX_ALLOW_UNSANDBOXED: ""
+      REJOX_ALLOW_ANONYMOUS: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+
+      # Fail loudly rather than letting the suite skip itself green: these tests
+      # skip where no daemon answers, which is right on a laptop and worthless
+      # in CI.
+      - name: The runner really has a daemon
+        run: docker version --format 'server {{.Server.Version}}'
+
+      - name: Containment gates
+        working-directory: backend
+        run: pytest -q -m sandbox_live
+
+  # Section B: the deployment as it is actually shipped. The job above runs as a
+  # process ON the host, so every path it hands the daemon is one the daemon
+  # already shares — the sibling-container mount mismatch cannot happen there.
+  # Here the worker is a container asking the host's daemon for a sandbox, which
+  # is the geometry that shipped broken and was only caught by running it.
+  deployment:
+    name: Deployment (docker compose — section B)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bind-mounted at an identical path on both sides, owned by the image's
+      # uid — see the note at the top of docker-compose.yml.
+      - name: Prepare the workspace root
+        run: |
+          sudo mkdir -p /srv/rejox-data
+          sudo chown -R 10001:10001 /srv/rejox-data
+
+      - name: Deployment gates
+        env:
+          REJOX_DATA_DIR: /srv/rejox-data
+          REJOX_AI_PROVIDER: fake
+          MIGRATE_TIMEOUT: "1800"
+          # The production posture, in full: the compose deployment must stand
+          # up without either refusal being waived.
+          REJOX_ALLOW_UNSANDBOXED: ""
+          REJOX_ALLOW_ANONYMOUS: ""
+        run: |
+          REJOX_DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)" \
+            ./verify-deployment.sh
 
   frontend:
     name: Frontend (types + lint + build)
