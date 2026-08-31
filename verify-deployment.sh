@@ -14,7 +14,7 @@
 # path it names is a path the daemon already shares, so the sibling-container
 # mismatch can never occur. Here it can. That is the point of this script.
 #
-# Gates covered: A0, A1, A8, A9, B0, B1, B2, B3, B5.
+# Gates covered: A0, A1, A8, A9, B0, B1, B2, B3, B5, C3.
 # Exits non-zero on the first failure, and dumps the service logs when it does.
 
 set -uo pipefail
@@ -215,6 +215,47 @@ check "url-ish dependency specs" "0" \
          | grep -cE '(https?://|git\+|file:|github:|npm:)')"
 check "evil-pkg carried over" "" \
       "$(jq -r '.dependencies["evil-pkg"] // empty' "$WORK/emitted.json")"
+
+# --- C3 ----------------------------------------------------------------------
+#
+# Run against the SAME run B2 just migrated: a real upload with real source in
+# it, not a synthetic id. The second key is a legitimate, authenticated caller —
+# the question is only whether authentication is being mistaken for authorization.
+
+gate "C3 — a run belongs to one identity and no other"
+KEY_B="$(printf '%s' "$REJOX_API_KEYS" | cut -d, -f2)"
+if [ -z "$KEY_B" ] || [ "$KEY_B" = "$KEY" ]; then
+  fail "REJOX_API_KEYS must carry two distinct keys for this gate"
+else
+  HB="X-API-Key: $KEY_B"
+  MISSING="00000000000000000000000000000000"
+
+  check "download as the owner" "200" \
+        "$(curl -s -o /dev/null -w '%{http_code}' "$API/api/runs/$RUN_ID/download" -H "$H")"
+  check "download as a stranger" "404" \
+        "$(curl -s -o "$WORK/c3-stranger.json" -w '%{http_code}' "$API/api/runs/$RUN_ID/download" -H "$HB")"
+  check "job as a stranger" "404" \
+        "$(curl -s -o /dev/null -w '%{http_code}' "$API/api/jobs/$JOB_ID" -H "$HB")"
+  check "event stream as a stranger" "404" \
+        "$(curl -s -o /dev/null -w '%{http_code}' "$API/api/jobs/$JOB_ID/events" -H "$HB")"
+  check "plan as a stranger" "404" \
+        "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/api/plan" -H "$HB" \
+             -H 'Content-Type: application/json' -d "{\"runId\":\"$RUN_ID\"}")"
+
+  # A 403 — or a different message — would confirm the run exists, which is
+  # itself a disclosure. Someone else's run must read exactly like a missing one.
+  curl -s -o "$WORK/c3-absent.json" "$API/api/runs/$MISSING/download" -H "$HB"
+  check "a run that does not exist" \
+        "No such run: $MISSING" "$(jq -r '.detail' "$WORK/c3-absent.json")"
+  check "the two messages have the same shape" \
+        "No such run: $RUN_ID" "$(jq -r '.detail' "$WORK/c3-stranger.json")"
+
+  # Local-path mode reads a server directory the caller names, which is a way
+  # past ownership entirely. It must be off unless a deployment opts in.
+  check "local-path mode is refused" "403" \
+        "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/api/parse" -H "$H" \
+             -H 'Content-Type: application/json' -d '{"path":"/srv"}')"
+fi
 
 # --- B5 ----------------------------------------------------------------------
 
