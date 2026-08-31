@@ -294,7 +294,8 @@ one config-driven root:
 {REJOX_WORKSPACE_ROOT}/{runId}/     # default root: backend/.rejox-workspaces (gitignored)
 ├── source/        # the ingested React project (upload lands here)
 ├── output/        # the emitted React Native project (emit writes here)
-└── ingest.json    # the IngestedProject manifest (root detection, warnings)
+├── ingest.json    # the IngestedProject manifest (root detection, warnings)
+└── owner          # the identity this run belongs to
 ```
 
 This is the **one** place run directories are created, resolved, and reaped —
@@ -303,6 +304,14 @@ an ad-hoc temp dir) both go through it. `runId` is a hex token
 (`uuid4().hex`) validated on every lookup (`_RUN_ID_RE`), so a value taken from
 an HTTP path can never contain `/` or `..` and escape the root. `cleanup(runId)`
 deletes a run; `sweep(ttl_seconds)` reaps runs older than a TTL (default 24 h).
+
+A run also **belongs to one identity**, recorded in `owner` at creation. It is a
+file rather than memory because the process that creates a run (the API) is not
+the one that executes it (a worker). `Run.owned_by()` fails closed — an unowned
+run belongs to nobody, never to everybody — and the HTTP surface enforces it in
+a single place (`_get_run_or_404`), answering `404` to anyone else so a response
+cannot be used to probe for other people's runIds. See
+[`SECURITY.md`](SECURITY.md).
 
 ### Ingestion (`app/pipeline/ingest.py`)
 

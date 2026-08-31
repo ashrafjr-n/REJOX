@@ -48,11 +48,12 @@ controlled by `REJOX_CORS_ORIGINS` (default `http://localhost:5173,http://127.0.
 > **`dev.sh` is a local-only posture.** Validating a migration runs the uploaded
 > project's `npm install`, `tsc` and Metro, so a server that accepts uploads
 > must run them contained (`REJOX_SANDBOX=docker`) and behind an API key
-> (`REJOX_API_KEYS`). `dev.sh` sets `REJOX_ALLOW_ANONYMOUS=1` and
-> `REJOX_ALLOW_UNSANDBOXED=1` because it binds to `127.0.0.1` and migrates
-> projects you chose yourself. Without those, the API returns 503 and explains
-> what to set. Read **[`docs/SECURITY.md`](docs/SECURITY.md)** before deploying
-> this anywhere — it lists both the guarantees and the known gaps.
+> (`REJOX_API_KEYS`). `dev.sh` sets `REJOX_ALLOW_ANONYMOUS=1`,
+> `REJOX_ALLOW_UNSANDBOXED=1` and `REJOX_ALLOW_LOCAL_PATH=1` because it binds to
+> `127.0.0.1` and migrates projects you chose yourself. Without those, the API
+> returns 503 — or 403 for a local `path` — and explains what to set. Read
+> **[`docs/SECURITY.md`](docs/SECURITY.md)** before deploying this anywhere — it
+> lists both the guarantees and the known gaps.
 
 **End-to-end browser test** (real stack, real backend numbers)
 
@@ -166,6 +167,11 @@ containment. The worker checks the same sandbox refusal the API does, so a
 misconfigured worker cannot become an un-sandboxed hole behind a correct front
 door. **Read [`docs/SECURITY.md`](docs/SECURITY.md) first** — including what the
 worker's Docker socket mount actually grants.
+
+**Ownership.** A run belongs to the identity that created it. Its uploads, its
+job, and its download answer `404` — not `403`, which would confirm the run
+exists — to every other caller, so one key holder cannot read another's source
+code by learning a `runId`.
 
 **Retention.** A run workspace holds an uploaded project and the React Native
 project emitted from it, so it is deleted after `REJOX_RUN_TTL_SECONDS` (24h
