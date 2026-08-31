@@ -16,6 +16,20 @@
 # which is why the worker runs nothing but queued migrations and why the sandbox
 # containers themselves are capability-less, non-root, and network-denied except
 # during install. Read docs/SECURITY.md before deploying this.
+#
+# It also dictates how the workspace is mounted. A sandbox container is a
+# SIBLING, started by the host's daemon, so the `-v {run dir}:/work` the worker
+# asks for is resolved against the HOST's filesystem — not the worker's. The
+# workspace root is therefore bind-mounted at an IDENTICAL path on both sides
+# (REJOX_DATA_DIR), so the two agree. A named volume would not: the daemon would
+# quietly create an empty directory of that name and every stage would validate
+# nothing while reporting success. The sandbox proves the mount before it runs
+# anything, so a mistake here fails loudly — but it is still a mistake.
+#
+#   sudo mkdir -p /srv/rejox-data && sudo chown -R 10001:10001 /srv/rejox-data
+#   echo 'REJOX_DATA_DIR=/srv/rejox-data' >> .env
+#
+# 10001 is the `rejox` uid in backend/Dockerfile — the containers run as it.
 
 name: rejox
 
@@ -26,7 +40,10 @@ x-backend: &backend
   environment: &backend-env
     REJOX_QUEUE: rq
     REJOX_REDIS_URL: redis://redis:6379/0
-    REJOX_WORKSPACE_ROOT: /data/workspaces
+    # Under REJOX_DATA_DIR, so this path means the same thing to the worker and
+    # to the host daemon that mounts it into a sandbox container.
+    REJOX_WORKSPACE_ROOT: ${REJOX_DATA_DIR:?set REJOX_DATA_DIR in .env — see the note at the top of this file}/workspaces
+    REJOX_AI_CACHE: ${REJOX_DATA_DIR}/rejox-ai-cache.sqlite3
     # Real containment for the uploaded project's toolchain. Without this the
     # API and the worker both refuse to run migrations at all.
     REJOX_SANDBOX: docker
@@ -40,8 +57,9 @@ x-backend: &backend
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   volumes:
     # The API writes uploads here and the worker reads them: one workspace,
-    # shared, or a worker could not see the job it was handed.
-    - workspaces:/data
+    # shared, or a worker could not see the job it was handed. Same path on
+    # both sides of the colon — see the note at the top of this file.
+    - ${REJOX_DATA_DIR}:${REJOX_DATA_DIR}
   depends_on:
     redis:
       condition: service_healthy
@@ -78,11 +96,10 @@ services:
       # Only the API sweeps; N workers sweeping the same directory would race.
       REJOX_RETENTION: "off"
     volumes:
-      - workspaces:/data
+      - ${REJOX_DATA_DIR}:${REJOX_DATA_DIR}
       # The worker starts sandbox containers for the Validator's stages.
       - /var/run/docker.sock:/var/run/docker.sock
     # No ports: a worker is reached through the queue, never over HTTP.
 
 volumes:
-  workspaces:
   redis-data:
