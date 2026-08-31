@@ -9,6 +9,13 @@ analysis stages (``/api/parse|analyze|plan``), the Migration Engine
 Every stage after Upload accepts either a ``runId`` (a landed upload in its run
 workspace) or a local ``path`` (dev/CLI convenience) — the same pipeline
 functions run underneath, never over HTTP, never re-implemented.
+
+**A run belongs to one identity.** ``guard()`` establishes who is calling; every
+run this module creates is stamped with that identity, and every lookup of a run
+— directly by ``runId``, or indirectly through the job that runs in it — goes
+through :func:`_get_run_or_404`, which answers ``404`` to anyone else. ``404``
+rather than ``403`` on purpose: a ``403`` confirms the run exists, which is
+itself a disclosure to someone who should not know.
 """
 
 from __future__ import annotations
@@ -92,6 +99,30 @@ app.add_middleware(
 _DOWNLOAD_SKIP = {"node_modules", ".rejox-bundle", ".expo", ".git"}
 
 
+# --- local-path mode ---------------------------------------------------------
+# `path` reads a directory of the server's filesystem chosen by the caller. On a
+# developer machine that is the CLI's convenience; on a server it is a way past
+# every other control on this surface — including run ownership, since a run's
+# source lives at a path. So it is off unless a deployment says otherwise, and
+# the refusal names the flag rather than pretending the path was not found.
+def _local_path_allowed() -> bool:
+    return os.environ.get("REJOX_ALLOW_LOCAL_PATH", "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
+def _assert_local_path_allowed() -> None:
+    if not _local_path_allowed():
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "This Rejox server does not accept a local 'path'; upload the "
+                "project and use its runId. Set REJOX_ALLOW_LOCAL_PATH=1 for a "
+                "local development server."
+            ),
+        )
+
+
 class HealthResponse(BaseModel):
     """Response schema for the health check endpoint."""
 
@@ -128,11 +159,12 @@ class SourceRequest(BaseModel):
         return self
 
 
-def _source_for(req: SourceRequest) -> Path:
+def _source_for(req: SourceRequest, identity: str) -> Path:
     """Resolve the request to the React project directory to run against."""
     if req.path:
+        _assert_local_path_allowed()
         return Path(req.path)
-    run = _get_run_or_404(req.runId)  # type: ignore[arg-type]
+    run = _get_run_or_404(req.runId, identity)  # type: ignore[arg-type]
     if not run.manifest_path.is_file():
         raise HTTPException(status_code=409, detail=f"Run {run.runId} has no ingested project.")
     ingested = IngestedProject.model_validate_json(run.manifest_path.read_text())
@@ -144,11 +176,22 @@ def _source_for(req: SourceRequest) -> Path:
     return Path(ingested.detectedRoot)
 
 
-def _get_run_or_404(run_id: str) -> workspace.Run:
+def _get_run_or_404(run_id: str, identity: str) -> workspace.Run:
+    """Resolve a run the caller owns, or 404.
+
+    THE ownership seam: a run reached over HTTP is reached through here, so
+    "belongs to one identity" is enforced in one place rather than remembered at
+    each endpoint. A run that exists but belongs to someone else answers exactly
+    what a run that does not exist answers — same status, same message — so the
+    response cannot be used to probe for other people's runIds.
+    """
     try:
-        return workspace.get_run(run_id)
+        run = workspace.get_run(run_id)
     except workspace.WorkspaceError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if not run.owned_by(identity):
+        raise HTTPException(status_code=404, detail=f"No such run: {run_id}")
+    return run
 
 
 def _build_kg(source: Path) -> KnowledgeGraph:
@@ -186,8 +229,8 @@ def _plan(report: AnalysisReport, kg: KnowledgeGraph) -> MigrationPlan:
 @app.post("/api/upload", response_model=IngestedProject)
 async def upload(request: Request, file: UploadFile = File(...)) -> IngestedProject:
     """Upload stage: land a ZIP into a fresh run workspace and detect the root."""
-    guard(request, "upload")
-    run = workspace.new_run()
+    identity = guard(request, "upload")
+    run = workspace.new_run(identity)
     try:
         data = await file.read()
         return ingest_zip(data, run)
@@ -209,8 +252,8 @@ class GithubUploadRequest(BaseModel):
 @app.post("/api/upload/github", response_model=IngestedProject)
 def upload_github(request: Request, req: GithubUploadRequest) -> IngestedProject:
     """Upload stage: shallow-clone a public GitHub repo into a fresh run."""
-    guard(request, "upload")
-    run = workspace.new_run()
+    identity = guard(request, "upload")
+    run = workspace.new_run(identity)
     try:
         return ingest_github(req.url, run, ref=req.ref)
     except IngestError as exc:
@@ -234,9 +277,9 @@ _PLAN_CACHE = "plan.json"
 _ModelT = TypeVar("_ModelT", bound=BaseModel)
 
 
-def _run_for(req: SourceRequest) -> Optional[workspace.Run]:
+def _run_for(req: SourceRequest, identity: str) -> Optional[workspace.Run]:
     """The run backing this request (for caching), or None in local-path mode."""
-    return _get_run_or_404(req.runId) if req.runId else None
+    return _get_run_or_404(req.runId, identity) if req.runId else None
 
 
 def _read_cache(run: workspace.Run, name: str, model: type[_ModelT]) -> Optional[_ModelT]:
@@ -256,15 +299,15 @@ def _write_cache(run: workspace.Run, name: str, value: BaseModel) -> None:
 @app.post("/api/parse", response_model=KnowledgeGraph)
 def parse(request: Request, req: SourceRequest) -> KnowledgeGraph:
     """Parse stage: run the Node worker and return the Knowledge Graph JSON."""
-    guard(request, "pipeline")
-    return _build_kg(_source_for(req))
+    identity = guard(request, "pipeline")
+    return _build_kg(_source_for(req, identity))
 
 
 @app.post("/api/analyze", response_model=AnalysisReport)
 def analyze(request: Request, req: SourceRequest) -> AnalysisReport:
     """Analysis stage: parse the project, then analyze migratability (cached per run)."""
-    guard(request, "pipeline")
-    run = _run_for(req)
+    identity = guard(request, "pipeline")
+    run = _run_for(req, identity)
     if run is not None:
         cached = _read_cache(run, _ANALYSIS_CACHE, AnalysisReport)
         if cached is not None:
@@ -273,7 +316,7 @@ def analyze(request: Request, req: SourceRequest) -> AnalysisReport:
         if plan_cached is not None:
             return plan_cached.report
 
-    report = _analyze(_build_kg(_source_for(req)))
+    report = _analyze(_build_kg(_source_for(req, identity)))
     if run is not None:
         _write_cache(run, _ANALYSIS_CACHE, report)
     return report
@@ -282,14 +325,14 @@ def analyze(request: Request, req: SourceRequest) -> AnalysisReport:
 @app.post("/api/plan", response_model=PlanResponse)
 def plan(request: Request, req: SourceRequest) -> PlanResponse:
     """Plan stage: parse + analyze + plan (cached per run — a 2nd call is a read)."""
-    guard(request, "pipeline")
-    run = _run_for(req)
+    identity = guard(request, "pipeline")
+    run = _run_for(req, identity)
     if run is not None:
         cached = _read_cache(run, _PLAN_CACHE, PlanResponse)
         if cached is not None:
             return cached
 
-    kg = _build_kg(_source_for(req))
+    kg = _build_kg(_source_for(req, identity))
     report = _analyze(kg)
     response = PlanResponse(report=report, plan=_plan(report, kg))
     if run is not None:
@@ -321,7 +364,7 @@ def migrate(request: Request, req: MigrateRequest) -> JobCreated:
     ``GET /api/jobs/{jobId}``. The RN project is emitted into the run's
     ``output/`` dir, so ``GET /api/runs/{runId}/download`` can package it after.
     """
-    guard(request, "migrate")
+    identity = guard(request, "migrate")
     # The migration executes the uploaded project's toolchain. Refuse to do that
     # without real containment rather than discovering it in production.
     try:
@@ -344,13 +387,13 @@ def migrate(request: Request, req: MigrateRequest) -> JobCreated:
             headers={"Retry-After": "30"},
         )
 
-    source = _source_for(req)
+    source = _source_for(req, identity)
 
     # Every job is hosted by a run workspace (so its state + output have a home).
     if req.runId:
-        run = _get_run_or_404(req.runId)
+        run = _get_run_or_404(req.runId, identity)
     else:
-        run = workspace.new_run()
+        run = workspace.new_run(identity)
     out_dir = run.output_dir
 
     job = jobs.create_job(run.runId)
@@ -374,19 +417,33 @@ def migrate(request: Request, req: MigrateRequest) -> JobCreated:
 # --- Jobs: state + event stream ----------------------------------------------
 
 
-def _get_job_or_404(job_id: str) -> JobState:
+def _get_job_or_404(job_id: str, identity: str) -> JobState:
+    """Resolve a job whose run the caller owns, or 404.
+
+    A job is not a separate thing to own: it reports on a run — its stages, its
+    diagnostics, its result — so it is readable by exactly whoever the run is
+    readable by. A job whose run is gone (reaped) is unreachable too; its state
+    describes files that no longer exist.
+    """
     try:
-        return jobs.get_job(job_id)
+        job = jobs.get_job(job_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"No such job: {job_id}") from exc
+    try:
+        run = workspace.get_run(job.runId) if job.runId else None
+    except workspace.WorkspaceError:
+        run = None
+    if run is None or not run.owned_by(identity):
+        raise HTTPException(status_code=404, detail=f"No such job: {job_id}")
+    return job
 
 
 @app.get("/api/jobs/{job_id}", response_model=JobState)
 def job_state(request: Request, job_id: str) -> JobState:
     """The full, reconstructable job state — a late joiner rebuilds the whole
     picture (events so far + final result/error) from this alone."""
-    guard(request, "read")
-    return _get_job_or_404(job_id)
+    identity = guard(request, "read")
+    return _get_job_or_404(job_id, identity)
 
 
 def _sse(event_type: str, seq: int, payload: str) -> str:
@@ -401,8 +458,8 @@ async def job_events(job_id: str, request: Request) -> StreamingResponse:
     client's ``Last-Event-ID`` (or from the start), then streams live until the
     terminal event, then closes. The stream is a convenience over
     ``GET /api/jobs/{id}`` — never the source of truth."""
-    guard(request, "read")
-    _get_job_or_404(job_id)
+    identity = guard(request, "read")
+    _get_job_or_404(job_id, identity)
 
     header_id = request.headers.get("last-event-id")
     query_id = request.query_params.get("lastEventId")
@@ -454,8 +511,8 @@ def _zip_output(out_dir: Path) -> Path:
 @app.get("/api/runs/{run_id}/download")
 def download(request: Request, run_id: str) -> FileResponse:
     """Download stage: stream the emitted React Native project back as a ZIP."""
-    guard(request, "read")
-    run = _get_run_or_404(run_id)
+    identity = guard(request, "read")
+    run = _get_run_or_404(run_id, identity)
     out_dir = run.output_dir
     if not out_dir.is_dir() or not any(out_dir.iterdir()):
         raise HTTPException(
