@@ -12,7 +12,10 @@ Two modes, and the difference between them is stated plainly:
     Each command runs in a throw-away container: no capabilities, no privilege
     escalation, a non-root user, a pid ceiling, hard memory/CPU limits, and
     **the network switched off for every stage that does not need it** (only
-    ``npm install`` gets network). The run directory is the only writable mount.
+    ``npm install`` gets network). The run directory is the only writable mount,
+    and that mount is *proven* before the first command runs — see
+    :func:`assert_run_dir_is_visible`, which exists because the failure it
+    catches otherwise looks like success.
 
 ``direct`` (development convenience — NOT a sandbox)
     The command runs as the Rejox process itself, with a timeout as its only
@@ -33,6 +36,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import threading
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
@@ -210,6 +215,89 @@ def _run_docker(
     return proc
 
 
+# --- mount verification ------------------------------------------------------
+#
+# `docker run -v {cwd}:/work` is resolved by the daemon that owns the socket. In
+# the compose deployment that is the HOST's daemon, while `cwd` is a path inside
+# the worker's own container — so the two only agree if the workspace root is
+# bind-mounted at an identical path on both sides.
+#
+# When they disagree, Docker does not fail. It creates an empty directory of
+# that name on the host and mounts that instead, and every stage then runs
+# against nothing: `tsc` type-checks an empty project and passes, Metro finds no
+# entry point, and the run reports a validated migration of a directory that was
+# never there. A wrong answer that looks green is worse than a crash, so the
+# mount is proven before anything is trusted to it.
+
+_PROBE_FILENAME = ".rejox-mount-probe"
+_PROBE_TIMEOUT_SECONDS = 60
+
+_probed: set[str] = set()
+_probe_lock = threading.Lock()
+
+
+def reset_mount_probes() -> None:
+    """Forget which directories have been proven (tests, and a re-check after a
+    deployment's mounts change under a long-lived process)."""
+    with _probe_lock:
+        _probed.clear()
+
+
+def assert_run_dir_is_visible(cwd: Path, policy: SandboxPolicy) -> None:
+    """Prove the sandbox sees ``cwd``'s real contents, or refuse to use it.
+
+    Writes a token into ``cwd`` from this process and reads it back from inside
+    a container. Anything other than the same token back means the container was
+    handed a different directory, and no result computed there means anything.
+
+    Proven once per directory per process: the answer cannot change for a given
+    run, and a migration runs several commands in the same directory.
+    """
+    key = str(cwd.resolve())
+    with _probe_lock:
+        if key in _probed:
+            return
+
+    token = uuid.uuid4().hex
+    probe = cwd / _PROBE_FILENAME
+    try:
+        probe.write_text(token, encoding="utf-8")
+    except OSError as exc:
+        raise SandboxError(
+            f"Cannot write to the run directory {cwd}: {exc}"
+        ) from exc
+
+    try:
+        proc = _run_docker(
+            ["cat", f"/work/{_PROBE_FILENAME}"],
+            cwd,
+            _PROBE_TIMEOUT_SECONDS,
+            network=False,
+            policy=policy,
+        )
+    finally:
+        probe.unlink(missing_ok=True)
+
+    if proc.stdout.strip() != token:
+        raise SandboxError(
+            f"The sandbox was handed a directory that is not the run directory.\n"
+            f"Wrote a probe into {cwd} and the container read back "
+            f"{proc.stdout.strip()!r} (exit {proc.returncode}).\n\n"
+            "`docker run -v` is resolved by the daemon that owns the socket, so "
+            "this path must name the same directory to that daemon as it does "
+            "here. A named volume, or a bind mount to a different path, "
+            "guarantees it does not — and Docker mounts a new empty directory "
+            "rather than failing, so every stage would validate nothing and "
+            "report success.\n\n"
+            "Fix: bind-mount the workspace root at an IDENTICAL path on both "
+            "sides (REJOX_DATA_DIR in docker-compose.yml), or run the worker "
+            "somewhere it shares the daemon's filesystem paths."
+        )
+
+    with _probe_lock:
+        _probed.add(key)
+
+
 # --- entry point -------------------------------------------------------------
 
 
@@ -234,5 +322,8 @@ def run(
     """
     policy = policy or SandboxPolicy.from_env()
     if policy.mode == "docker":
+        # Never run a stage against a directory the container cannot actually
+        # see: the result would be a validated migration of nothing.
+        assert_run_dir_is_visible(cwd, policy)
         return _run_docker(cmd, cwd, timeout, network=network, policy=policy)
     return _run_direct(cmd, cwd, timeout)
