@@ -21,6 +21,9 @@ def _dev_server_posture() -> None:
 
     os.environ.setdefault("REJOX_ALLOW_ANONYMOUS", "1")
     os.environ.setdefault("REJOX_ALLOW_UNSANDBOXED", "1")
+    # Most of the suite points the pipeline at a fixture directory on this
+    # machine rather than uploading it — the local-path mode a server refuses.
+    os.environ.setdefault("REJOX_ALLOW_LOCAL_PATH", "1")
     # The suite deliberately starts several migrations at once and asserts on
     # their event streams. The production ceiling protects one box from real
     # load; here it would just make tests fail by arrival order.

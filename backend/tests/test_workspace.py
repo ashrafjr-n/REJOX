@@ -26,6 +26,30 @@ def test_new_run_creates_source_and_output(ws) -> None:
     assert again.root == run.root
 
 
+def test_the_owner_survives_a_fresh_handle_to_the_same_run(ws) -> None:
+    # The API creates the run; an rq worker in another process resolves it. The
+    # owner has to be on disk, not held by the object that created it.
+    run = workspace.new_run("key:abc123")
+    assert workspace.get_run(run.runId).owner == "key:abc123"
+    assert workspace.get_run(run.runId).owned_by("key:abc123")
+    assert not workspace.get_run(run.runId).owned_by("key:someone-else")
+
+
+def test_a_run_with_no_owner_belongs_to_nobody(ws) -> None:
+    # Fails closed: an unowned run is not a public run.
+    run = workspace.new_run()
+    assert run.owner is None
+    assert not run.owned_by("key:abc123")
+    assert not run.owned_by("")
+
+
+def test_the_owner_is_not_shipped_in_the_run_source_or_output(ws) -> None:
+    run = workspace.new_run("key:abc123")
+    assert (run.root / "owner").is_file()
+    assert not (run.source_dir / "owner").exists()
+    assert not (run.output_dir / "owner").exists()
+
+
 def test_get_run_rejects_malformed_ids(ws) -> None:
     for bad in ["../escape", "a/b", "..", "not hex!", "", "x" * 200]:
         with pytest.raises(WorkspaceError):
