@@ -66,7 +66,7 @@ Nothing here is signed. That is the honest starting position, not an oversight.
 | Gate | Proves | Status |
 | --- | --- | --- |
 | A0 | the worker can reach a Docker daemon at all | ☐ not run |
-| A1 | a sandboxed command runs, in the right directory | ☐ not run — expected **red** until the bind-mount fix lands |
+| A1 | a sandboxed command runs, in the right directory | ☐ not run |
 | A2 | the container is non-root and holds no capabilities | ☐ not run |
 | A3 | only the run directory is writable | ☐ not run |
 | A4 | network is off for stages that did not ask for it | ☐ not run |
@@ -176,6 +176,14 @@ An empty stdout with `exit: 0` is a **failure**, not a pass — it means the
 sandbox mounted a different, empty directory of the same name and every
 validation result computed against it is fiction. This is the single most
 dangerous way this system can be wrong, because it looks green.
+
+The deployment now avoids this by bind-mounting the workspace root at an
+identical path on both sides (`REJOX_DATA_DIR`), and
+`sandbox.assert_run_dir_is_visible()` proves the mount before any stage runs —
+so the expected failure mode here is a loud `SandboxError`, not a silent empty
+directory. **Neither of those is evidence.** This gate stays unsigned until the
+canary has actually been read back through a live daemon: the point of the gate
+is that the fix is unverified until someone watches it work.
 
 **Evidence:**
 
