@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from app import security
+from app.pipeline import sandbox
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -28,6 +29,14 @@ def _dev_server_posture() -> None:
     # (the UI follows the SSE stream instead). Lift the read budget so the
     # suite measures the pipeline, not the limiter.
     os.environ.setdefault("REJOX_RATE_READ", "100000")
+
+
+@pytest.fixture(autouse=True)
+def _reset_mount_probes() -> None:
+    """The sandbox proves a run directory is visible once per process and
+    remembers it. Tests reuse `tmp_path` names across a session, so without this
+    one test's proof could stand in for another's."""
+    sandbox.reset_mount_probes()
 
 
 @pytest.fixture(autouse=True)
