@@ -212,3 +212,40 @@ def test_failure_before_migration_reports_the_real_stage(
     assert state["error"]["type"] == "RuntimeError"
     assert state["events"][-1]["stage"] == stage
     assert stage in state["events"][-1]["message"]
+
+
+# --- Cross-process state (the `rq` deployment) -------------------------------
+
+
+def test_the_api_sees_a_job_another_process_is_advancing(tmp_path, monkeypatch) -> None:
+    """With the `rq` backend the API creates a job and a WORKER runs it.
+
+    The API therefore has no business holding a memory copy: it would shadow the
+    file the worker is writing, and every poll would answer `queued` while the
+    migration ran to completion behind it. `job.json` is the seam between the two
+    processes, so a read must reflect what the other process last wrote.
+    """
+    import app.jobs as jobs_mod
+    from app.models.jobs import JobState
+    from app.pipeline import workspace
+
+    monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    jobs_mod._REGISTRY.clear()
+
+    run = workspace.new_run()
+    job = jobs_mod.create_job(run.runId)
+
+    # Creating a job must leave nothing behind in this process: whoever runs it
+    # adopts it from the file.
+    assert job.jobId not in jobs_mod._REGISTRY
+    assert jobs_mod.get_job(job.jobId).status == "queued"
+
+    # Another process advances it and writes job.json, exactly as a worker does.
+    advanced = JobState.model_validate_json((run.root / "job.json").read_text())
+    advanced.status = "running"
+    advanced.updatedAt = advanced.createdAt + 1
+    (run.root / "job.json").write_text(advanced.model_dump_json())
+
+    assert jobs_mod.get_job(job.jobId).status == "running"
+    _events, status = jobs_mod.events_after(job.jobId, 0)
+    assert status == "running"
