@@ -7,6 +7,7 @@ single config-driven root::
         source/        # the ingested React project (upload lands here)
         output/        # the emitted React Native project (emit writes here)
         ingest.json    # the IngestedProject manifest (root detection, warnings)
+        owner          # the identity this run belongs to (see below)
 
 This is the *one* place run directories are created, resolved, and reaped — the
 API (uploads) and the CLI (local-path runs) both go through it, so there is a
@@ -14,12 +15,22 @@ single code path, not a special case for uploads. ``runId`` is a plain hex
 token and is validated on every lookup, so it can never be used to escape the
 workspace root via a crafted path.
 
+**Ownership.** A run holds someone's source code and the project emitted from
+it, so it belongs to exactly one identity. That identity is recorded here, in a
+file inside the run, because it has to outlive the request that created it and
+be readable from a process that never saw that request (the API creates a run;
+an rq worker executes it). It is written once, at creation, and never rewritten
+— a run does not change hands. A run created without an owner (the CLI, which
+has no HTTP identity) is owned by nobody, and :meth:`Run.owned_by` answers
+``False`` for every caller: unowned means unreachable over HTTP, never public.
+
 Environment:
   ``REJOX_WORKSPACE_ROOT`` — root for all runs (default: ``backend/.rejox-workspaces``).
 """
 
 from __future__ import annotations
 
+import hmac
 import os
 import re
 import shutil
@@ -27,6 +38,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 # workspace.py is backend/app/pipeline/workspace.py → parents[2] == backend.
 _DEFAULT_WORKSPACE_ROOT = Path(__file__).resolve().parents[2] / ".rejox-workspaces"
@@ -40,6 +52,11 @@ _RUN_ID_RE = re.compile(r"^[0-9a-f]{8,64}$")
 # is a data-retention window, not a disk-space convenience. Override with
 # REJOX_RUN_TTL_SECONDS.
 DEFAULT_TTL_SECONDS = 24 * 60 * 60
+
+# The file holding the run's owning identity. A bare filename, never a path the
+# caller influences, and deliberately not inside source/ or output/ so it is
+# neither ingested nor shipped in the download.
+_OWNER_FILE = "owner"
 
 
 def ttl_seconds() -> int:
@@ -90,12 +107,44 @@ class Run:
     def manifest_path(self) -> Path:
         return self.root / "ingest.json"
 
+    @property
+    def owner(self) -> Optional[str]:
+        """The identity this run belongs to, or ``None`` if it has no owner.
 
-def new_run() -> Run:
-    """Create a fresh run with a unique id and its ``source``/``output`` dirs."""
+        Read from disk on every call rather than captured at construction: the
+        process asking is often not the process that wrote it.
+        """
+        try:
+            return (self.root / _OWNER_FILE).read_text().strip() or None
+        except OSError:
+            return None
+
+    def owned_by(self, identity: str) -> bool:
+        """Whether ``identity`` owns this run.
+
+        Fails closed: an unowned run belongs to nobody, so this is ``False`` for
+        every caller rather than ``True`` for all of them. Compared in constant
+        time — an owner is derived from an API key's digest.
+        """
+        owner = self.owner
+        if owner is None:
+            return False
+        return hmac.compare_digest(owner, identity)
+
+
+def new_run(owner: Optional[str] = None) -> Run:
+    """Create a fresh run with a unique id and its ``source``/``output`` dirs.
+
+    ``owner`` is the identity the run belongs to (see the module docstring).
+    Written before the run has any content, so a run is never readable in the
+    window between its directory existing and its owner being known.
+    """
     run_id = uuid.uuid4().hex
     root = workspace_root() / run_id
     run = Run(runId=run_id, root=root)
+    root.mkdir(parents=True, exist_ok=True)
+    if owner:
+        (root / _OWNER_FILE).write_text(owner)
     run.source_dir.mkdir(parents=True, exist_ok=True)
     run.output_dir.mkdir(parents=True, exist_ok=True)
     return run
