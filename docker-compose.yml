@@ -40,6 +40,10 @@ x-backend: &backend
   environment: &backend-env
     REJOX_QUEUE: rq
     REJOX_REDIS_URL: redis://redis:6379/0
+    # Rate-limit counters in Redis, not in each API process. Without this the
+    # ceiling is per container, so two API replicas mean twice the configured
+    # limit — silently. See gate C2 in docs/PRE-LAUNCH-CHECKLIST.md.
+    REJOX_RATE_STORE: redis
     # Under REJOX_DATA_DIR, so this path means the same thing to the worker and
     # to the host daemon that mounts it into a sandbox container.
     REJOX_WORKSPACE_ROOT: ${REJOX_DATA_DIR:?set REJOX_DATA_DIR in .env — see the note at the top of this file}/workspaces

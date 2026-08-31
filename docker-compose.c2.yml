@@ -1,0 +1,24 @@
+# Gate C2 only — two API replicas behind one budget.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.c2.yml up -d --scale api=2
+#
+# The base file publishes one fixed host port, which cannot be scaled: a second
+# replica would collide on it. This overrides that with a two-port range, so the
+# replicas land on 8000 and 8001 and the gate can address each one directly —
+# a stronger check than a load balancer, which would leave "did both replicas
+# actually serve?" to chance.
+#
+# `!override` rather than a second entry: ports merge across compose files, so
+# without it the fixed mapping would still be there and still collide.
+#
+# Not a deployment topology. Real multi-replica deployments put a reverse proxy
+# in front (see docs/SECURITY.md); this file exists so the gate is repeatable.
+
+services:
+  api:
+    ports: !override
+      - "${REJOX_PORT:-8000}-${REJOX_C2_PORT:-8001}:8000"
+    environment:
+      # Small enough that the gate is unambiguous: 10 allowed, everything after
+      # it refused, no matter which replica answers.
+      REJOX_RATE_UPLOAD: "10"

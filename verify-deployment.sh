@@ -14,7 +14,10 @@
 # path it names is a path the daemon already shares, so the sibling-container
 # mismatch can never occur. Here it can. That is the point of this script.
 #
-# Gates covered: A0, A1, A8, A9, B0, B1, B2, B3, B5, C3.
+# Gates covered: A0, A1, A8, A9, B0, B1, B2, B3, B5, C2, C3.
+#
+# C2 runs LAST because it is the only gate that changes the topology: it scales
+# the API to two replicas, which is the whole question it asks.
 # Exits non-zero on the first failure, and dumps the service logs when it does.
 
 set -uo pipefail
@@ -277,6 +280,67 @@ else
   fail "the 503 does not say what was unreachable: $(head -c 120 "$WORK/b5.json")"
 fi
 docker compose start redis >/dev/null 2>&1
+
+# --- C2 ----------------------------------------------------------------------
+#
+# Last, because it is the only gate that changes the topology. Two API replicas
+# on two host ports, addressed directly rather than through a load balancer: a
+# balancer would leave "did both replicas actually serve?" to chance, and this
+# gate is worthless unless they did.
+#
+# The budget is spent by the SECOND key, which has made no upload so far — so a
+# leftover window from B2 cannot be mistaken for the ceiling under test.
+
+gate "C2 — the rate limit is shared across API replicas"
+C2_LIMIT=10
+P1="${REJOX_PORT:-8000}"
+P2="${REJOX_C2_PORT:-8001}"
+KEY_C2="$(printf '%s' "$REJOX_API_KEYS" | cut -d, -f2)"
+H2="X-API-Key: ${KEY_C2:-$KEY}"
+
+if ! docker compose -f docker-compose.yml -f docker-compose.c2.yml up -d --scale api=2 >/dev/null 2>&1; then
+  fail "could not scale the API to two replicas"
+else
+  ready=1
+  for port in "$P1" "$P2"; do
+    deadline=$((SECONDS + 120))
+    until curl -sf "http://localhost:$port/health" >/dev/null 2>&1; do
+      [ "$SECONDS" -lt "$deadline" ] || { fail "replica on :$port never became healthy"; ready=0; break; }
+      sleep 2
+    done
+  done
+
+  replicas="$(docker compose ps api --format '{{.State}}' 2>/dev/null | grep -c running)"
+  check "API replicas running" "2" "$replicas"
+
+  if [ "$ready" -eq 1 ]; then
+    # Redis holds the counters, so a replica restarted by the scale-up above
+    # inherits whatever this identity has already spent. Clear the bucket first
+    # so the gate measures one full window and not a partial one.
+    docker compose exec -T redis redis-cli --scan --pattern 'rejox:rate:upload:*' 2>/dev/null \
+      | tr -d '\r' | while read -r k; do [ -n "$k" ] && docker compose exec -T redis redis-cli DEL "$k" >/dev/null 2>&1; done
+
+    allowed=0; served_1=0; served_2=0
+    for i in $(seq 1 $((C2_LIMIT * 4))); do
+      if [ $((i % 2)) -eq 1 ]; then port="$P1"; else port="$P2"; fi
+      code="$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://localhost:$port/api/upload" \
+                -H "$H2" -F "file=@$WORK/fixture.zip")"
+      if [ "$code" != "429" ]; then
+        allowed=$((allowed + 1))
+        if [ "$port" = "$P1" ]; then served_1=$((served_1 + 1)); else served_2=$((served_2 + 1)); fi
+      fi
+    done
+
+    # THE gate. Per-process counters would answer 20 here — the configured limit
+    # once per replica — and that is the failure this exists to catch.
+    check "requests allowed across 2 replicas (limit $C2_LIMIT)" "$C2_LIMIT" "$allowed"
+    if [ "$served_1" -gt 0 ] && [ "$served_2" -gt 0 ]; then
+      pass "both replicas served ($served_1 via :$P1, $served_2 via :$P2)"
+    else
+      fail "only one replica ever served ($served_1 via :$P1, $served_2 via :$P2) — the count above proves nothing"
+    fi
+  fi
+fi
 
 # --- verdict -----------------------------------------------------------------
 
