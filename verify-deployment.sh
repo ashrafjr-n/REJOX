@@ -275,10 +275,34 @@ else
   fail "took ${elapsed}s — an unreachable queue must fail fast, not stall the client"
 fi
 if grep -qi 'redis' "$WORK/b5.json"; then
-  pass "the body names the queue: $(head -c 120 "$WORK/b5.json")"
+  pass "the body names Redis: $(head -c 120 "$WORK/b5.json")"
 else
   fail "the 503 does not say what was unreachable: $(head -c 120 "$WORK/b5.json")"
 fi
+
+# With REJOX_RATE_STORE=redis the rate limiter refuses BEFORE the request ever
+# reaches the queue, so the 503 above no longer proves the queue's own refusal —
+# it proves the surface refuses somewhere. Assert the queue directly, or this
+# gate passes while testing something else. (Both refusals matter: the surface
+# must not serve, and the queue must not quietly run the job in a thread.)
+qverdict="$(docker compose exec -T api python - <<'PY' 2>&1 | tail -1
+from pathlib import Path
+from app import queue
+
+try:
+    queue.enqueue(
+        "gate-b5", source_root=Path("/tmp"), run_id="0" * 32, out_dir=Path("/tmp"),
+        answers={}, install=False, run_bundle=False,
+    )
+    print("ENQUEUED")          # a queue that is down cannot have accepted this
+except queue.QueueError:
+    print("QUEUE-REFUSED")
+except Exception as exc:
+    print("OTHER:", type(exc).__name__)
+PY
+)"
+check "the queue itself refuses, never a thread fallback" "QUEUE-REFUSED" "$qverdict"
+
 docker compose start redis >/dev/null 2>&1
 
 # --- C2 ----------------------------------------------------------------------

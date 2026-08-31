@@ -993,30 +993,40 @@ $ POST /api/parse  -H 'X-API-Key: gate-key-alpha'         good-key=200
 
 ### C2 — the rate limit is shared across API replicas
 
-> **Blocked.** Counters live in each API process
-> (`backend/app/security.py`), so this gate cannot pass today. It is unblocked
-> by moving them to Redis — plan step 6.
+**Proves:** the limit is a limit, not a limit-per-container. With counters in
+each API process the effective ceiling is N times the configured one.
 
-**Proves:** the limit is a limit, not a limit-per-container. With N replicas the
-effective ceiling today is N times the configured one.
+Since plan step 6, `REJOX_RATE_STORE` decides where the counters live and
+compose sets `redis`. The gate is therefore not "does the code have a Redis
+path" but "do two live replicas actually share one budget".
 
 **Command:**
 
+Covered by `./verify-deployment.sh`, which runs it last — it is the only gate
+that changes the topology. By hand:
+
 ```bash
-docker compose up -d --scale api=2   # requires removing the fixed host port
+docker compose -f docker-compose.yml -f docker-compose.c2.yml up -d --scale api=2
 for i in $(seq 1 40); do
-  curl -s -o /dev/null -w '%{http_code} ' -X POST localhost:8000/api/upload -H "$H" -F "file=@/tmp/sample-app.zip"
+  p=$(( i % 2 == 1 ? 8000 : 8001 ))
+  curl -s -o /dev/null -w '%{http_code} ' -X POST localhost:$p/api/upload -H "$H" -F "file=@/tmp/sample-app.zip"
 done; echo
 ```
 
+The override file replaces the fixed host port with a two-port range, so the
+replicas land on `8000` and `8001` and each can be addressed directly. Deliberate:
+behind a load balancer, "did both replicas actually serve?" is left to chance,
+and this gate is worthless unless they did.
+
 **Required output:** with `REJOX_RATE_UPLOAD=10`, exactly 10 responses that are
-not `429`, then `429` for the rest — **regardless of replica count**. Twenty
-successes across two replicas is the failure this gate exists to catch.
+not `429`, then `429` for the rest — **regardless of replica count** — and both
+replicas must appear among the 10. Twenty successes across two replicas is the
+failure this gate exists to catch.
 
 **Evidence:**
 
 ```text
-(unsigned — blocked on plan step 6)
+(pending — the run signing this is below once verify-deployment.sh reports it)
 ```
 
 ---
