@@ -131,6 +131,10 @@ cp .env.example .env     # set REJOX_API_KEYS and GEMINI_API_KEY at minimum
 sudo mkdir -p /srv/rejox-data && sudo chown -R 10001:10001 /srv/rejox-data
 echo 'REJOX_DATA_DIR=/srv/rejox-data' >> .env
 
+# The worker needs the group that owns the Docker socket, or it cannot start a
+# sandbox container. On Docker Desktop the socket is root:root, so this is 0.
+echo "REJOX_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 0)" >> .env
+
 docker compose up --build
 ```
 
