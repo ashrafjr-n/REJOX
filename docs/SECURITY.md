@@ -96,6 +96,31 @@ reintroducing it quietly.
   endpoint forever.
 - CORS origins are explicit; there is no wildcard fallback.
 
+### 5. Ownership — whose run is whose
+
+`app/main.py` + `app/pipeline/workspace.py`:
+
+- **A run belongs to exactly one identity.** The identity `guard()` establishes
+  is stamped on the run at creation, into `{run}/owner` — a file, because the
+  API process that creates a run is not the worker process that executes it.
+  Written once; a run never changes hands.
+- **Every lookup goes through one seam.** `_get_run_or_404()` resolves a run
+  *and* checks the owner, so ownership is enforced in one place rather than
+  remembered at each endpoint. A job is not separately owned: it reports on a
+  run, so it is readable by whoever the run is readable by.
+- **A stranger's run is indistinguishable from a run that does not exist** —
+  same `404`, same message. A `403` would confirm the run exists, which is
+  itself a disclosure to someone who should not know.
+- **Unowned fails closed.** A run created without an identity (the CLI, which
+  has none) is owned by nobody and is unreachable over HTTP — never public.
+- **Local-path mode is off by default.** `{"path": …}` reads a server directory
+  the caller chooses, which walks straight past ownership because a run's source
+  lives at a path. It is refused with `403` unless
+  `REJOX_ALLOW_LOCAL_PATH=1` is set for a developer machine.
+
+Enforced by `tests/test_run_ownership.py` and gate C3 in
+[`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md).
+
 ## What is NOT contained — known gaps
 
 Stated plainly, because a security document that only lists wins is marketing:
@@ -105,17 +130,13 @@ Stated plainly, because a security document that only lists wins is marketing:
   times the number of API replicas. A shared store is the fix; until then run
   one API container (migration *workers* scale freely — they are behind the
   queue, not the rate limiter).
-- **A shared API key is not user accounts, and runs have no owner.** There is no
-  per-user isolation, quota, or audit trail; every holder of a key is the same
-  principal. Worse, nothing records *which* identity created a run:
-  `/api/runs/{runId}/download` and `/api/jobs/{jobId}` check only that the
-  caller is authenticated. Any key holder can download any other key holder's
-  uploaded source and emitted project if they learn the runId — which is a
-  `uuid4`, unguessable but not access control, and it travels in URLs, browser
-  history and proxy logs. Verified live on 2026-08-31 (C3 in
-  [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md)): a second key received
-  `200` for another key's run. **Do not put two tenants on one deployment until
-  ownership is enforced.**
+- **A shared API key is still not user accounts.** Runs now have an owner (see
+  *Ownership* above), so one key holder can no longer read another's run — the
+  hole verified live on 2026-08-31, when a second key received `200` for another
+  key's run, is closed. What remains: an identity is a *key*, not a person, so
+  everyone sharing a key shares its runs; there is no per-user quota and no
+  audit trail; and revoking a key orphans its runs rather than reassigning them
+  (they become unreachable and are reaped on the TTL).
 - **Run workspaces are deleted on a TTL, but are not encrypted at rest.**
   `REJOX_RUN_TTL_SECONDS` (24h default) is enforced by a sweeper the API starts
   and by `rejox sweep` for cron-driven deployments. What remains open: the data
@@ -143,7 +164,7 @@ REJOX_SANDBOX_IMAGE=node:20-bookworm-slim@sha256:<pin>
 REJOX_API_KEYS=<generated-key>
 REJOX_CORS_ORIGINS=https://your-frontend.example
 # and NOT set: REJOX_ALLOW_ANONYMOUS, REJOX_ALLOW_UNSANDBOXED,
-#              REJOX_NPM_ALLOW_SCRIPTS
+#              REJOX_NPM_ALLOW_SCRIPTS, REJOX_ALLOW_LOCAL_PATH
 ```
 
 Run one API container and as many `rejox-worker` containers as the box can take
