@@ -96,8 +96,8 @@ are red and stay red. Every signature below carries the output it came from.
 | C3 | a run belongs to one identity and no other | ☒ **RED** — confirmed live: a second identity downloaded another's run (plan step 7) |
 | C4 | CORS is never a wildcard | ☑ signed |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
-| D0 | docker mode is exercised in CI, not just on someone's laptop | ☐ not run |
-| D1 | the compose deployment is exercised in CI | ☐ not run |
+| D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ job written, passing locally — CI run unsigned |
+| D1 | the compose deployment is exercised in CI | ◐ job + script written — CI run unsigned |
 | E0 | a failed migration is diagnosable after the fact | ☐ not run |
 | E1 | one identity cannot fill the disk | ☐ not run |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
@@ -1164,7 +1164,26 @@ runner's daemon, and is required for merge. Paste the green run's URL.
 **Evidence:**
 
 ```text
-(unsigned — plan step 5)
+PARTIAL — the job exists and passes locally; the CI run itself is unsigned.
+
+`.github/workflows/ci.yml` job `containment` (Containment — live daemon,
+section A) runs `pytest -m sandbox_live` from backend/tests/test_sandbox_live.py:
+the mount is real in both directions, non-root with CapEff 0 and NoNewPrivs 1,
+a read-only root, network off unless the stage asked, the pid ceiling stopping a
+process storm, and a memory bomb OOM-killed at the limit with the daemon still
+answering afterwards.
+
+The workflow-level env sets REJOX_ALLOW_UNSANDBOXED=1 for every job, so this one
+empties it explicitly — a containment job that inherited the opt-out would be
+asserting nothing.
+
+$ pytest -q -m sandbox_live          # macOS, Docker Desktop 29.6.2
+9 passed in 15.89s
+
+STILL REQUIRED TO SIGN:
+  - a green run of the `containment` job on GitHub, URL pasted here;
+  - the job marked as a required status check on master (a repository setting,
+    not something this file or the workflow can assert).
 ```
 
 ---
@@ -1179,7 +1198,21 @@ B5 against it, and fails the build on any of them. Paste the green run's URL.
 **Evidence:**
 
 ```text
-(unsigned — plan step 5)
+PARTIAL — the job and its script exist; the CI run itself is unsigned.
+
+`./verify-deployment.sh` runs A0, A1, A8, A9, B0, B1, B2, B3 and B5 as one
+pass, dumps the API and worker logs on any failure, and exits non-zero.
+`.github/workflows/ci.yml` job `deployment` prepares /srv/rejox-data (owned by
+uid 10001), derives REJOX_DOCKER_GID from the runner's socket, and runs it.
+
+This job carries what D0 structurally cannot: D0's tests run as a process ON the
+host, where every path they name is already shared with the daemon, so A1's
+mismatch cannot arise there. Here a worker inside a container asks the host's
+daemon to mount a path — the exact geometry that shipped broken.
+
+STILL REQUIRED TO SIGN:
+  - a green run of the `deployment` job on GitHub, URL pasted here;
+  - the job marked as a required status check on master.
 ```
 
 ---
@@ -1282,7 +1315,7 @@ answers.
 | A — Containment | 10 | **10 / 10** | yes — absolute |
 | B — Deployment | 8 | **7 / 8** (B6 red) | yes |
 | C — HTTP surface | 6 | **5 / 6** (C3 red, C2 blocked) | yes |
-| D — CI | 2 | 0 / 2 | yes |
+| D — CI | 2 | 0 / 2 (both written, neither run in CI) | yes |
 | E — Operability | 3 | 0 / 3 | answers required, fixes negotiable |
 
 Outstanding before launch, in the order the plan takes them:
@@ -1291,7 +1324,8 @@ Outstanding before launch, in the order the plan takes them:
 2. **C3** — record an owner on a run and enforce it (plan step 7). Red, live.
 3. **B6** — decide what a job means when its worker dies: re-queue it, fail it,
    or document it. Red, live.
-4. **D0 / D1** — put A and B in CI so these signatures cannot rot (plan step 5).
+4. **D0 / D1** — the jobs are written and green locally; they need one run on
+   GitHub and to be made required status checks on master.
 5. **E0 – E2** — answers, not necessarily fixes.
 
 ```text
