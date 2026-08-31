@@ -176,13 +176,31 @@ default). The API sweeps hourly; to drive it from cron instead, set
 does not yet: rate-limit counters are per process, so N API replicas mean N times
 the limit. Run one API container until that state is shared.
 
-**Before you point this at other people's code.** Everything above is verified
-by review, not by a run: no CI job has executed a sandboxed command, and the
-compose deployment has never been exercised end to end.
-[`docs/PRE-LAUNCH-CHECKLIST.md`](docs/PRE-LAUNCH-CHECKLIST.md) is the list of
-gates that must be observed passing on a real host first — each one with the
-exact command and the exact output it has to produce. Nothing in it is signed
-yet.
+**Verify the deployment, don't assume it.**
+
+```bash
+REJOX_DATA_DIR=/srv/rejox-data \
+REJOX_DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)" \
+  ./verify-deployment.sh
+```
+
+Stands the whole stack up and asserts what only a real run can: that the worker
+reaches the daemon, that a sandbox container is handed the *right* directory,
+that a migration crosses the queue into another process and comes back
+downloadable, that an uploaded `postinstall` and a URL dependency spec are both
+dropped from the emitted project, and that a dead Redis is a clean 503 rather
+than a quiet in-process fallback. It exits non-zero on the first failure and
+dumps the service logs. CI runs it on every push (the `deployment` job), next to
+`pytest -m sandbox_live`, which asserts the container's own limits against a
+live daemon (the `containment` job).
+
+**Before you point this at other people's code**, read
+[`docs/PRE-LAUNCH-CHECKLIST.md`](docs/PRE-LAUNCH-CHECKLIST.md): every gate, the
+exact command, the output it must produce, and what has actually been signed.
+Two gates are red today — runs have no owner (any API key can download any
+other key's project) and a job whose worker dies is stuck at `running` for
+ever — and both are listed under known gaps in
+[`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## CLI quick start
 
