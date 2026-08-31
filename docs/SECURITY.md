@@ -44,6 +44,13 @@ and nowhere else. In `docker` mode each one runs in a throw-away container:
   `--network none`
 - a wall-clock timeout on every stage
 
+Every one of those was verified against a live daemon on 2026-08-31 — non-root
+and zero capabilities, a read-only root, `--network none` for typecheck and
+bundle, a fork storm stopped at the pid ceiling, and a memory bomb OOM-killed at
+the limit with the host unaffected. See section A of
+[`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md) for the commands and the
+output each produced.
+
 `direct` mode runs commands as the Rejox process. It is a development
 convenience and is **not a sandbox**; the code says so, and `/api/migrate`
 refuses to start in that mode unless `REJOX_ALLOW_UNSANDBOXED=1` is set
@@ -98,8 +105,17 @@ Stated plainly, because a security document that only lists wins is marketing:
   times the number of API replicas. A shared store is the fix; until then run
   one API container (migration *workers* scale freely — they are behind the
   queue, not the rate limiter).
-- **A shared API key is not user accounts.** There is no per-user isolation,
-  quota, or audit trail; every holder of a key is the same principal.
+- **A shared API key is not user accounts, and runs have no owner.** There is no
+  per-user isolation, quota, or audit trail; every holder of a key is the same
+  principal. Worse, nothing records *which* identity created a run:
+  `/api/runs/{runId}/download` and `/api/jobs/{jobId}` check only that the
+  caller is authenticated. Any key holder can download any other key holder's
+  uploaded source and emitted project if they learn the runId — which is a
+  `uuid4`, unguessable but not access control, and it travels in URLs, browser
+  history and proxy logs. Verified live on 2026-08-31 (C3 in
+  [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md)): a second key received
+  `200` for another key's run. **Do not put two tenants on one deployment until
+  ownership is enforced.**
 - **Run workspaces are deleted on a TTL, but are not encrypted at rest.**
   `REJOX_RUN_TTL_SECONDS` (24h default) is enforced by a sweeper the API starts
   and by `rejox sweep` for cron-driven deployments. What remains open: the data
@@ -109,10 +125,15 @@ Stated plainly, because a security document that only lists wins is marketing:
   `REJOX_SANDBOX_IMAGE` to a digest in production.
 - **`ingest_github` clones a URL the caller supplies.** The clone itself is
   shallow and unauthenticated, but it is outbound traffic the caller controls.
-- **Docker mode has not been exercised against a live daemon in this
-  repository's test runs.** The container flags are unit-tested from
-  `docker_argv`; the end-to-end path needs verification on a host with Docker
-  running before it is trusted in production.
+- **A job whose worker dies is wedged at `running` for ever.** `job.json` — what
+  `/api/jobs/{id}` serves — is only written by the process executing the job, and
+  nothing reconciles it against RQ's registries. Kill a worker mid-migration and
+  the client polls a job that will never change status and never reports an
+  error. Observed, 2026-08-31; see B6 in
+  [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md).
+- **Retention has no notion of an in-flight run.** The sweeper reaps by age
+  alone, so a short `REJOX_RUN_TTL_SECONDS` and a long migration can delete a
+  workspace out from under a running job. Harmless at the 24h default.
 
 ## Minimum production configuration
 
@@ -137,6 +158,11 @@ owned by the image's `rejox` uid:
 ```bash
 sudo mkdir -p /srv/rejox-data && sudo chown -R 10001:10001 /srv/rejox-data
 ```
+
+The worker also needs the gid that owns `/var/run/docker.sock` (`REJOX_DOCKER_GID`;
+`stat -c '%g' /var/run/docker.sock` on Linux, `0` on Docker Desktop). The socket
+is mode 0660 and the image is non-root, so without it every migration fails at
+the first stage with `permission denied ... docker.sock`.
 
 **The worker's Docker socket.** In the compose deployment the worker mounts
 `/var/run/docker.sock` so the Validator can start a sandbox container per stage.
