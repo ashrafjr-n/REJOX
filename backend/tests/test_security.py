@@ -132,6 +132,40 @@ def test_separate_identities_have_separate_budgets(monkeypatch: pytest.MonkeyPat
     )
 
 
+# --- Where the counters live -------------------------------------------------
+#
+# The shared-store behaviour itself needs a real Redis and lives in
+# `test_rate_limit_shared.py` (gate C2). What belongs here is the refusal: what
+# the surface does when the store is misconfigured or gone.
+
+
+def test_an_unreachable_shared_store_refuses_rather_than_counting_locally(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Falling back to per-process counters would restore the very ceiling the
+    # shared store removes — and would look exactly like a working server.
+    monkeypatch.setenv("REJOX_ALLOW_ANONYMOUS", "1")
+    monkeypatch.setenv("REJOX_RATE_STORE", "redis")
+    monkeypatch.setenv("REJOX_REDIS_URL", "redis://127.0.0.1:6399/0")  # nothing listens
+    security.limiter.reset()
+
+    resp = client.post("/api/parse", json={"path": "/nonexistent"})
+    assert resp.status_code == 503
+    assert "6399" in resp.json()["detail"]
+
+
+def test_an_unknown_store_name_refuses_rather_than_guessing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REJOX_ALLOW_ANONYMOUS", "1")
+    monkeypatch.setenv("REJOX_RATE_STORE", "postgres")
+    security.limiter.reset()
+
+    resp = client.post("/api/parse", json={"path": "/nonexistent"})
+    assert resp.status_code == 503
+    assert "REJOX_RATE_STORE" in resp.json()["detail"]
+
+
 # --- Migration is gated on containment ---------------------------------------
 
 
