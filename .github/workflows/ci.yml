@@ -34,6 +34,18 @@ jobs:
     name: Backend (fast)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The shared rate-limit gate (C2) asserts against a real Redis and skips
+    # itself where none answers. Without this it would skip on every CI run —
+    # a green tick for a test that never executed.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -149,13 +161,16 @@ jobs:
         working-directory: backend
         run: pytest -q -m sandbox_live
 
-  # Section B: the deployment as it is actually shipped. The job above runs as a
-  # process ON the host, so every path it hands the daemon is one the daemon
-  # already shares — the sibling-container mount mismatch cannot happen there.
-  # Here the worker is a container asking the host's daemon for a sandbox, which
-  # is the geometry that shipped broken and was only caught by running it.
+  # Sections B and C: the deployment as it is actually shipped. The job above
+  # runs as a process ON the host, so every path it hands the daemon is one the
+  # daemon already shares — the sibling-container mount mismatch cannot happen
+  # there. Here the worker is a container asking the host's daemon for a sandbox,
+  # which is the geometry that shipped broken and was only caught by running it.
+  # It also carries the two HTTP gates that need a real deployment rather than a
+  # test client: run ownership across two identities (C3), and one rate-limit
+  # budget across two API replicas (C2).
   deployment:
-    name: Deployment (docker compose — section B)
+    name: Deployment (docker compose — sections B and C)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
