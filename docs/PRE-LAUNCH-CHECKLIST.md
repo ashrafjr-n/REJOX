@@ -52,6 +52,7 @@ Gates go red again when the thing they test changes. Treat these as automatic:
 | `backend/app/pipeline/scaffold.py` | A8, A9 |
 | `backend/app/queue.py`, `backend/app/jobs.py` | all of **B** |
 | `backend/app/security.py` | all of **C** |
+| `backend/app/main.py`, `backend/app/pipeline/workspace.py` | C3 |
 | `docker-compose.yml`, `backend/Dockerfile` | A0, A1, all of **B** |
 
 Section **D** exists so that these re-runs are not a matter of anyone
@@ -66,9 +67,13 @@ three full migrations (`test-projects/sample-app`, plus a copy carrying a
 hostile `postinstall` and a URL dependency spec), one API restart mid-job, one
 deliberate worker kill, and a deliberate Redis outage.
 
-**Two gates found release blockers that code review had not.** A0 and B2 were
-red on their first run and are signed with the failure kept in place; C3 and B6
-are red and stay red. Every signature below carries the output it came from.
+Re-run 2026-09-01 against the same host, commit `ee2991b`, by
+`./verify-deployment.sh`: A0, A1, A8, A9, B0, B1, B2, B3, B5 and **C3** all
+green in one pass.
+
+**Three gates found release blockers that code review had not.** A0, B2 and C3
+were red on their first run and are signed with the failure kept in place; B6 is
+red and stays red. Every signature below carries the output it came from.
 
 | Gate | Proves | Status |
 | --- | --- | --- |
@@ -93,7 +98,7 @@ are red and stay red. Every signature below carries the output it came from.
 | C0 | a server with no keys refuses to serve | ☑ signed |
 | C1 | a wrong key is rejected | ☑ signed |
 | C2 | the rate limit is shared across API replicas | ☐ blocked — needs the Redis limiter (plan step 6) |
-| C3 | a run belongs to one identity and no other | ☒ **RED** — confirmed live: a second identity downloaded another's run (plan step 7) |
+| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed |
 | C4 | CORS is never a wildcard | ☑ signed |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ job written, passing locally — CI run unsigned |
@@ -1018,33 +1023,67 @@ successes across two replicas is the failure this gate exists to catch.
 
 ### C3 — a run belongs to one identity and no other
 
-> **Blocked.** No ownership is recorded on a run today: `guard()` establishes an
-> identity and nothing stores it, so `/api/runs/{runId}/download` and
-> `/api/jobs/{jobId}` check only *that* the caller is authenticated, never *who*
-> they are. Unblocked by plan step 7.
+**Proves:** one user cannot download another user's source code. Before plan
+step 7 the only protection was that a `runId` is a `uuid4` — unguessable, but
+not access control, and it travels in URLs, logs and proxy access records.
 
-**Proves:** one user cannot download another user's source code. Today the only
-protection is that a `runId` is a `uuid4` — unguessable, but not access control,
-and it travels in URLs, logs and proxy access records.
+Since step 7, `guard()`'s identity is stamped on the run at creation
+(`{run}/owner`) and every HTTP lookup of a run goes through one seam
+(`_get_run_or_404`). The stranger's `404` here is therefore an authorization
+decision, not a lucky miss.
 
 **Command:**
 
-With two distinct keys configured, upload as key A, then:
+Covered by `./verify-deployment.sh`, which runs it against the run it just
+migrated. By hand, with two distinct keys configured and an upload from key A:
 
 ```bash
 curl -s -o /dev/null -w 'owner=%{http_code}\n'    localhost:8000/api/runs/$RUN/download -H "X-API-Key: $KEY_A"
 curl -s -o /dev/null -w 'stranger=%{http_code}\n' localhost:8000/api/runs/$RUN/download -H "X-API-Key: $KEY_B"
 curl -s -o /dev/null -w 'job-stranger=%{http_code}\n' localhost:8000/api/jobs/$JOB     -H "X-API-Key: $KEY_B"
+curl -s -o /dev/null -w 'localpath=%{http_code}\n' -X POST localhost:8000/api/parse \
+     -H "X-API-Key: $KEY_A" -H 'Content-Type: application/json' -d '{"path":"/srv"}'
 ```
 
-**Required output:** `owner=200`, `stranger=404`, `job-stranger=404`.
+**Required output:** `owner=200`, `stranger=404`, `job-stranger=404`,
+`localpath=403` — and the stranger's response body must be byte-identical in
+shape to the one for a `runId` that does not exist.
 
 `404` rather than `403` on purpose: a `403` confirms the run exists, which is
-itself a disclosure to someone who should not know.
+itself a disclosure to someone who should not know. The local-path check belongs
+to this gate because `{"path": …}` reads a server directory the caller names,
+which walks past ownership entirely — a run's source lives at a path.
 
 **Evidence:**
 
 ```text
+Signed: 2026-09-01 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit ee2991b — GREEN. The 2026-08-31 failure below is kept in place; this gate has been red once and the record stays.
+
+Two keys configured. Run 9e7306df156e46fc8691cc036c42e55e was uploaded and
+migrated to completion by ALPHA, then probed by BRAVO — a fully authenticated
+caller, so what is being tested is authorization, not authentication:
+
+    download as the owner        = 200
+    download as a stranger       = 404
+    job as a stranger            = 404
+    event stream as a stranger   = 404
+    plan as a stranger           = 404
+    local-path mode is refused   = 403
+
+And the disclosure check — a stranger's run must be indistinguishable from one
+that was never created:
+
+    stranger's run  → "No such run: 9e7306df156e46fc8691cc036c42e55e"
+    absent run      → "No such run: 00000000000000000000000000000000"
+
+Same status, same message shape. Nothing in the response answers "does this
+runId exist?" for a caller not entitled to know.
+
+Standing coverage: backend/tests/test_run_ownership.py (9 tests) runs this
+shape in-process on every suite run; this signature is the live one.
+
+---
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4 — RED, exactly as predicted. This is now observed, not theorised.
 
 Two keys configured (gate-key-alpha, gate-key-bravo). Run
@@ -1314,19 +1353,21 @@ answers.
 | --- | --- | --- | --- |
 | A — Containment | 10 | **10 / 10** | yes — absolute |
 | B — Deployment | 8 | **7 / 8** (B6 red) | yes |
-| C — HTTP surface | 6 | **5 / 6** (C3 red, C2 blocked) | yes |
+| C — HTTP surface | 6 | **5 / 6** (C2 blocked) | yes |
 | D — CI | 2 | 0 / 2 (both written, neither run in CI) | yes |
 | E — Operability | 3 | 0 / 3 | answers required, fixes negotiable |
 
 Outstanding before launch, in the order the plan takes them:
 
 1. **C2** — move the rate-limit counters to Redis (plan step 6).
-2. **C3** — record an owner on a run and enforce it (plan step 7). Red, live.
-3. **B6** — decide what a job means when its worker dies: re-queue it, fail it,
+2. **B6** — decide what a job means when its worker dies: re-queue it, fail it,
    or document it. Red, live.
-4. **D0 / D1** — the jobs are written and green locally; they need one run on
+3. **D0 / D1** — the jobs are written and green locally; they need one run on
    GitHub and to be made required status checks on master.
-5. **E0 – E2** — answers, not necessarily fixes.
+4. **E0 – E2** — answers, not necessarily fixes.
+
+Closed: **C3** — a run now records its owner and every HTTP lookup enforces it
+(plan step 7). Signed live 2026-09-01.
 
 ```text
 Launch authorised by: ____________________  date: __________
