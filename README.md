@@ -155,6 +155,14 @@ default). The API sweeps hourly; to drive it from cron instead, set
 does not yet: rate-limit counters are per process, so N API replicas mean N times
 the limit. Run one API container until that state is shared.
 
+**Before you point this at other people's code.** Everything above is verified
+by review, not by a run: no CI job has executed a sandboxed command, and the
+compose deployment has never been exercised end to end.
+[`docs/PRE-LAUNCH-CHECKLIST.md`](docs/PRE-LAUNCH-CHECKLIST.md) is the list of
+gates that must be observed passing on a real host first — each one with the
+exact command and the exact output it has to produce. Nothing in it is signed
+yet.
+
 ## CLI quick start
 
 ```bash
