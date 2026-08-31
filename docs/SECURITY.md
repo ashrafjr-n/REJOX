@@ -97,7 +97,10 @@ reintroducing it quietly.
   the queue already uses, so the limit is the fleet's. A shared store that
   cannot be reached answers **503**; it never falls back to counting locally,
   because that would restore the per-replica ceiling and look like a working
-  server. Compose sets `redis`.
+  server. Compose sets `redis`. The cost of that choice, stated plainly: on the
+  compose deployment Redis becomes a hard dependency of the *whole*
+  authenticated surface, not just of `/api/migrate` — if Redis is down, every
+  guarded endpoint answers 503, because the limiter runs before the handler.
 - **Concurrency**: `REJOX_MAX_CONCURRENT_MIGRATIONS` caps simultaneous
   migrations, counted from live worker threads so a wedged job cannot block the
   endpoint forever.
