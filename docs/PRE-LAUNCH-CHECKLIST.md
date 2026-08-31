@@ -67,9 +67,10 @@ three full migrations (`test-projects/sample-app`, plus a copy carrying a
 hostile `postinstall` and a URL dependency spec), one API restart mid-job, one
 deliberate worker kill, and a deliberate Redis outage.
 
-Re-run 2026-09-01 against the same host, commit `ee2991b`, by
-`./verify-deployment.sh`: A0, A1, A8, A9, B0, B1, B2, B3, B5 and **C3** all
-green in one pass.
+Re-run 2026-09-01 against the same host, commit `4468bc4`, by
+`./verify-deployment.sh`: A0, A1, A8, A9, B0, B1, B2, B3, B5, **C2** and **C3**
+all green in one pass. That run also caught B5 passing for the wrong reason —
+see its entry.
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place; B6 is
@@ -92,12 +93,12 @@ red and stays red. Every signature below carries the output it came from.
 | B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed |
 | B3 | the emitted project is downloadable and real | ☑ signed |
 | B4 | an API restart does not lose an in-flight job | ☑ signed |
-| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, nothing started |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly |
 | B6 | a killed worker does not silently strand a job | ☒ **RED** — a killed worker wedges the job at `running` for ever |
 | B7 | retention actually deletes a run workspace | ☑ signed |
 | C0 | a server with no keys refuses to serve | ☑ signed |
 | C1 | a wrong key is rejected | ☑ signed |
-| C2 | the rate limit is shared across API replicas | ☐ blocked — needs the Redis limiter (plan step 6) |
+| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed |
 | C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed |
 | C4 | CORS is never a wildcard | ☑ signed |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
@@ -788,9 +789,48 @@ docker ps --format '{{.Image}}' | grep -c node   # expect 0
 A `202` here is the worst possible outcome and is a release blocker: the client
 is told the work was accepted and will poll a job that will never run.
 
+**And assert the queue directly.** Since `REJOX_RATE_STORE=redis`, the rate
+limiter shares that Redis and refuses *before* the request reaches the queue —
+so the 503 above proves the surface refuses somewhere, not that the queue
+refuses. Both matter, so the queue's own decision is asserted on its own:
+
+```bash
+docker compose exec -T api python -c "
+from pathlib import Path
+from app import queue
+try:
+    queue.enqueue('gate-b5', source_root=Path('/tmp'), run_id='0'*32,
+                  out_dir=Path('/tmp'), answers={}, install=False, run_bundle=False)
+    print('ENQUEUED')
+except queue.QueueError:
+    print('QUEUE-REFUSED')"
+```
+
+**Required output:** `QUEUE-REFUSED`. `ENQUEUED` would mean a dead queue
+accepted work; anything else means it failed for a reason nobody predicted.
+
 **Evidence:**
 
 ```text
+Signed: 2026-09-01 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 4468bc4 — re-signed after REJOX_RATE_STORE=redis changed which refusal answers first.
+
+$ docker compose stop redis
+$ POST /api/migrate
+http=503   elapsed=0s
+{"detail":"Rate-limit store at redis://redis:6379/0 is unreachable: Error -2
+ connecting to redis:6379. Name or service not known."}
+$ queue.enqueue(...) inside the api container
+QUEUE-REFUSED
+
+Note what changed, because the gate nearly stopped testing its own claim: the
+503 now comes from the RATE LIMITER, not the queue — with counters in Redis, the
+limiter runs first and Redis is a hard dependency of every guarded endpoint, not
+just of /api/migrate. The old body check (`grep -i redis`) passed on the new
+message without noticing. The queue's refusal is now asserted directly, which is
+what this gate is actually about.
+
+---
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ docker compose stop redis
 $ POST /api/migrate
@@ -1026,7 +1066,26 @@ failure this gate exists to catch.
 **Evidence:**
 
 ```text
-(pending — the run signing this is below once verify-deployment.sh reports it)
+Signed: 2026-09-01 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 4468bc4 — GREEN, first run of this gate. It was never red; it was unrunnable, because there was nothing to share.
+
+Two API replicas on :8000 and :8001, REJOX_RATE_STORE=redis,
+REJOX_RATE_UPLOAD=10. The budget was spent by the second key, which had made no
+upload earlier in the run, and the upload bucket was cleared in Redis first so
+the gate measured one whole window:
+
+    API replicas running                          = 2
+    requests allowed across 2 replicas (limit 10) = 10
+    both replicas served                          = 5 via :8000, 5 via :8001
+
+40 requests, 10 allowed. Per-process counters would have answered 20 — the
+configured limit once per replica — which is exactly the failure this gate
+exists to catch. The last line matters as much as the count: without it, "10
+allowed" is also what one dead replica and one working one would produce.
+
+Standing coverage: backend/tests/test_rate_limit_shared.py runs the same
+scenario against a live Redis, with the memory store asserted as the negative
+control (two limiters, 2x the ceiling) so a silent fallback to per-process
+counting fails the suite. CI runs it with a Redis service.
 ```
 
 ---
@@ -1363,21 +1422,23 @@ answers.
 | --- | --- | --- | --- |
 | A — Containment | 10 | **10 / 10** | yes — absolute |
 | B — Deployment | 8 | **7 / 8** (B6 red) | yes |
-| C — HTTP surface | 6 | **5 / 6** (C2 blocked) | yes |
+| C — HTTP surface | 6 | **6 / 6** | yes |
 | D — CI | 2 | 0 / 2 (both written, neither run in CI) | yes |
 | E — Operability | 3 | 0 / 3 | answers required, fixes negotiable |
 
 Outstanding before launch, in the order the plan takes them:
 
-1. **C2** — move the rate-limit counters to Redis (plan step 6).
-2. **B6** — decide what a job means when its worker dies: re-queue it, fail it,
+1. **B6** — decide what a job means when its worker dies: re-queue it, fail it,
    or document it. Red, live.
-3. **D0 / D1** — the jobs are written and green locally; they need one run on
+2. **D0 / D1** — the jobs are written and green locally; they need one run on
    GitHub and to be made required status checks on master.
-4. **E0 – E2** — answers, not necessarily fixes.
+3. **E0 – E2** — answers, not necessarily fixes.
 
-Closed: **C3** — a run now records its owner and every HTTP lookup enforces it
-(plan step 7). Signed live 2026-09-01.
+Closed on 2026-09-01, both signed live:
+
+- **C3** — a run records its owner and every HTTP lookup enforces it (step 7).
+- **C2** — rate-limit counters moved to Redis, proven across two replicas
+  (step 6). Section **C** is now complete.
 
 ```text
 Launch authorised by: ____________________  date: __________
