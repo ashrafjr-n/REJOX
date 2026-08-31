@@ -18,7 +18,7 @@ export default function App() {
         <Route
           path="settings"
           element={<SettingsPage darkMode={darkMode} setDarkMode={setDarkMode} />}
-        />
+        /> 
       </Route>
     </Routes>
   )
