@@ -50,6 +50,19 @@ refuses to start in that mode unless `REJOX_ALLOW_UNSANDBOXED=1` is set
 deliberately. Docker mode never silently degrades: if the daemon is missing, the
 run fails rather than falling back.
 
+**The mount is proven, not assumed.** A sandbox container is a *sibling*,
+started by the daemon that owns the socket, so `-v {run dir}:/work` is resolved
+against that daemon's filesystem — the host's — while the path came from inside
+the worker's own container. When the two disagree Docker does not fail: it
+creates an empty directory of that name and mounts it, and every stage then
+runs against nothing while reporting success. That is a wrong answer wearing a
+green badge, so before the first command in a run directory the sandbox writes
+a token there and reads it back from inside a container; a mismatch raises
+`SandboxError`. The deployment avoids the situation in the first place by
+bind-mounting the workspace root at an identical path on both sides
+(`REJOX_DATA_DIR`), and the check is what stops a future deployment from
+reintroducing it quietly.
+
 ### 3. Dependencies — what may be installed
 
 - `npm install --ignore-scripts`. Lifecycle scripts (`preinstall`,
@@ -115,6 +128,15 @@ REJOX_CORS_ORIGINS=https://your-frontend.example
 Run one API container and as many `rejox-worker` containers as the box can take
 (`docker compose up --scale worker=N`). Put a reverse proxy in front for TLS and
 a request-body cap.
+
+The workspace root must be a bind mount at an **identical path** on the host and
+inside the containers (`REJOX_DATA_DIR`), for the reason given under *the mount
+is proven, not assumed* above. Create it before the first `docker compose up`,
+owned by the image's `rejox` uid:
+
+```bash
+sudo mkdir -p /srv/rejox-data && sudo chown -R 10001:10001 /srv/rejox-data
+```
 
 **The worker's Docker socket.** In the compose deployment the worker mounts
 `/var/run/docker.sock` so the Validator can start a sandbox container per stage.
