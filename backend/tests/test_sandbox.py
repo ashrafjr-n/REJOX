@@ -27,6 +27,38 @@ from app.pipeline.scaffold import _build_dependencies, generate_scaffold
 DOCKER = SandboxPolicy(mode="docker")
 
 
+class _Proc:
+    """A finished process, as `subprocess.run` would return it."""
+
+    def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = ""
+
+
+def _correctly_mounted_daemon(issued: list[list[str]]):
+    """A `subprocess.run` stand-in that behaves like a daemon whose mount works.
+
+    The seam proves the run directory is visible before it will run a stage, so
+    a fake that answers nothing to the probe is a fake of a *broken* daemon —
+    every stage test would fail on the mount check instead of on its subject.
+    This reads the probe back through the `-v` argument, exactly as `cat` in a
+    correctly-mounted container would.
+
+    Probe calls are kept out of ``issued``: they are the seam's own preflight,
+    not a stage the Validator asked for.
+    """
+
+    def fake_run(argv: list[str], **_kwargs: object) -> _Proc:
+        if argv[-2:] == ["cat", f"/work/{sandbox._PROBE_FILENAME}"]:
+            host_dir = Path(argv[argv.index("-v") + 1].split(":")[0])
+            return _Proc((host_dir / sandbox._PROBE_FILENAME).read_text())
+        issued.append(argv)
+        return _Proc()
+
+    return fake_run
+
+
 # --- Policy ------------------------------------------------------------------
 
 
@@ -113,6 +145,123 @@ def test_command_runs_in_the_mounted_workdir() -> None:
     assert argv[-2:] == ["node", "x"]
 
 
+# --- The mount is proven, not assumed ----------------------------------------
+#
+# The worker is itself a container talking to the host's daemon, so a run
+# directory path means one thing to the worker and another to the daemon that
+# resolves `-v`. When they disagree Docker mounts a NEW EMPTY directory instead
+# of failing: `tsc` then type-checks nothing and passes, and the run reports a
+# validated migration of a project the container never saw. These tests pin the
+# refusal that makes that impossible.
+
+
+def test_a_mismatched_mount_is_refused_not_validated(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The daemon mounted something else: the probe file is not there to read.
+    monkeypatch.setattr(
+        sandbox.subprocess, "run", lambda _argv, **_kw: _Proc(stdout="", returncode=1)
+    )
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    with pytest.raises(SandboxError, match="not the run directory"):
+        sandbox.run(["npm", "install"], tmp_path, 10, policy=DOCKER)
+
+
+def test_a_wrong_directory_that_answers_is_still_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A stale probe from another run must not satisfy the check: the token is
+    per-call, so only the directory written to *this* time can answer."""
+    monkeypatch.setattr(
+        sandbox.subprocess, "run", lambda _argv, **_kw: _Proc(stdout="some-old-token")
+    )
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    with pytest.raises(SandboxError, match="not the run directory"):
+        sandbox.run(["npm", "install"], tmp_path, 10, policy=DOCKER)
+
+
+def test_the_refusal_names_the_fix(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(sandbox.subprocess, "run", lambda _argv, **_kw: _Proc())
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    with pytest.raises(SandboxError) as exc:
+        sandbox.run(["npm", "install"], tmp_path, 10, policy=DOCKER)
+    # An operator hitting this at 2am needs the cause and the fix, not a trace.
+    assert "IDENTICAL path" in str(exc.value)
+    assert "REJOX_DATA_DIR" in str(exc.value)
+
+
+def test_a_visible_directory_runs_the_command(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    issued: list[list[str]] = []
+    monkeypatch.setattr(sandbox.subprocess, "run", _correctly_mounted_daemon(issued))
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    sandbox.run(["npm", "install"], tmp_path, 10, network=True, policy=DOCKER)
+
+    assert len(issued) == 1
+    assert issued[0][-2:] == ["npm", "install"]
+
+
+def test_the_probe_leaves_nothing_behind(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The probe writes into the emitted project's own directory, so a leftover
+    would be shipped to the user inside the downloaded zip."""
+    monkeypatch.setattr(sandbox.subprocess, "run", _correctly_mounted_daemon([]))
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    sandbox.run(["npm", "install"], tmp_path, 10, policy=DOCKER)
+    assert list(tmp_path.iterdir()) == []
+
+    # Also on the failure path, where a `finally` is easy to forget.
+    sandbox.reset_mount_probes()
+    monkeypatch.setattr(sandbox.subprocess, "run", lambda _argv, **_kw: _Proc())
+    with pytest.raises(SandboxError):
+        sandbox.run(["npm", "install"], tmp_path, 10, policy=DOCKER)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_proven_directory_is_not_re_probed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A migration runs several stages in one directory; the answer cannot
+    change between them, and each probe costs a container."""
+    probes: list[list[str]] = []
+
+    def counting(argv: list[str], **_kw: object) -> _Proc:
+        if argv[-2:] == ["cat", f"/work/{sandbox._PROBE_FILENAME}"]:
+            probes.append(argv)
+            host_dir = Path(argv[argv.index("-v") + 1].split(":")[0])
+            return _Proc((host_dir / sandbox._PROBE_FILENAME).read_text())
+        return _Proc()
+
+    monkeypatch.setattr(sandbox.subprocess, "run", counting)
+    monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
+
+    for cmd in (["npm", "install"], ["npx", "tsc"], ["npx", "expo", "export"]):
+        sandbox.run(cmd, tmp_path, 10, policy=DOCKER)
+
+    assert len(probes) == 1
+
+
+def test_direct_mode_never_probes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """There is no mount to prove when the command runs as this process — and a
+    probe there would start a container the mode explicitly does not use."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        sandbox.subprocess, "run", lambda argv, **_kw: (calls.append(argv), _Proc())[1]
+    )
+
+    sandbox.run(["echo", "hi"], tmp_path, 10, policy=SandboxPolicy(mode="direct"))
+
+    assert calls == [["echo", "hi"]]
+    assert list(tmp_path.iterdir()) == []
+
+
 # --- npm lifecycle scripts ---------------------------------------------------
 
 
@@ -145,16 +294,7 @@ def test_validator_containerizes_every_command_it_runs(
 
     issued: list[list[str]] = []
 
-    class _Proc:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def fake_run(argv, **kwargs):
-        issued.append(argv)
-        return _Proc()
-
-    monkeypatch.setattr(sandbox.subprocess, "run", fake_run)
+    monkeypatch.setattr(sandbox.subprocess, "run", _correctly_mounted_daemon(issued))
     monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
 
     validator.validate_project(tmp_path, install=True, run_bundle=True, policy=DOCKER)
@@ -188,15 +328,8 @@ def test_install_ignores_dependency_lifecycle_scripts(
     (tmp_path / "package.json").write_text('{"name":"x"}')
     issued: list[list[str]] = []
 
-    class _Proc:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
     monkeypatch.delenv("REJOX_NPM_ALLOW_SCRIPTS", raising=False)
-    monkeypatch.setattr(
-        sandbox.subprocess, "run", lambda argv, **kw: (issued.append(argv), _Proc())[1]
-    )
+    monkeypatch.setattr(sandbox.subprocess, "run", _correctly_mounted_daemon(issued))
     monkeypatch.setattr(sandbox.shutil, "which", lambda _n: "/usr/local/bin/docker")
 
     validator.validate_project(tmp_path, install=True, run_bundle=False, policy=DOCKER)
