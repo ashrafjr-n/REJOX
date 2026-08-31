@@ -99,6 +99,17 @@ services:
       - ${REJOX_DATA_DIR}:${REJOX_DATA_DIR}
       # The worker starts sandbox containers for the Validator's stages.
       - /var/run/docker.sock:/var/run/docker.sock
+    # The socket is mode 0660, owned by root and the host's docker group, while
+    # the image runs as the non-root `rejox` uid — so without this the worker
+    # gets "permission denied while trying to connect to the docker API" and
+    # every migration fails at the first stage. Granting the group is the way
+    # to reach the socket while staying non-root; running the worker as root
+    # would be strictly worse for no gain.
+    #
+    #   Linux:          stat -c '%g' /var/run/docker.sock   (usually the `docker` group)
+    #   Docker Desktop: 0                                   (the socket is root:root)
+    group_add:
+      - "${REJOX_DOCKER_GID:?set REJOX_DOCKER_GID in .env — the gid that owns /var/run/docker.sock}"
     # No ports: a worker is reached through the queue, never over HTTP.
 
 volumes:
