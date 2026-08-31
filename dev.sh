@@ -23,11 +23,13 @@ else
   exit 1
 fi
 # A local dev server binds to 127.0.0.1 and migrates projects you chose
-# yourself, so it opts out of the two refusals a public server must keep:
-# API keys, and containment for the uploaded project's toolchain. Never export
+# yourself, so it opts out of the three refusals a public server must keep:
+# API keys, containment for the uploaded project's toolchain, and pointing the
+# pipeline at a directory on this machine instead of an upload. Never export
 # these for anything reachable from outside this machine — see docs/SECURITY.md.
 export REJOX_ALLOW_ANONYMOUS=1
 export REJOX_ALLOW_UNSANDBOXED=1
+export REJOX_ALLOW_LOCAL_PATH=1
 
 echo ">> backend  → http://localhost:8000  (docs at /docs)"
 echo "   (dev posture: no API key, no sandbox — local only)"
