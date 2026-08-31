@@ -178,9 +178,11 @@ project emitted from it, so it is deleted after `REJOX_RUN_TTL_SECONDS` (24h
 default). The API sweeps hourly; to drive it from cron instead, set
 `REJOX_RETENTION=off` and schedule `rejox sweep` (`--dry-run` lists what would go).
 
-**Scaling, honestly.** Workers scale freely — they sit behind the queue. The API
-does not yet: rate-limit counters are per process, so N API replicas mean N times
-the limit. Run one API container until that state is shared.
+**Scaling, honestly.** Workers scale freely — they sit behind the queue. So does
+the API, now that rate-limit counters live in Redis (`REJOX_RATE_STORE=redis`,
+which compose sets): the budget is the fleet's, not one per container. Scaling
+the API past one replica also needs a reverse proxy in front of it — the base
+compose file publishes a single fixed host port.
 
 **Verify the deployment, don't assume it.**
 
