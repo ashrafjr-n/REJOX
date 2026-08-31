@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import SettingToggle from '../components/SettingToggle'
 import CartSummary from '../components/CartSummary'
-
+// now dark mode btn is work
 interface SettingsPageProps {
   darkMode: boolean
   setDarkMode: (value: boolean) => void
