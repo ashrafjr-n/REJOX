@@ -38,6 +38,12 @@ from app.pipeline.intelligence import build_knowledge_graph
 from app.pipeline.migrate import run_migration
 from app.pipeline.planner import plan_migration
 
+# Jobs THIS process is executing, and only those. A process that merely created
+# a job must not keep a copy here: with the `rq` backend the API creates the job
+# and a worker runs it, so an API-side entry would shadow the file the worker is
+# updating and every read would answer `queued` forever. The executing process
+# adopts the persisted state on first touch (`run_job`, `_emit_sink`); everyone
+# else reads job.json.
 _REGISTRY: dict[str, JobState] = {}
 # Live worker threads, so concurrency is measured from what is actually running
 # rather than from a status a dead thread can no longer update.
@@ -75,8 +81,10 @@ def create_job(run_id: str) -> JobState:
     state = JobState(
         jobId=job_id, runId=run_id, status="queued", createdAt=now, updatedAt=now
     )
-    with _LOCK:
-        _REGISTRY[job_id] = state
+    # Persisted, not registered: whoever ends up running this job adopts it from
+    # the file. Keeping a copy here would make this process answer from its own
+    # memory forever, which is right only when this process is also the one
+    # advancing the job — and with the `rq` backend it is not.
     _persist(state)
     return state
 
