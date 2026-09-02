@@ -118,6 +118,9 @@ class RouteMapping(AnalysisBase):
     path: Optional[str] = None
     params: list[str] = Field(default_factory=list)
     hasParams: bool = False
+    # Props the react-router element passed, which a `Screen component={…}`
+    # cannot carry — the navigator generator answers for these.
+    elementProps: list[str] = Field(default_factory=list)
 
 
 class RoutingReport(AnalysisBase):
