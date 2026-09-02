@@ -172,16 +172,30 @@ Stated plainly, because a security document that only lists wins is marketing:
   of 2026-09-03: against a live daemon, a killed worker's job reported `failed`
   with `WorkerLost` past the grace, while RQ still held the execution as
   `started` — lost, and said so.
-- **A failed migration is not diagnosable from the logs, and the worker's log
-  contradicts it.** Only `app/retention.py` logs anything; no pipeline stage,
-  the API, the worker or the jobs layer emit an application log line, so nothing
-  in the retained output names the stage or reason a migration failed. Worse,
-  because `run_job` deliberately never raises, RQ records a failed migration as
-  `Successfully completed` / `Job OK`. The full picture is available from
-  `GET /api/jobs/{id}` per job, but there is no path from a job id to a cause in
-  the logs and no way to see a failure rate. Observed 2026-09-03; see E0 in
-  [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md). The fix — structured
-  logging keyed by run and job id — is scheduled with the session/auth work.
+- **A failed migration is under-reported in the logs — but no longer
+  mis-reported.** Gate E0 (2026-09-03) found two separate defects here, and they
+  are at different stages of repair. Keeping them apart matters: one was a lie,
+  the other is a silence, and only the lie is fixed.
+
+  *Fixed — a failed job written down as a success.* `run_job` catches every
+  failure to guarantee a terminal event, and used to return cleanly afterwards,
+  so RQ logged `Successfully completed` / `Job OK` for migrations that had
+  failed. An operator scanning the worker log for trouble found a green line.
+  Since 2026-09-03 `run_job` raises `MigrationFailed` **after** writing the
+  terminal event, so the worker's record agrees with the job's and names the
+  stage and reason:
+  `app.jobs.MigrationFailed: <job> failed during analyze — NothingToMigrate: …`.
+  The event stream never depends on that raise, and the `thread` backend
+  swallows it (there is no second record to correct in-process).
+
+  *Still open — a failure nothing logs at all.* There is still no structured,
+  run/job-keyed logging: only `app/retention.py` logs, so no stage boundary is
+  recorded, and a job whose worker was killed (`WorkerLost`) produces no log
+  line about ending at all — the process that ruled it lost is the API, which
+  logs nothing. The full picture is available from `GET /api/jobs/{id}` per job,
+  but there is still no way to see a failure rate or to go from a job id to a
+  cause without querying that job. E0 stays RED on this half. The fix is
+  scheduled with the session/auth work, because it touches `app/main.py`.
 - **Retention has no notion of an in-flight run.** The sweeper reaps by age
   alone, so a short `REJOX_RUN_TTL_SECONDS` and a long migration can delete a
   workspace out from under a running job. Harmless at the 24h default.
