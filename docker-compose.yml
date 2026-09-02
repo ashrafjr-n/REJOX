@@ -54,7 +54,21 @@ x-backend: &backend
     REJOX_SANDBOX_IMAGE: ${REJOX_SANDBOX_IMAGE:-node:20-bookworm-slim}
     REJOX_SANDBOX_MEMORY: ${REJOX_SANDBOX_MEMORY:-4g}
     REJOX_SANDBOX_CPUS: ${REJOX_SANDBOX_CPUS:-2}
-    REJOX_API_KEYS: ${REJOX_API_KEYS:?set REJOX_API_KEYS in .env — the API refuses to serve without keys}
+    REJOX_API_KEYS: ${REJOX_API_KEYS:-}
+    # Browser sessions: an invite code is exchanged for a signed httpOnly
+    # cookie. A server needs API keys, invite codes, or both — with neither it
+    # refuses to serve. The secret has no default on purpose: a shared fallback
+    # would let anyone mint a session for any Rejox deployment.
+    REJOX_INVITE_CODES: ${REJOX_INVITE_CODES:-}
+    REJOX_SESSION_SECRET: ${REJOX_SESSION_SECRET:-}
+    REJOX_SESSION_TTL: ${REJOX_SESSION_TTL:-43200}
+    # Storage ceilings (gate E1). The account quota bounds one identity's total
+    # footprint; the free-space floor stops the server taking work it cannot
+    # finish. Both in bytes.
+    REJOX_ACCOUNT_QUOTA_BYTES: ${REJOX_ACCOUNT_QUOTA_BYTES:-2147483648}
+    REJOX_MIN_FREE_BYTES: ${REJOX_MIN_FREE_BYTES:-2147483648}
+    REJOX_LOG_FORMAT: ${REJOX_LOG_FORMAT:-json}
+    REJOX_LOG_LEVEL: ${REJOX_LOG_LEVEL:-INFO}
     REJOX_CORS_ORIGINS: ${REJOX_CORS_ORIGINS:-http://localhost:5173}
     REJOX_RUN_TTL_SECONDS: ${REJOX_RUN_TTL_SECONDS:-86400}
     # How a job whose worker died stops looking alive: the executing process
