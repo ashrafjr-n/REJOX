@@ -62,17 +62,30 @@ def _start_emit_only(client, run_id: str) -> str:
     return resp.json()["jobId"]
 
 
-def _await(client, job_id: str, timeout: float = 60.0) -> dict:
+# Emit-only migrations take a few seconds on an idle machine, but this suite also
+# runs on a CI runner and next to a `docker compose` verification pass, where the
+# same work has been observed taking past 60s (2026-09-03). The ceiling exists to
+# stop a hung job from hanging the suite, not to assert a speed — so it is set
+# well clear of the slow case, and the failure says what to look at.
+_AWAIT_TIMEOUT = 240.0
+
+
+def _await(client, job_id: str, timeout: float = _AWAIT_TIMEOUT) -> dict:
     deadline = time.monotonic() + timeout
+    last = None
     while time.monotonic() < deadline:
         state = client.get(f"/api/jobs/{job_id}").json()
         if state["status"] in ("succeeded", "failed"):
             return state
+        last = state
         time.sleep(0.05)
-    raise AssertionError(f"job {job_id} did not finish in {timeout}s")
+    raise AssertionError(
+        f"job {job_id} did not finish in {timeout}s — last status "
+        f"{(last or {}).get('status')!r} after {len((last or {}).get('events', []))} event(s)"
+    )
 
 
-def _read_sse(client, url: str, headers=None, timeout: float = 60.0):
+def _read_sse(client, url: str, headers=None, timeout: float = _AWAIT_TIMEOUT):
     """Read an SSE stream to its terminal event; return [(event_type, data)]."""
     events: list[tuple[str, dict]] = []
     with client.stream("GET", url, headers=headers or {}, timeout=timeout) as resp:
