@@ -12,8 +12,11 @@ Durability, stated plainly:
 - ``job.json`` is written on every state change, so a **completed** job survives
   a process restart (``get_job`` falls back to scanning run workspaces).
 - A job still **running** when the process dies does NOT survive — its thread is
-  gone. Its last-persisted ``job.json`` remains (status ``running``), but it will
-  never advance. We do not resurrect running jobs.
+  gone. We do not resurrect it. What we do instead is *say so*: the executing
+  process stamps a heartbeat into ``job.json`` on a fixed beat, and a reader
+  that finds a ``running`` job whose heartbeat has stopped marks it terminally
+  ``failed``. A job whose worker died therefore ends as a failure a client can
+  see, never as ``running`` for ever (pre-launch gate B6).
 """
 
 from __future__ import annotations
@@ -37,6 +40,15 @@ from app.pipeline.analyzer import analyze_graph
 from app.pipeline.intelligence import build_knowledge_graph
 from app.pipeline.migrate import run_migration
 from app.pipeline.planner import plan_migration
+from app.queue import env_int
+
+# How often the process executing a job stamps ``job.json`` to say it is still
+# there, and how long a reader waits for a beat before calling the job
+# abandoned. The grace is deliberately several beats wide: a worker under load
+# may miss one, and a false "failed" on a migration that is still running is a
+# worse answer than a slightly late one.
+DEFAULT_HEARTBEAT_SECONDS = 10
+DEFAULT_HEARTBEAT_GRACE_SECONDS = 60
 
 # Jobs THIS process is executing, and only those. A process that merely created
 # a job must not keep a copy here: with the `rq` backend the API creates the job
@@ -111,7 +123,8 @@ def get_job(job_id: str) -> JobState:
     callers never observe a half-applied mutation. Otherwise the persisted
     ``job.json``, which is what makes the state readable across processes: with
     the `rq` backend the worker owns the memory copy and the API only ever sees
-    the file.
+    the file — and is therefore the only party in a position to notice that
+    nobody is writing it any more. Hence the reconcile on that path.
     """
     with _LOCK:
         state = _REGISTRY.get(job_id)
@@ -119,7 +132,7 @@ def get_job(job_id: str) -> JobState:
             return state.model_copy(deep=True)
     persisted = _load_persisted(job_id)
     if persisted is not None:
-        return persisted
+        return _reconcile(persisted)
     raise KeyError(job_id)
 
 
@@ -157,6 +170,7 @@ def events_after(job_id: str, after_seq: int) -> tuple[list[MigrationEvent], str
     persisted = _load_persisted(job_id)
     if persisted is None:
         raise KeyError(job_id)
+    persisted = _reconcile(persisted)
     return [e for e in persisted.events if e.seq > after_seq], persisted.status
 
 
@@ -201,6 +215,108 @@ def _emit_sink(job_id: str):
         _persist(snapshot)
 
     return emit
+
+
+def _heartbeat_interval() -> float:
+    return float(max(1, env_int("REJOX_JOB_HEARTBEAT", DEFAULT_HEARTBEAT_SECONDS)))
+
+
+def _heartbeat_grace() -> float:
+    return float(
+        max(1, env_int("REJOX_JOB_HEARTBEAT_GRACE", DEFAULT_HEARTBEAT_GRACE_SECONDS))
+    )
+
+
+def _touch(job_id: str) -> None:
+    """Stamp "I am still executing this" into ``job.json``.
+
+    Only ``updatedAt`` moves — no event is invented, because nothing happened.
+    That distinction matters: events are the record of what the pipeline did,
+    and a heartbeat is not one of them.
+    """
+    with _LOCK:
+        state = _REGISTRY.get(job_id)
+        # Terminal states are never touched: a finished job that kept ticking
+        # would look alive to every reader that came after it.
+        if state is None or state.status != "running":
+            return
+        state.updatedAt = _now()
+        snapshot = state.model_copy(deep=True)
+    _persist(snapshot)
+
+
+def _start_heartbeat(job_id: str) -> threading.Event:
+    """Beat until the returned event is set. Daemon: it must never hold up exit.
+
+    Needed because stages are long and *silent* — ``npm install`` can run for
+    minutes without emitting anything — so "no new events" cannot be read as "no
+    executor". A separate beat makes staleness mean exactly one thing.
+    """
+    stop = threading.Event()
+
+    def beat() -> None:
+        interval = _heartbeat_interval()
+        while not stop.wait(interval):
+            _touch(job_id)
+
+    threading.Thread(
+        target=beat, name=f"heartbeat-{job_id[:8]}", daemon=True
+    ).start()
+    return stop
+
+
+def _fail_abandoned(state: JobState) -> JobState:
+    """Close out a job whose executor is gone, with a terminal ``failed`` event.
+
+    Written straight to the file rather than through ``_emit_sink``: this
+    process is not running the job and must not adopt it into ``_REGISTRY``,
+    which is reserved for jobs it *is* executing.
+
+    Two readers racing here both append the same terminal event and the last
+    atomic write wins, which is harmless — they agree about the outcome.
+    """
+    stage: MigrationStage = state.events[-1].stage if state.events else "intelligence"
+    silent_for = _now() - state.updatedAt
+    message = (
+        "The process running this migration stopped without reporting a result "
+        f"(no heartbeat for {silent_for:.0f}s, past the {_heartbeat_grace():.0f}s "
+        "grace). The migration did not complete; start it again."
+    )
+    error = MigrationError(type="WorkerLost", message=message, stage=stage)
+    event = MigrationEvent(
+        seq=len(state.events) + 1,
+        type="failed",
+        stage=stage,
+        ts=_now(),
+        message=message,
+        error=error,
+    )
+    state.events.append(event)
+    state.status = "failed"
+    state.error = error
+    state.updatedAt = event.ts
+    _persist(state)
+    return state
+
+
+def _reconcile(state: JobState) -> JobState:
+    """Answer with the truth about a persisted job, not just its last write.
+
+    Applied ONLY to state loaded from ``job.json`` — never to a registry entry,
+    because a registry entry belongs to a job this process is running right now
+    and its heartbeat is this process's own responsibility.
+
+    Known trade-off, recorded rather than hidden: a live worker frozen for
+    longer than the grace (a suspended host, a badly throttled container) is
+    declared lost, and if it later thaws it will keep writing and the job will
+    come back to life. That is rarer, and less damaging, than the wedge this
+    replaces — but it is why the grace is a setting.
+    """
+    if state.status != "running":
+        return state
+    if _now() - state.updatedAt <= _heartbeat_grace():
+        return state
+    return _fail_abandoned(state)
 
 
 def _has_terminal(job_id: str) -> bool:
@@ -255,6 +371,11 @@ def run_job(
     # a failure before the Migration Engine is reported where it happened
     # (parse/analyze/plan) instead of being blamed on emit.
     stage: MigrationStage = "intelligence"
+    # From here on this process owes the job a heartbeat: everything below can
+    # run for minutes in silence, and silence is what a reader is about to
+    # interpret. Stopped in the `finally`, so a job that ends any way at all —
+    # success, failure, or an exception nothing caught — stops beating.
+    stop_heartbeat = _start_heartbeat(job_id)
     try:
         kg = build_knowledge_graph(source_root)
         stage = "analyze"
@@ -276,6 +397,8 @@ def run_job(
                 "failed", stage, f"Migration failed during {stage}: {exc}",
                 error=MigrationError(type=type(exc).__name__, message=str(exc), stage=stage),
             )
+    finally:
+        stop_heartbeat.set()
 
 
 def register_worker(job_id: str, thread: threading.Thread) -> None:
