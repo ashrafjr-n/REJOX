@@ -118,7 +118,7 @@ signature below carries the output it came from.
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
-| E0 | a failed migration is diagnosable after the fact | ☒ **RED** — the logs name no stage or reason, and report a failed job as `Job OK` |
+| E0 | a failed migration is diagnosable after the fact | ☒ **RED** — the `Job OK` lie is fixed; the silence (no run/job logging) remains |
 | E1 | one identity cannot fill the disk | ☐ not run |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
@@ -1664,13 +1664,34 @@ An operator handed only a job id today can learn nothing about why it failed
 without querying the API for that specific job. There is no path from a
 complaint to a cause, and no way to notice a rising failure rate at all.
 
-THE FIX (not applied here, by decision): structured logging carrying the run id
-and job id on every line, emitted at each stage boundary and on every terminal
-event, plus a non-OK signal to RQ — or an explicit log line at the terminal
-`failed` — so the worker's own record stops contradicting the job's. Deferred
-deliberately to be done together with the session/auth work, because both touch
-`app/main.py` and both re-red all of section C; doing them in one pass means one
-re-signing round instead of two.
+FINDING 2 IS FIXED — 2026-09-03, commit V3.4, verified live on the same
+fixture. `run_job` now raises `MigrationFailed` AFTER writing the terminal
+event, so the runner's record agrees with the job's:
+
+  $ docker compose logs worker | grep 2054981333ce459bb8a15fd6bc7d3d3f
+    rejox-migrations: app.jobs.run_job('2054981333ce…')
+    [Job 2054981333ce…]: exception raised while executing (app.jobs.run_job)
+    app.jobs.MigrationFailed: 2054981333ce… failed during analyze —
+    NothingToMigrate: No React components found in project 'broken-app' …
+  $ docker compose logs worker | grep -cE "Successfully completed.*JOB|Job OK"
+    0
+
+The green line for a failed job is gone, and what replaced it names the stage
+and the reason. The event stream is untouched: the terminal event is written
+first and never depends on that raise. Split out and fixed on its own because
+it lives entirely in `app/jobs.py` — it does not touch `app/main.py`, so it does
+not re-red section C.
+
+FINDING 1 IS STILL OPEN, and this gate stays RED for it. There is still no
+run/job-keyed structured logging, no stage boundary is logged, and case 2 —
+`WorkerLost` — still produces no log line about the job ending at all, because
+the process that rules a job lost is the API, which logs nothing. Deferred
+deliberately to be done with the session/auth work: both touch `app/main.py` and
+both re-red all of section C, so one pass means one re-signing round instead of
+two.
+
+TO SIGN, this gate must be re-run and both cases explained from the retained
+logs alone. Case 1 would pass that today. Case 2 would not.
 
 
 test-projects/broken-app was added 2026-09-03 for this gate, with
