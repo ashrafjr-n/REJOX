@@ -165,19 +165,40 @@ def cleanup(run_id: str) -> None:
     shutil.rmtree(workspace_root() / run_id, ignore_errors=True)
 
 
+def expired_runs(
+    ttl_seconds: int = DEFAULT_TTL_SECONDS, *, now: float | None = None
+) -> list[str]:
+    """The run ids past their window — the ONE definition of "expired".
+
+    Both the sweeper and ``rejox sweep --dry-run`` ask this, so a dry run cannot
+    promise to delete something the real sweep would never touch. It did once:
+    the dry run had its own copy of the predicate without the run-id filter, and
+    named a directory the sweep then left in place (observed at gate B7,
+    2026-09-03). A retention preview that overstates what it will delete is
+    worse than no preview.
+
+    Age is measured from the run directory's mtime, which ``new_run`` sets at
+    creation and later writes refresh. Directories whose names are not run ids
+    are never candidates: the workspace root is shared, and this deletes trees.
+    """
+    now = time.time() if now is None else now
+    return sorted(
+        child.name
+        for child in workspace_root().iterdir()
+        if child.is_dir()
+        and _RUN_ID_RE.match(child.name)
+        and now - child.stat().st_mtime > ttl_seconds
+    )
+
+
 def sweep(ttl_seconds: int = DEFAULT_TTL_SECONDS, *, now: float | None = None) -> list[str]:
     """Reap runs whose directory is older than ``ttl_seconds``.
 
-    Returns the ids removed. Age is measured from the run directory's mtime,
-    which ``new_run`` sets at creation and later writes refresh.
+    Returns the ids removed.
     """
-    now = time.time() if now is None else now
-    removed: list[str] = []
     root = workspace_root()
-    for child in root.iterdir():
-        if not child.is_dir() or not _RUN_ID_RE.match(child.name):
-            continue
-        if now - child.stat().st_mtime > ttl_seconds:
-            shutil.rmtree(child, ignore_errors=True)
-            removed.append(child.name)
+    removed: list[str] = []
+    for run_id in expired_runs(ttl_seconds, now=now):
+        shutil.rmtree(root / run_id, ignore_errors=True)
+        removed.append(run_id)
     return removed

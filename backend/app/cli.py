@@ -855,15 +855,9 @@ def sweep(
     _stage("Sweep — run workspace retention")
 
     if dry_run:
-        import time as _time  # noqa: PLC0415
-
-        now = _time.time()
-        root = workspace.workspace_root()
-        stale = [
-            child.name
-            for child in sorted(root.iterdir())
-            if child.is_dir() and now - child.stat().st_mtime > window
-        ]
+        # The same predicate the sweep itself uses — never a second copy of it,
+        # or the preview drifts from the deletion it is previewing.
+        stale = workspace.expired_runs(window)
         for run_id in stale:
             console.print(f"  [dim]would reap[/] {run_id}")
         console.print(
