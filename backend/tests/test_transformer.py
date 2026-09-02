@@ -209,6 +209,20 @@ def test_quantitystepper_onclick_and_text_wrap(options: dict) -> None:
     assert "<Text>+</Text>" in r.code
 
 
+def test_settingtoggle_drops_the_dom_only_button_type(options: dict) -> None:
+    """`type` is a <button> attribute; Pressable has no such prop.
+
+    Carrying it through the rename is a TS2322 and nothing else — no behaviour
+    of the app lives in `type="button"` — so it is dropped with a warning rather
+    than left for the AI. `role`/`aria-checked` stay: React Native supports both.
+    """
+    r = transform_component(SRC / "components" / "SettingToggle.tsx", options)
+    assert "<Pressable" in r.code
+    assert "type=" not in r.code
+    assert 'role="switch"' in r.code and "aria-checked=" in r.code
+    assert "WEB_ONLY_ATTRIBUTE" in {w.code for w in r.warnings}
+
+
 def test_productcard_css_module_is_residue(options: dict) -> None:
     r = transform_component(SRC / "components" / "ProductCard.tsx", options)
     assert "CSS_MODULE" in _codes(r)
