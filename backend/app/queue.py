@@ -116,10 +116,20 @@ def get_queue():
 def _enqueue_thread(job_id: str, payload: dict[str, Any]) -> None:
     from app import jobs  # noqa: PLC0415 - circular at module scope
 
+    def run() -> None:
+        try:
+            jobs.run_job(job_id, **payload)
+        except jobs.MigrationFailed:
+            # `run_job` raises this so an rq worker's own record agrees with the
+            # job's. In this backend there is no such second record — the job
+            # state IS this process's record, and it already says `failed`. Let
+            # it go rather than dumping a thread traceback that reports nothing
+            # new. Any OTHER exception still surfaces: that would be a defect
+            # here, not a failed migration.
+            pass
+
     thread = threading.Thread(
-        target=jobs.run_job,
-        args=(job_id,),
-        kwargs=payload,
+        target=run,
         name=f"migrate-{job_id[:8]}",
         daemon=True,
     )
