@@ -22,6 +22,14 @@ from app.models.knowledge_graph import KnowledgeGraph
 WORKER_DIR = Path(__file__).resolve().parents[2] / "parser-worker"
 WORKER_ENTRY = WORKER_DIR / "dist" / "index.js"
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# The committed benchmark and the graph fixture generated from it. Named here so
+# the generator (`rejox export-graph`) and the staleness gate that guards the
+# file cannot drift apart on where either one lives.
+BENCHMARK_PROJECT = REPO_ROOT / "test-projects" / "sample-app"
+FIXTURES_DIR = REPO_ROOT / "backend" / "tests" / "fixtures"
+
 # Generous ceiling; parsing is CPU-bound and local.
 PARSE_TIMEOUT_SECONDS = 300
 BUILD_TIMEOUT_SECONDS = 600
@@ -139,3 +147,37 @@ def build_knowledge_graph(path: Path) -> KnowledgeGraph:
         raise IntelligenceError(
             f"parser-worker output failed Knowledge Graph validation:\n{exc}"
         ) from exc
+
+
+# --- committed graph fixtures ------------------------------------------------
+
+
+def _portable_root(project_path: Path, repo_root: Path) -> str:
+    """The value to commit as ``project.root``.
+
+    Repo-relative for a project inside the repo (the benchmark case); otherwise
+    just the directory name. Never an absolute path: that is the home directory
+    of whichever machine ran the parser, and committing it makes the file read
+    as if it belonged to one developer.
+    """
+    resolved = project_path.expanduser().resolve()
+    try:
+        return resolved.relative_to(repo_root.resolve()).as_posix()
+    except ValueError:
+        return resolved.name
+
+
+def render_graph_fixture(
+    kg: KnowledgeGraph, *, project_path: Path, repo_root: Path = REPO_ROOT
+) -> str:
+    """Serialize ``kg`` as a committed test fixture.
+
+    Deterministic bytes, so the only reason such a file ever changes is that the
+    graph itself changed — which is what lets a test compare a fresh parse
+    against the committed copy and fail when it has gone stale. Consumers of the
+    fixture pass ``source_root`` explicitly, so the portable ``project.root``
+    written here is never read as a real location.
+    """
+    data = kg.model_dump(mode="json")
+    data["project"]["root"] = _portable_root(project_path, repo_root)
+    return json.dumps(data, indent=2) + "\n"
