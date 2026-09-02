@@ -102,14 +102,14 @@ signature below carries the output it came from.
 | A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
 | A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped |
 | A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped |
-| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 |
-| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 |
-| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 |
-| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 |
-| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03; also proves the heartbeat spares a live worker |
-| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 |
-| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03 |
-| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed 2026-09-03 |
+| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2) |
+| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2) |
+| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2) |
+| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2) |
+| B4 | an API restart does not lose an in-flight job | ⟲ **re-red** — was: signed — re-signed 2026-09-03; also proves the heartbeat spares a live worker (jobs.py changed for E0) |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2) |
+| B6 | a killed worker does not silently strand a job | ⟲ **re-red** — was: signed — RED first (wedged at `running` for ever), fixed 2026-09-03 (jobs.py changed for E0) |
+| B7 | retention actually deletes a run workspace | ⟲ **re-red** — was: signed — RED first (the dry run over-promised), fixed; re-signed 2026-09-03 (jobs.py changed for E0) |
 | C0 | a server with no keys refuses to serve | ☑ signed |
 | C1 | a wrong key is rejected | ☑ signed |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed |
@@ -583,6 +583,9 @@ loop looks identical to a healthy one in the first thirty seconds.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
+  PASS  health — {"status":"ok"}
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
 $ ./verify-deployment.sh
   PASS  health — {"status":"ok"}
@@ -626,6 +629,9 @@ running.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
+  PASS  1 worker(s) registered
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
   PASS  1 worker(s) registered
 
@@ -682,6 +688,13 @@ not run what it claims to have run.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
+  PASS  migration status — succeeded
+  PASS  a sibling sandbox container was observed on the host during the run
+
+  Note for this re-run: a SUCCEEDING migration must not trip the new raise.
+  It did not — the job reached `succeeded` and the worker logged no exception.
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
   PASS  uploaded — runId d65beb218874464a86a081ff39d1402e
   PASS  enqueued — jobId db80f12823fd4ec6ac1431b2c25a0c74
@@ -738,6 +751,10 @@ but contains three files is red.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
+  PASS  download — 200
+  PASS  41 files in the archive
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
   PASS  download — 200
   PASS  41 files in the archive
@@ -872,6 +889,10 @@ accepted work; anything else means it failed for a reason nobody predicted.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
+  PASS  status with Redis down — 503
+  PASS  the queue itself refuses, never a thread fallback — QUEUE-REFUSED
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
   PASS  status with Redis down — 503
   PASS  answered in 0s (must not hang)
