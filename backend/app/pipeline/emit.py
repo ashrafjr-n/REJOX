@@ -38,7 +38,7 @@ from app.models.emission import EmittedFile, EmittedProject, SkippedFile
 from app.models.knowledge_graph import KnowledgeGraph
 from app.models.plan import MigrationPlan
 from app.models.transformation import TransformResult
-from app.ai.navigation import build_navigator_spec, generate_navigator
+from app.ai.navigation import build_navigator_spec, generate_navigator, unhoistable_screens
 from app.pipeline.analyzer import analyze_graph
 from app.pipeline.resolve_apply import apply_resolutions
 from app.pipeline.scaffold import generate_scaffold
@@ -104,9 +104,15 @@ def _navigator_source(
     one decision — chosen by the user / the tier-3 LLM proposal and passed in via
     ``answers['navigator-shape']`` — and the generator writes the code for it.
     No NAV_CONTAINER TODO survives.
+
+    A route element that carried props is the one thing wiring cannot settle by
+    itself: where the props are plain reads of the routing component's state the
+    generator relocates them, and where they are not it leaves NAV_SCREEN_PROPS
+    for the AI Resolution Engine.
     """
     spec = build_navigator_spec(nav_shape, routes)
-    return generate_navigator(spec, routes), []
+    todos = ["NAV_SCREEN_PROPS"] if unhoistable_screens(spec, routes) else []
+    return generate_navigator(spec, routes), todos
 
 
 def _app_source(has_navigator: bool, nativewind: bool, app_name: str) -> str:
