@@ -195,6 +195,13 @@ project emitted from it, so it is deleted after `REJOX_RUN_TTL_SECONDS` (24h
 default). The API sweeps hourly; to drive it from cron instead, set
 `REJOX_RETENTION=off` and schedule `rejox sweep` (`--dry-run` lists what would go).
 
+**When a worker dies.** The migration is lost — nothing re-queues it — but the
+job does not go quiet. The process running a migration heartbeats into its job
+file every `REJOX_JOB_HEARTBEAT` seconds (10 by default), and a job left
+`running` with no beat for `REJOX_JOB_HEARTBEAT_GRACE` seconds (60) is reported
+as a terminal `WorkerLost` failure, so a client is told to start again instead
+of polling forever. Widen the grace on a slow or heavily contended host.
+
 **Scaling, honestly.** Workers scale freely — they sit behind the queue. So does
 the API, now that rate-limit counters live in Redis (`REJOX_RATE_STORE=redis`,
 which compose sets): the budget is the fleet's, not one per container. Scaling
