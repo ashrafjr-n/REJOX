@@ -109,6 +109,21 @@ export interface Hook {
   usedBy: string[];
 }
 
+/** One prop on a route's element, and the binding it reads (when it is one). */
+export interface RouteElementProp {
+  name: string;
+  /** The identifier the prop reads (`darkMode={darkMode}` → `darkMode`), or
+   *  null when the value is any richer expression — those cannot be hoisted. */
+  binding: string | null;
+}
+
+/** A `const [value, setter] = useState(initializer)` in the routing component. */
+export interface RouteHostState {
+  value: string;
+  setter: string | null;
+  initializer: string;
+}
+
 export interface Route {
   path: string | null;
   componentName: string | null;
@@ -117,13 +132,20 @@ export interface Route {
   params: string[];
   /**
    * Props the route's element passes to its component
-   * (`<Route element={<Settings darkMode={x} />}>` → `["darkMode"]`).
+   * (`<Route element={<Settings darkMode={x} />}>`).
    *
-   * A `Stack.Screen` registers a component, not an element, so these have
-   * nowhere to travel — the navigator generator has to answer for them rather
-   * than drop them on the floor.
+   * A `Screen` registers a component, not an element, so these have nowhere to
+   * travel — the navigator generator has to answer for them rather than drop
+   * them on the floor.
    */
-  elementProps: string[];
+  elementProps: RouteElementProp[];
+  /**
+   * State declared by the component that renders this `<Route>`. React Router
+   * lets that component thread its state into the element; a navigator has no
+   * such seam, so the generator hoists these declarations into `AppNavigator`
+   * — which is what that component's routing half becomes.
+   */
+  hostState: RouteHostState[];
 }
 
 export interface Store {
