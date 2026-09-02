@@ -133,6 +133,21 @@ class Hook(KGBase):
 # --- Routes -----------------------------------------------------------------
 
 
+class RouteElementProp(KGBase):
+    """A prop on a route's element, and the binding it reads (when it is one)."""
+
+    name: str
+    binding: Optional[str] = None
+
+
+class RouteHostState(KGBase):
+    """A ``const [value, setter] = useState(initializer)`` in the routing component."""
+
+    value: str
+    setter: Optional[str] = None
+    initializer: str = ""
+
+
 class Route(KGBase):
     path: Optional[str] = None
     componentName: Optional[str] = None
@@ -142,7 +157,10 @@ class Route(KGBase):
     # Props the route's element passes to its component. A React Navigation
     # screen registers a component, not an element, so these cannot travel with
     # it — see NAV_SCREEN_PROPS in docs/CONVERSION-RULES.md.
-    elementProps: list[str] = Field(default_factory=list)
+    elementProps: list[RouteElementProp] = Field(default_factory=list)
+    # State owned by the component that renders the route, which React Router
+    # let it thread into the element. AppNavigator inherits that role.
+    hostState: list[RouteHostState] = Field(default_factory=list)
 
 
 # --- State management -------------------------------------------------------

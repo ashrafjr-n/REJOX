@@ -37,6 +37,7 @@ def analyze_routing(kg: KnowledgeGraph) -> RoutingReport:
             params=r.params,
             hasParams=r.hasParams,
             elementProps=r.elementProps,
+            hostState=r.hostState,
         )
         for r in kg.routes
     ]

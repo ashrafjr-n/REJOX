@@ -10,7 +10,7 @@
  */
 
 import { Node, SyntaxKind, type SourceFile } from 'ts-morph';
-import type { Route } from '../types';
+import type { Route, RouteElementProp, RouteHostState } from '../types';
 import type { FileImports } from './imports';
 
 function stringAttr(attr: Node | undefined): string | null {
@@ -37,15 +37,54 @@ function componentNameFromElement(attr: Node | undefined): string | null {
 }
 
 /**
- * Named props on the route's element. Spreads (`{...rest}`) have no name to
- * report, so they are counted under `...` rather than passed over in silence.
+ * Props on the route's element, each paired with the identifier it reads.
+ * A spread (`{...rest}`) has no name to report, so it is recorded as `...`
+ * with no binding rather than passed over in silence — that alone is enough
+ * to make the route un-hoistable, which is the honest answer.
  */
-function elementPropsFrom(attr: Node | undefined): string[] {
+function elementPropsFrom(attr: Node | undefined): RouteElementProp[] {
   const tag = elementTag(attr);
   if (!tag) return [];
-  return tag
-    .getAttributes()
-    .map((a) => (Node.isJsxAttribute(a) ? a.getNameNode().getText() : '...'));
+  return tag.getAttributes().map((a) => {
+    if (!Node.isJsxAttribute(a)) return { name: '...', binding: null };
+    const name = a.getNameNode().getText();
+    const init = a.getInitializer();
+    if (init && Node.isJsxExpression(init)) {
+      const expr = init.getExpression();
+      if (expr && Node.isIdentifier(expr)) return { name, binding: expr.getText() };
+    }
+    return { name, binding: null };
+  });
+}
+
+/** `useState` declarations in the function component that renders this route. */
+function hostStateOf(tag: Node): RouteHostState[] {
+  const fn = tag.getFirstAncestor(
+    (a) =>
+      Node.isFunctionDeclaration(a) ||
+      Node.isArrowFunction(a) ||
+      Node.isFunctionExpression(a),
+  );
+  if (!fn) return [];
+
+  const state: RouteHostState[] = [];
+  for (const decl of fn.getDescendantsOfKind(SyntaxKind.VariableDeclaration)) {
+    const init = decl.getInitializer();
+    if (!init || !Node.isCallExpression(init)) continue;
+    if (init.getExpression().getText() !== 'useState') continue;
+
+    const bindings = decl.getNameNode();
+    if (!Node.isArrayBindingPattern(bindings)) continue;
+    const [first, second] = bindings.getElements();
+    if (!first || !Node.isBindingElement(first)) continue;
+
+    state.push({
+      value: first.getName(),
+      setter: second && Node.isBindingElement(second) ? second.getName() : null,
+      initializer: init.getArguments()[0]?.getText() ?? '',
+    });
+  }
+  return state;
 }
 
 function paramsFromPath(path: string): string[] {
@@ -97,6 +136,7 @@ export function extractRoutes(
       hasParams: params.length > 0,
       params,
       elementProps: elementPropsFrom(attrMap.get('element')),
+      hostState: hostStateOf(tag),
     });
   }
 

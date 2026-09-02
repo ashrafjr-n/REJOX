@@ -13,6 +13,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.knowledge_graph import RouteElementProp, RouteHostState
+
 # --- Shared enums -----------------------------------------------------------
 
 Severity = Literal["info", "warning", "blocker"]
@@ -119,8 +121,10 @@ class RouteMapping(AnalysisBase):
     params: list[str] = Field(default_factory=list)
     hasParams: bool = False
     # Props the react-router element passed, which a `Screen component={…}`
-    # cannot carry — the navigator generator answers for these.
-    elementProps: list[str] = Field(default_factory=list)
+    # cannot carry, plus the routing component's own state — together they let
+    # the generator hoist rather than drop. See NAV_SCREEN_PROPS.
+    elementProps: list[RouteElementProp] = Field(default_factory=list)
+    hostState: list[RouteHostState] = Field(default_factory=list)
 
 
 class RoutingReport(AnalysisBase):
