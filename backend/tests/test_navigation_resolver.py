@@ -21,9 +21,11 @@ from app.ai.navigation import (
     resolve_nav_active,
     resolve_nav_container,
     stack_spec_from_routes,
+    unhoistable_screens,
 )
 from app.ai.provider import LLMProvider, LLMResponse
 from app.models.analysis import RouteMapping
+from app.models.knowledge_graph import RouteElementProp, RouteHostState
 
 ROUTES = [
     RouteMapping(screenName="Home", componentName="HomePage", path="/"),
@@ -91,6 +93,81 @@ def test_nav_container_generates_navigator_from_route_table_zero_llm() -> None:
     for screen in ("Home", "Products", "ProductDetail", "Settings"):
         assert f'name="{screen}"' in src
     assert "REJOX-TODO" not in src  # complete — no NAV_CONTAINER TODO survives
+
+
+# --- Route element props: relocated where provable, TODO where not ----------
+
+_DARK_MODE = RouteHostState(value="darkMode", setter="setDarkMode", initializer="false")
+
+
+def _settings_carrying(*props: RouteElementProp, state: list[RouteHostState] | None = None):
+    """The route table, with Settings carrying `props` from the routing component."""
+    return [
+        *ROUTES[:3],
+        RouteMapping(
+            screenName="Settings", componentName="SettingsPage", path="settings",
+            elementProps=list(props),
+            hostState=[_DARK_MODE] if state is None else state,
+        ),
+    ]
+
+
+def test_route_element_props_are_relocated_into_the_navigator() -> None:
+    """A `Screen` takes a component, so the state moves with the routing half.
+
+    `component={SettingsPage}` would drop `darkMode`/`setDarkMode` on the floor
+    and fail tsc; the render-callback form keeps the props, and the `useState`
+    that fed them comes along, because AppNavigator is what `App`'s routing half
+    became. Zero LLM — the binding is a plain read, so this is a relocation.
+    """
+    routes = _settings_carrying(
+        RouteElementProp(name="darkMode", binding="darkMode"),
+        RouteElementProp(name="setDarkMode", binding="setDarkMode"),
+    )
+    src = resolve_nav_container(routes).navigatorSource
+
+    assert "import { useState } from 'react';" in src
+    assert "const [darkMode, setDarkMode] = useState(false);" in src
+    assert "{() => <SettingsPage darkMode={darkMode} setDarkMode={setDarkMode} />}" in src
+    assert "component={SettingsPage}" not in src
+    assert "REJOX-TODO" not in src
+
+
+def test_a_prop_that_is_not_plain_state_leaves_a_todo() -> None:
+    """Anything richer than a read is design: it gets a TODO, never a guess."""
+    routes = _settings_carrying(RouteElementProp(name="user", binding=None))
+    src = resolve_nav_container(routes).navigatorSource
+
+    assert "REJOX-TODO(NAV_SCREEN_PROPS)" in src
+    assert "user" in src
+    assert "useState" not in src  # nothing was invented to satisfy it
+    assert "component={SettingsPage}" in src  # the screen is still registered
+
+
+def test_screens_without_element_props_stay_plain_lines() -> None:
+    src = resolve_nav_container(ROUTES).navigatorSource
+    assert "useState" not in src
+    assert "component={HomePage}" in src
+
+
+def test_unhoistable_screens_names_only_what_it_cannot_place() -> None:
+    resolvable = _settings_carrying(RouteElementProp(name="darkMode", binding="darkMode"))
+    unresolvable = _settings_carrying(RouteElementProp(name="user", binding=None))
+
+    assert unhoistable_screens(stack_spec_from_routes(resolvable), resolvable) == []
+    assert unhoistable_screens(stack_spec_from_routes(unresolvable), unresolvable) == ["Settings"]
+
+
+def test_generated_navigator_with_relocated_state_is_valid_typescript() -> None:
+    if not _has_node():
+        pytest.skip("node/npm not on PATH")
+    from app.pipeline.transformer import check_syntax
+
+    routes = _settings_carrying(
+        RouteElementProp(name="darkMode", binding="darkMode"),
+        RouteElementProp(name="setDarkMode", binding="setDarkMode"),
+    )
+    assert check_syntax(resolve_nav_container(routes).navigatorSource) == 0
 
 
 def test_generated_stack_navigator_is_valid_typescript() -> None:
