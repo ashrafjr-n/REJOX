@@ -168,7 +168,10 @@ Stated plainly, because a security document that only lists wins is marketing:
   is the mirror of it: a live worker frozen longer than the grace is declared
   lost, and resurrects if it thaws — widen the grace on a contended host. The
   wedge as originally observed (2026-08-31) is recorded under B6 in
-  [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md).
+  [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md), which is signed green as
+  of 2026-09-03: against a live daemon, a killed worker's job reported `failed`
+  with `WorkerLost` past the grace, while RQ still held the execution as
+  `started` — lost, and said so.
 - **Retention has no notion of an in-flight run.** The sweeper reaps by age
   alone, so a short `REJOX_RUN_TTL_SECONDS` and a long migration can delete a
   workspace out from under a running job. Harmless at the 24h default.
