@@ -8,6 +8,7 @@ The AI is left disabled (no key, no fake) so this also proves the zero-AI path.
 from __future__ import annotations
 
 import io
+import json
 import re
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 from app.cli import _RUN_COMMAND, _project_panel, app
+from app.models.knowledge_graph import KnowledgeGraph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE = REPO_ROOT / "test-projects" / "sample-app"
@@ -103,5 +105,31 @@ def test_migrate_with_offline_fake_provider_makes_exactly_one_llm_call(tmp_path,
 
 def test_migrate_rejects_a_missing_project() -> None:
     result = runner.invoke(app, ["migrate", "/does/not/exist", "--yes", "--no-validate"])
+    assert result.exit_code == 1
+    assert "Not a directory" in result.output
+
+
+def test_export_graph_writes_a_loadable_graph_with_a_portable_root(tmp_path) -> None:
+    out = tmp_path / "sample-app.kg.json"
+    result = runner.invoke(app, ["export-graph", "--project", str(SAMPLE), "--out", str(out)])
+    assert result.exit_code == 0, result.output
+
+    kg = KnowledgeGraph.model_validate(json.loads(out.read_text(encoding="utf-8")))
+    assert len(kg.components) == 21
+    # The whole point of the command: no machine's home directory in the file.
+    assert kg.project.root == "test-projects/sample-app"
+
+
+def test_export_graph_is_byte_deterministic(tmp_path) -> None:
+    first, second = (tmp_path / "a.json", tmp_path / "b.json")
+    for path in (first, second):
+        assert runner.invoke(
+            app, ["export-graph", "--project", str(SAMPLE), "--out", str(path)]
+        ).exit_code == 0
+    assert first.read_text(encoding="utf-8") == second.read_text(encoding="utf-8")
+
+
+def test_export_graph_rejects_a_missing_project() -> None:
+    result = runner.invoke(app, ["export-graph", "--project", "/does/not/exist"])
     assert result.exit_code == 1
     assert "Not a directory" in result.output
