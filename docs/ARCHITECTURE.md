@@ -414,7 +414,14 @@ definitions):
 
 Every node carries a stable `id` (`<file>#<name>`); `edges` reference those ids
 (and file paths for `imports`/`calls-api`). A pretty-printed real example lives
-at `backend/tests/fixtures/sample-app.kg.json`.
+at `backend/tests/fixtures/sample-app.kg.json` — most of the test suite reads it
+instead of re-parsing the benchmark.
+
+That file is **generated, never hand-edited**: `rejox export-graph` parses
+`test-projects/sample-app` for real and rewrites it, with `project.root` written
+repo-relative so no machine's home directory is committed. `test_parser.py`
+parses for real too, and fails when the committed copy no longer equals a fresh
+parse — a fixture cannot age silently behind the project it describes.
 
 ### Known limitations (feed the Analyzer)
 
