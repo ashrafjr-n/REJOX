@@ -165,6 +165,49 @@ def cleanup(run_id: str) -> None:
     shutil.rmtree(workspace_root() / run_id, ignore_errors=True)
 
 
+def _tree_bytes(root: Path) -> int:
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(root, onerror=lambda _e: None):
+        for name in filenames:
+            try:
+                total += (Path(dirpath) / name).stat().st_size
+            except OSError:  # raced with a sweep, or a broken symlink
+                continue
+    return total
+
+
+def footprint(identity: str) -> int:
+    """Total bytes this identity currently occupies across all its runs.
+
+    Walked on demand rather than tracked incrementally: a stored counter and the
+    filesystem disagree the first time a run is reaped, a migration is
+    interrupted, or two processes write at once — and a quota enforced from a
+    counter that has drifted is worse than no quota, because it is trusted.
+
+    The cost is a walk of one identity's runs, paid on upload only. At the sizes
+    this ceiling permits (a few GB) that is milliseconds; if it ever is not, the
+    answer is a cached per-run size written at the end of a migration, not a
+    running total maintained by hand.
+    """
+    root = workspace_root()
+    total = 0
+    for child in root.iterdir():
+        if not child.is_dir() or not _RUN_ID_RE.match(child.name):
+            continue
+        try:
+            owner = (child / _OWNER_FILE).read_text().strip()
+        except OSError:
+            continue
+        if owner and hmac.compare_digest(owner, identity):
+            total += _tree_bytes(child)
+    return total
+
+
+def free_bytes() -> int:
+    """Free space on the volume holding the workspace root."""
+    return shutil.disk_usage(workspace_root()).free
+
+
 def expired_runs(
     ttl_seconds: int = DEFAULT_TTL_SECONDS, *, now: float | None = None
 ) -> list[str]:

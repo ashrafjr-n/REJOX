@@ -326,6 +326,7 @@ def session_delete(response: Response) -> SessionState:
 async def upload(request: Request, file: UploadFile = File(...)) -> IngestedProject:
     """Upload stage: land a ZIP into a fresh run workspace and detect the root."""
     identity = guard(request, "upload")
+    security.guard_storage(identity)
     run = workspace.new_run(identity)
     try:
         data = await file.read()
@@ -349,6 +350,7 @@ class GithubUploadRequest(BaseModel):
 def upload_github(request: Request, req: GithubUploadRequest) -> IngestedProject:
     """Upload stage: shallow-clone a public GitHub repo into a fresh run."""
     identity = guard(request, "upload")
+    security.guard_storage(identity)
     run = workspace.new_run(identity)
     try:
         return ingest_github(req.url, run, ref=req.ref)
