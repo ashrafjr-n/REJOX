@@ -1,7 +1,7 @@
 {
   "project": {
     "name": "sample-app",
-    "root": "/Users/ashrafjarabeah/Desktop/rejox/test-projects/sample-app",
+    "root": "test-projects/sample-app",
     "framework": "react",
     "language": "ts",
     "bundler": "vite",
