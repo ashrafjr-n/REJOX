@@ -66,7 +66,7 @@ self-checks that its output is syntactically valid TS before emitting.
 | `onSubmit` → dropped (+ `FORM_SUBMIT` unhandled) | attribute removal                                   | ✅ High / automated |
 | `onMouseEnter`/`onKeyDown`/… → dropped          | attribute removal (+ warning)                        | ✅ High / automated |
 | DOM-only attributes surviving a tag rename → dropped: `type` on `button`→`Pressable`, `htmlFor` on `label`→`Text`, `target`/`rel`/`download` on `a`→`Pressable` (`href` is deliberately **kept** — the `<a>` Linking TODO points at it) | attribute removal (+ `WEB_ONLY_ATTRIBUTE` warning) — the RN component has no such prop, so carrying it over is a `tsc` error and never a behaviour | ✅ High / automated |
-| `<Route element={<Screen a={x} b={y} />}>` with props → `<Stack.Screen name component={Screen} />` + `NAV_SCREEN_PROPS` unhandled | navigator generation: `component=` takes a reference, so element props cannot travel with it | ✅ High / automated |
+| `<Route element={<Screen a={a} />}>` where every prop is a plain read of the routing component's `useState` → `<Screen name>{() => <Screen a={a} />}</Screen>` + that `useState` hoisted into `AppNavigator` | navigator generation: `component=` takes a reference, not an element, so the props ride in the render callback and the state moves with the routing half it belonged to | ✅ High / automated |
 | NativeWind-supported Tailwind classes           | **passed through untouched** (the mechanical majority) | ✅ High / automated |
 | `space-x-*`/`space-y-*` → `gap-x-*`/`gap-y-*`   | class rename (child-selector spacing → flex gap)     | ✅ High / automated |
 | `flex` with no direction → append `flex-row`    | web defaults to row, RN to column — direction made explicit | ✅ High / automated |
@@ -83,7 +83,7 @@ comment so nothing is ever silently dropped:
 | `NAV_ACTIVE`    | `NavLink` styles by `isActive`                                   | active state is navigation state; tab bar vs highlight is design |
 | `NAV_CONTAINER` | `<Routes>`/`<Route>`/`<Outlet>` structure                        | navigator arrangement (stack/tab/drawer) is design |
 | `NAV_HOOK`      | router hooks other than `useParams` still referenced             | imperative navigation intent |
-| `NAV_SCREEN_PROPS` | a route element passed props (`<Route element={<Settings darkMode={x} />}>`); a `Stack.Screen` registers a component, not an element, so the props have nowhere to go | where the state belongs once the router stops carrying it — lifted to a context/store, or threaded through `initialParams` — is design, not a rename |
+| `NAV_SCREEN_PROPS` | a route element passed props the generator could **not** relocate — a spread, a derived expression, a value from a context, or a nested-navigator screen (hoisting there would make a second, independent copy of the state) | where such a value belongs once the router stops carrying it — a context/store, or `initialParams` — is design, not a rename. Plain reads of the routing component's own state are relocated instead, and leave no TODO |
 | `CSS_MODULE`    | `*.module.css` imports                                           | restyling a stylesheet is design |
 | `TW_UNSUPPORTED`| `hover:`/`group-*`/`grid-*`/gradients/`backdrop-*`/transitions/animations/`sticky`/`fixed`/`divide-*` | no RN equivalent; re-expression (pressed state, flex reflow, expo-linear-gradient, Moti) is design |
 | `EVENT_ADAPTER` | `onChangeText` handler now receives a string                     | handler body may need reshaping |
