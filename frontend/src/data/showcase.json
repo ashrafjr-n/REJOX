@@ -709,12 +709,12 @@
   },
   "meta": {
     "aiProvider": "fake",
-    "generatedAt": "2026-07-16T18:46:04+04:00",
+    "generatedAt": "2026-08-31T18:37:12+04:00",
     "rejoxVersion": "0.1.0",
     "reproduce": "REJOX_AI_PROVIDER=fake rejox export-showcase",
     "sampleProject": "test-projects/sample-app",
     "schemaVersion": 1,
-    "sourceCommit": "565cce64273d211022a0efc69fe4adc02cfa71cf"
+    "sourceCommit": "87364c33c1aa2a6fbf3286cc28f86ad9fb39be04"
   },
   "project": {
     "counts": {
@@ -853,8 +853,8 @@
         "reason": "HOVER_STATE reduces per-component convertibility."
       },
       {
-        "delta": -0.34,
-        "evidence": "9 component(s): CartBadge, CartItem, CartSummary, Navbar…",
+        "delta": -0.3,
+        "evidence": "8 component(s): CartBadge, CartItem, Navbar, ProductCard…",
         "label": "Implicit flex direction",
         "reason": "IMPLICIT_FLEX_ROW reduces per-component convertibility."
       },
@@ -865,8 +865,8 @@
         "reason": "MISSING_TEXT_WRAP reduces per-component convertibility."
       },
       {
-        "delta": -0.19,
-        "evidence": "5 component(s): Footer, Hero, HomePage, ProductDetailPage…",
+        "delta": -0.15,
+        "evidence": "4 component(s): Hero, HomePage, ProductDetailPage, ProductGrid",
         "label": "Responsive breakpoints",
         "reason": "RESPONSIVE_BREAKPOINT reduces per-component convertibility."
       },
@@ -949,8 +949,8 @@
         "reason": "HOVER_STATE has no clean NativeWind/RN mapping; needs re-expression."
       },
       {
-        "delta": -1.0,
-        "evidence": "5 component(s) affected",
+        "delta": -0.8,
+        "evidence": "4 component(s) affected",
         "label": "Responsive breakpoints",
         "reason": "RESPONSIVE_BREAKPOINT has no clean NativeWind/RN mapping; needs re-expression."
       },
@@ -998,14 +998,14 @@
     ],
     "metroPassed": true,
     "metroRan": true,
-    "predictedConfidence": 97.7,
-    "predictedCoverage": 82.49,
+    "predictedConfidence": 98.0,
+    "predictedCoverage": 82.77,
     "repairRounds": 0,
     "tscErrorCount": 0,
     "tscPassed": true,
     "validatedCompilingCoverage": 100.0,
-    "validatedConfidence": 97.3,
-    "validatedStrictCoverage": 57.7
+    "validatedConfidence": 97.5,
+    "validatedStrictCoverage": 61.5
   },
   "waves": [
     {
