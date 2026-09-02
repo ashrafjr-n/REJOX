@@ -65,6 +65,8 @@ self-checks that its output is syntactically valid TS before emitting.
 | `onChange` on `input`/`textarea`/`select` → `onChangeText` | rename (+ `EVENT_ADAPTER` unhandled)      | ✅ High / automated |
 | `onSubmit` → dropped (+ `FORM_SUBMIT` unhandled) | attribute removal                                   | ✅ High / automated |
 | `onMouseEnter`/`onKeyDown`/… → dropped          | attribute removal (+ warning)                        | ✅ High / automated |
+| DOM-only attributes surviving a tag rename (`type` on `button`→`Pressable`, `htmlFor`, `tabIndex`, `target`/`rel`/`download` on `a`→`Pressable`, `autoComplete` spellings, …) → dropped | attribute removal (+ warning) — the RN element has no such prop, so carrying it over is a `tsc` error, never a behaviour | ✅ High / automated |
+| `<Route element={<Screen a={x} b={y} />}>` with props → `<Stack.Screen name component={Screen} />` + `NAV_SCREEN_PROPS` unhandled | navigator generation: `component=` takes a reference, so element props cannot travel with it | ✅ High / automated |
 | NativeWind-supported Tailwind classes           | **passed through untouched** (the mechanical majority) | ✅ High / automated |
 | `space-x-*`/`space-y-*` → `gap-x-*`/`gap-y-*`   | class rename (child-selector spacing → flex gap)     | ✅ High / automated |
 | `flex` with no direction → append `flex-row`    | web defaults to row, RN to column — direction made explicit | ✅ High / automated |
@@ -81,6 +83,7 @@ comment so nothing is ever silently dropped:
 | `NAV_ACTIVE`    | `NavLink` styles by `isActive`                                   | active state is navigation state; tab bar vs highlight is design |
 | `NAV_CONTAINER` | `<Routes>`/`<Route>`/`<Outlet>` structure                        | navigator arrangement (stack/tab/drawer) is design |
 | `NAV_HOOK`      | router hooks other than `useParams` still referenced             | imperative navigation intent |
+| `NAV_SCREEN_PROPS` | a route element passed props (`<Route element={<Settings darkMode={x} />}>`); a `Stack.Screen` registers a component, not an element, so the props have nowhere to go | where the state belongs once the router stops carrying it — lifted to a context/store, or threaded through `initialParams` — is design, not a rename |
 | `CSS_MODULE`    | `*.module.css` imports                                           | restyling a stylesheet is design |
 | `TW_UNSUPPORTED`| `hover:`/`group-*`/`grid-*`/gradients/`backdrop-*`/transitions/animations/`sticky`/`fixed`/`divide-*` | no RN equivalent; re-expression (pressed state, flex reflow, expo-linear-gradient, Moti) is design |
 | `EVENT_ADAPTER` | `onChangeText` handler now receives a string                     | handler body may need reshaping |
