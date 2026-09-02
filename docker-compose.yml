@@ -57,6 +57,12 @@ x-backend: &backend
     REJOX_API_KEYS: ${REJOX_API_KEYS:?set REJOX_API_KEYS in .env — the API refuses to serve without keys}
     REJOX_CORS_ORIGINS: ${REJOX_CORS_ORIGINS:-http://localhost:5173}
     REJOX_RUN_TTL_SECONDS: ${REJOX_RUN_TTL_SECONDS:-86400}
+    # How a job whose worker died stops looking alive: the executing process
+    # stamps job.json on this beat, and a reader turns a `running` job that has
+    # missed the grace into a terminal WorkerLost failure. Forwarded because the
+    # right grace is a property of the host's load, not of the code. See B6.
+    REJOX_JOB_HEARTBEAT: ${REJOX_JOB_HEARTBEAT:-10}
+    REJOX_JOB_HEARTBEAT_GRACE: ${REJOX_JOB_HEARTBEAT_GRACE:-60}
     REJOX_AI_PROVIDER: ${REJOX_AI_PROVIDER:-gemini}
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   volumes:
