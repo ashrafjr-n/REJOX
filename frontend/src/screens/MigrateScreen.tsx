@@ -90,7 +90,7 @@ function useMigration(jobId: string | null) {
       }
 
       // 2. Stream anything new. Events are named (event: <type>), so listen per type.
-      es = new EventSource(jobEventsUrl(jobId, maxSeq))
+      es = new EventSource(jobEventsUrl(jobId, maxSeq), { withCredentials: true })
       const onEvent = (e: MessageEvent) => {
         try {
           const ev = JSON.parse(e.data) as MigrationEvent
