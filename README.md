@@ -141,7 +141,7 @@ before `docs/ARCHITECTURE.md`, which assumes more.
 ## Deploying
 
 ```bash
-cp .env.example .env     # set REJOX_API_KEYS and GEMINI_API_KEY at minimum
+cp .env.example .env     # set a credential, a session secret and GEMINI_API_KEY
 
 # Run workspaces live on the host and are bind-mounted at the SAME path inside
 # the containers — see below for why that is not optional. 10001 is the uid the
@@ -179,16 +179,41 @@ workspace root at an identical path on both sides keeps them in agreement; the
 sandbox also proves the mount with a canary before running anything, so a
 misconfiguration is an error rather than a green run against an empty folder.
 
-Two settings the deployment refuses to start without: `REJOX_API_KEYS`, and real
+Two things the deployment refuses to run without: a credential, and real
 containment. The worker checks the same sandbox refusal the API does, so a
 misconfigured worker cannot become an un-sandboxed hole behind a correct front
 door. **Read [`docs/SECURITY.md`](docs/SECURITY.md) first** — including what the
 worker's Docker socket mount actually grants.
 
-**Ownership.** A run belongs to the identity that created it. Its uploads, its
-job, and its download answer `404` — not `403`, which would confirm the run
-exists — to every other caller, so one key holder cannot read another's source
-code by learning a `runId`.
+**Signing in.** There are two credentials, because the two clients cannot share
+one. A CLI or CI job sends an API key (`REJOX_API_KEYS`) as `X-API-Key` or
+`Authorization: Bearer`. A browser exchanges an invite code
+(`REJOX_INVITE_CODES`) at `POST /api/session` for an httpOnly, `Secure`,
+`SameSite=Lax` cookie signed with `REJOX_SESSION_SECRET` — which has no default,
+so set it. The browser needs a cookie rather than a header because two of the
+surfaces it uses, the migration event stream (`EventSource`) and the project
+download (a link), cannot send a header at all.
+
+`SameSite=Lax` is what keeps CSRF off this surface without a token, and it works
+because the app and the API are served from **one origin**: the dev server
+proxies `/api` to the backend, and a production deployment puts a reverse proxy
+in the same shape. Serving them on separate origins is not supported.
+
+**Ownership.** A run belongs to the identity that created it — the *account*
+behind a session, not the session, so signing out and back in does not orphan
+your runs. Its uploads, its job, and its download answer `404` — not `403`,
+which would confirm the run exists — to every other caller, so one user cannot
+read another's source code by learning a `runId`.
+
+**Storage.** `REJOX_ACCOUNT_QUOTA_BYTES` (2 GB) bounds what one identity can
+occupy across all its runs, and `REJOX_MIN_FREE_BYTES` stops the server taking
+uploads it has no room to finish. Over quota answers `413` and says the runs
+expire; a full disk answers `503` and says it is the server's problem.
+
+**Logs.** One JSON line per event — stage boundaries, terminal results, HTTP
+requests — each carrying the run id, job id and the caller's identity digest, so
+a job id a user quotes leads straight to the lines about it. `REJOX_LOG_FORMAT=text`
+for a readable terminal format. Credentials are never logged.
 
 **Retention.** A run workspace holds an uploaded project and the React Native
 project emitted from it, so it is deleted after `REJOX_RUN_TTL_SECONDS` (24h
