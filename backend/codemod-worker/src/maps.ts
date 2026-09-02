@@ -42,6 +42,21 @@ export const WEB_ONLY_EVENTS = new Set([
   'onKeyPress', 'onScroll',
 ]);
 
+/**
+ * DOM-only attributes that must not survive a tag rename, keyed by the HOST tag
+ * they appear on (this runs before the rename, while tags are still lowercase).
+ *
+ * These carry no behaviour into RN — the mapped component simply has no such
+ * prop — so leaving them on is a `tsc` error and nothing else. `href` is
+ * deliberately absent: `<a>` already emits a Linking TODO that points the reader
+ * at the href, so removing it would delete the very thing the TODO refers to.
+ */
+export const WEB_ONLY_ATTRIBUTES: Record<string, ReadonlySet<string>> = {
+  button: new Set(['type']),
+  label: new Set(['htmlFor']),
+  a: new Set(['target', 'rel', 'download']),
+};
+
 /** react-router hooks that need React Navigation equivalents. */
 export const ROUTER_HOOKS = new Set([
   'useParams', 'useNavigate', 'useLocation', 'useSearchParams', 'useMatch',

@@ -65,7 +65,7 @@ self-checks that its output is syntactically valid TS before emitting.
 | `onChange` on `input`/`textarea`/`select` → `onChangeText` | rename (+ `EVENT_ADAPTER` unhandled)      | ✅ High / automated |
 | `onSubmit` → dropped (+ `FORM_SUBMIT` unhandled) | attribute removal                                   | ✅ High / automated |
 | `onMouseEnter`/`onKeyDown`/… → dropped          | attribute removal (+ warning)                        | ✅ High / automated |
-| DOM-only attributes surviving a tag rename (`type` on `button`→`Pressable`, `htmlFor`, `tabIndex`, `target`/`rel`/`download` on `a`→`Pressable`, `autoComplete` spellings, …) → dropped | attribute removal (+ warning) — the RN element has no such prop, so carrying it over is a `tsc` error, never a behaviour | ✅ High / automated |
+| DOM-only attributes surviving a tag rename → dropped: `type` on `button`→`Pressable`, `htmlFor` on `label`→`Text`, `target`/`rel`/`download` on `a`→`Pressable` (`href` is deliberately **kept** — the `<a>` Linking TODO points at it) | attribute removal (+ `WEB_ONLY_ATTRIBUTE` warning) — the RN component has no such prop, so carrying it over is a `tsc` error and never a behaviour | ✅ High / automated |
 | `<Route element={<Screen a={x} b={y} />}>` with props → `<Stack.Screen name component={Screen} />` + `NAV_SCREEN_PROPS` unhandled | navigator generation: `component=` takes a reference, so element props cannot travel with it | ✅ High / automated |
 | NativeWind-supported Tailwind classes           | **passed through untouched** (the mechanical majority) | ✅ High / automated |
 | `space-x-*`/`space-y-*` → `gap-x-*`/`gap-y-*`   | class rename (child-selector spacing → flex gap)     | ✅ High / automated |
