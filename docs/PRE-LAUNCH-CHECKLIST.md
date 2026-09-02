@@ -106,10 +106,10 @@ signature below carries the output it came from.
 | B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2) |
 | B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2) |
 | B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2) |
-| B4 | an API restart does not lose an in-flight job | ⟲ **re-red** — was: signed — re-signed 2026-09-03; also proves the heartbeat spares a live worker (jobs.py changed for E0) |
+| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker |
 | B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2) |
-| B6 | a killed worker does not silently strand a job | ⟲ **re-red** — was: signed — RED first (wedged at `running` for ever), fixed 2026-09-03 (jobs.py changed for E0) |
-| B7 | retention actually deletes a run workspace | ⟲ **re-red** — was: signed — RED first (the dry run over-promised), fixed; re-signed 2026-09-03 (jobs.py changed for E0) |
+| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2) |
+| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G |
 | C0 | a server with no keys refuses to serve | ☑ signed |
 | C1 | a wrong key is rejected | ☑ signed |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed |
@@ -805,6 +805,18 @@ in this scenario would mean the grace is too narrow, not that B4 passed.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0).
+
+Job 5555ba3c22364e6d8b7b3150c4807359, run 96a1b17933fd4c6bb5e6c189ade31db1.
+before restart: {"status":"running","nevents":1}
+$ curl /health   -> {"status":"ok"}
+after restart:  {"status":"running","nevents":1}
+final:          {"status":"succeeded","nevents":12,"error":null}
+
+Carries the same control as before — no WorkerLost on a live worker — and one
+more for this change: a migration that SUCCEEDS must not trip the new raise.
+It reached `succeeded` and the worker logged no exception.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change, and it is this gate that proves the heartbeat does not misfire on a live worker.
 
 Job 832f53499f8f4cbbb748348df5a2f0e0, run 819ba6e5260d45989b5dd198430baec9.
@@ -961,6 +973,22 @@ as a known gap, not something to sign around.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after the MigrationFailed change (gate E0). GREEN, unchanged.
+
+Job 71743a5f5e1b47a1b19a5819dfe1b4b8, run a6b678641c184520b698065da56cb634.
+before the kill:      {"status":"running","nevents":1,"error":null}
++10s (inside grace):  {"status":"running","error":null}
++70s (past grace):    {"status":"failed","error":{"type":"WorkerLost",
+                       "stage":"emit","message":"...no heartbeat for 72s..."}}
+$ docker compose start worker
++60s after restart:   {"status":"failed","error":"WorkerLost"}
+$ redis-cli HGET rq:job:71743a5f… status   -> started
+
+Worth re-running rather than assuming: the E0 fix makes `run_job` raise on a
+failed migration, and this is the one failure where `run_job` never returns at
+all — the worker is killed mid-stage, so nothing raises and the API's
+reconciler is still the only party that can rule the job lost. It still does.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 9990f35 — GREEN. This gate has been red once (2026-08-31, below) and that record stays.
 
 Job db527195781c4450aa589ce54404a907, run b7233ed36954421ba07fa3b3600834e8.
@@ -1071,6 +1099,17 @@ docker compose exec -T api sh -c 'du -sh /data/workspaces'
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after the MigrationFailed change, and the first run of this gate at real scale.
+
+$ ls .../workspaces   -> 28 entries, 1.1G
+$ rejox sweep --dry-run  (TTL=1s)   -> 27 run(s), listed
+$ rejox sweep            (TTL=1s)   -> 27 run(s) reaped, the SAME 27
+$ ls .../workspaces   -> 1 entry (gate-probe), 4.0K
+
+27 for 27, across a directory holding 1.1G — the preview/sweep agreement fixed
+earlier today holds at a size where a mismatch would actually cost something,
+and the one non-run directory was again neither claimed nor touched.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit c1d4fea — GREEN, on the second attempt. THE FIRST ATTEMPT WAS RED, and the finding is below.
 
 $ ls .../workspaces          -> 3 runs + gate-probe   (entries: 4, 772K)
