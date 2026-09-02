@@ -172,6 +172,16 @@ Stated plainly, because a security document that only lists wins is marketing:
   of 2026-09-03: against a live daemon, a killed worker's job reported `failed`
   with `WorkerLost` past the grace, while RQ still held the execution as
   `started` — lost, and said so.
+- **A failed migration is not diagnosable from the logs, and the worker's log
+  contradicts it.** Only `app/retention.py` logs anything; no pipeline stage,
+  the API, the worker or the jobs layer emit an application log line, so nothing
+  in the retained output names the stage or reason a migration failed. Worse,
+  because `run_job` deliberately never raises, RQ records a failed migration as
+  `Successfully completed` / `Job OK`. The full picture is available from
+  `GET /api/jobs/{id}` per job, but there is no path from a job id to a cause in
+  the logs and no way to see a failure rate. Observed 2026-09-03; see E0 in
+  [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md). The fix — structured
+  logging keyed by run and job id — is scheduled with the session/auth work.
 - **Retention has no notion of an in-flight run.** The sweeper reaps by age
   alone, so a short `REJOX_RUN_TTL_SECONDS` and a long migration can delete a
   workspace out from under a running job. Harmless at the 24h default.
