@@ -80,11 +80,11 @@ signed green. B7 was RED on its first attempt and found a live bug in
 `rejox sweep --dry-run`; it is signed on the re-run after the fix, with the
 finding kept.
 
-One gate is red again as a consequence: fixing B7 changed
-`backend/app/pipeline/workspace.py`, which the table above says invalidates
-**C3**. C3 was observed green in this same pass, minutes before that change, and
-the change touches expiry rather than ownership — but the trigger is mechanical
-on purpose, so C3 is marked re-red rather than argued out of.
+Fixing B7 changed `backend/app/pipeline/workspace.py`, which the table above
+says invalidates **C3** — so C3 was re-red rather than argued out of, and then
+re-earned: a second `./verify-deployment.sh` pass on commit `ee6df56`, a tree
+that carries the change, green on all eight of its checks. Sections **A, B and
+C are now signed in full**.
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
@@ -113,7 +113,7 @@ signature below carries the output it came from.
 | C0 | a server with no keys refuses to serve | ☑ signed |
 | C1 | a wrong key is rejected | ☑ signed |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed |
-| C3 | a run belongs to one identity and no other | ⟲ **re-red** — was: signed — RED first (a second identity downloaded another's run), fixed (workspace.py changed 2026-09-03) |
+| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 |
 | C4 | CORS is never a wildcard | ☑ signed |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
@@ -1286,6 +1286,22 @@ which walks past ownership entirely — a run's source lives at a path.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit ee6df56 — re-signed after `workspace.py` changed (the B7 fix), on a tree that carries that change.
+
+Run 33b756361c2f4a0283267622ded455b0, job 1df12266a1b940358bf60cf069f22918.
+
+  PASS  download as the owner — 200
+  PASS  download as a stranger — 404
+  PASS  job as a stranger — 404
+  PASS  event stream as a stranger — 404
+  PASS  plan as a stranger — 404
+  PASS  a run that does not exist — No such run: 00000000000000000000000000000000
+  PASS  the two messages have the same shape — No such run: 33b75636…
+  PASS  local-path mode is refused — 403
+
+Someone else's run still reads exactly like a missing one — same status, same
+message shape — so a 404 discloses nothing about whether the run exists.
+
 Signed: 2026-09-01 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit ee2991b — GREEN. The 2026-08-31 failure below is kept in place; this gate has been red once and the record stays.
 
 Two keys configured. Run 9e7306df156e46fc8691cc036c42e55e was uploaded and
