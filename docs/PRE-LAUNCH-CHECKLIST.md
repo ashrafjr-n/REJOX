@@ -118,7 +118,7 @@ signature below carries the output it came from.
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
-| E0 | a failed migration is diagnosable after the fact | ☐ not run |
+| E0 | a failed migration is diagnosable after the fact | ☐ not run — fixture + gate written 2026-09-03 |
 | E1 | one identity cannot fill the disk | ☐ not run |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
@@ -1549,25 +1549,93 @@ about security; they are about whether anyone can tell what happened.
 know". This is the gate most likely to be waved through and most likely to be
 regretted.
 
+It is asked from the operator's side of the glass. The user says "job
+`1df12266…` failed" and nothing more; everything else must come from what the
+deployment kept. Two facts about the code make that a real question rather than
+a formality, both checked rather than assumed:
+
+- `backend/app/retention.py` is the **only** module in the backend that logs
+  anything. The API, the worker, the jobs layer and every pipeline stage emit no
+  application log lines at all, so the container logs hold whatever uvicorn and
+  RQ happen to print and nothing Rejox chose to say.
+- A job that dies with its worker (`WorkerLost`, gate B6) writes its terminal
+  event from a *different* process than the one that failed. The process that
+  actually knew what was happening left nothing behind by definition.
+
 **Command:**
 
-Migrate a project that is known to fail (a deliberately broken fixture), then,
-using **only** what a deployment retains — not the developer's terminal:
+Two failures, deliberately of different kinds, against a running stack
+(`docker compose up -d`, `H="X-API-Key: $KEY"`, `API=http://localhost:8000`).
+
+*Case 1 — the upload is wrong.* `test-projects/broken-app` looks like a React
+project and contains no React component:
 
 ```bash
-docker compose logs --since 30m api worker | tail -50
-curl -s localhost:8000/api/jobs/$JOB -H "$H" | jq '{status, error, events: [.events[] | {stage, type}]}'
+( cd test-projects && zip -qr /tmp/broken.zip broken-app )
+RUN=$(curl -s -X POST "$API/api/upload" -H "$H" -F "file=@/tmp/broken.zip" | jq -r .runId)
+JOB=$(curl -s -X POST "$API/api/migrate" -H "$H" -H 'Content-Type: application/json' \
+        -d "{\"runId\":\"$RUN\"}" | jq -r .jobId)
+sleep 30
+curl -s "$API/api/jobs/$JOB" -H "$H" | jq '{status, error, events: [.events[] | {stage, type}]}'
 ```
 
-**Required output:** it must be possible to state, from that output alone, which
-stage failed and why. Write the answer into the evidence block. If the honest
-answer is "the logs do not say", this gate is red and the fix is structured
-logging with a run/job id on every line.
+*Case 2 — the capacity died.* Start a migration of `test-projects/sample-app`,
+wait for `running`, then `docker compose kill worker` and wait out the heartbeat
+grace, exactly as in B6.
+
+Then, for **each** job, using only what a deployment retains — not the
+developer's terminal, not the pipeline source:
+
+```bash
+docker compose logs --since 30m api worker | tail -80
+docker compose logs --since 30m api worker | grep -c "$JOB"
+```
+
+**Required output:** for each of the two failures, three things written into the
+evidence block below, in plain sentences:
+
+1. **Which stage failed**, and whether the container logs alone say so — or only
+   `job.json` does.
+2. **Why it failed**, in the words an operator would give the user.
+3. **The correlation count** from the `grep -c "$JOB"` above. A zero means the
+   job id a user quotes appears nowhere in the logs, so there is no way to get
+   from their complaint to the lines about it.
+
+The gate is **green** only if both failures can be explained from the retained
+output alone. If the honest answer for either is "the logs do not say, only the
+job's own state does", that is **red**, and the fix is structured logging
+carrying the run and job id on every line — not a wider `--since`.
+
+Record the answer even when it is unflattering. An "unknown" written down is
+worth more than a green mark that nobody tested.
 
 **Evidence:**
 
 ```text
-(unsigned)
+(unsigned — the fixture exists, the gate has not been run)
+
+test-projects/broken-app was added 2026-09-03 for this gate, with
+backend/tests/test_broken_fixture.py pinning it: it asserts the fixture still
+looks like a React project AND still holds zero components, so the day someone
+"fixes" it the test fails instead of the gate silently asserting nothing.
+
+Verified locally at that commit, on the host rather than through the API:
+  $ build_knowledge_graph(test-projects/broken-app)
+    parsed: 9 files, 0 components
+  $ analyze_graph(kg)
+    NothingToMigrate: No React components found in project 'broken-app'
+    (9 files, 0 components, 0 routes, 4 dependencies). Rejox migrates React
+    components to React Native; there is nothing here to score or migrate.
+    Check that the uploaded root is the app directory (not a wrapper folder),
+    and that it contains .jsx/.tsx sources.
+
+That is the pipeline refusing on content, at a named stage — NOT a parse
+failure. Worth stating because the obvious way to build this fixture, a file
+with a syntax error, does not work: the parser skips unparseable files and the
+migration succeeds anyway (tried, 2026-09-03).
+
+This says nothing yet about what the DEPLOYMENT retains, which is the only
+question E0 actually asks.
 ```
 
 ---
