@@ -119,7 +119,7 @@ signature below carries the output it came from.
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | E0 | a failed migration is diagnosable after the fact | ☒ **RED** — the `Job OK` lie is fixed; the silence (no run/job logging) remains |
-| E1 | one identity cannot fill the disk | ☐ not run |
+| E1 | one identity cannot fill the disk | ☒ **RED** on Q1 (300 GB/hour, unbounded) — Q2 not run |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
 ---
@@ -1802,7 +1802,42 @@ deliberately in a scratch environment and find out.
 **Evidence:**
 
 ```text
-(unsigned)
+(unsigned — question 2 has not been run. Question 1 is answered below, and it
+is already red.)
+
+PARTIAL FINDING, 2026-09-03 — from the shipped constants, no experiment needed:
+
+  DEFAULT_UPLOAD_LIMIT            10 / minute / identity   (app/security.py)
+  DEFAULT_MAX_UNCOMPRESSED_BYTES  500 MB / upload          (pipeline/ingest.py)
+  free-space check                none
+  REJOX_RUN_TTL_SECONDS           86400 (24h)
+
+  => 5 GB per minute, 300 GB per hour, for ONE identity, held for 24 hours.
+
+Question 1 of this gate ("how much disk can a single identity consume within
+one retention window") therefore has no bound worth the name: any realistic
+volume is filled in minutes to hours, well inside the window that is supposed
+to release it. The rate limit caps requests, not bytes, and the archive guard
+caps one upload, not their sum — nothing anywhere caps an identity's total
+footprint.
+
+For scale on ordinary use: gate B7's run the same day accumulated 1.1 GB across
+28 workspaces of plain gate traffic — about 40 MB per run. A deliberate caller
+uses the 500 MB ceiling instead, so the gap between normal and hostile is ~12x
+per upload before the rate limit is even considered.
+
+QUESTION 2 IS STILL OPEN: what the API actually does when /data is full is
+unknown, and this gate is not signed until it has been observed. Note before
+running it: the command says "fill the volume deliberately in a scratch
+environment", and on the verification host /private/tmp is the BOOT volume —
+running it as written fills the real disk. It needs a size-capped volume (a disk
+image, or a loopback mount inside a container) prepared first.
+
+THE FIX IS DEFERRED ON PURPOSE, not forgotten. A footprint quota is enforced
+per identity, and the session/auth work now in progress redefines what an
+identity is (API key -> invite code + session). Building the quota against the
+current identity model means building it twice. It is therefore scheduled as
+part of that pass, on top of the new model.
 ```
 
 ---
