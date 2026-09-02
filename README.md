@@ -113,6 +113,23 @@ not wall-clock. `npm run types:showcase` runs `json2ts` over
 JSON and the generated type are committed, so `npm run build` works on a fresh
 clone with no backend running.
 
+**The sample-app Knowledge Graph fixture**
+
+`backend/tests/fixtures/sample-app.kg.json` is the graph most of the test suite
+reads instead of re-parsing the benchmark. It is generated too — never
+hand-edited:
+
+```bash
+cd backend && source venv/bin/activate && rejox export-graph
+```
+
+That runs the real parser-worker over `test-projects/sample-app` and rewrites the
+fixture, byte-deterministically and with `project.root` written repo-relative so
+no machine's home directory is committed. `--project <path>` parses something
+else; `--out <file>` writes elsewhere. `backend/tests/test_parser.py` parses for
+real on every run and fails when the committed fixture no longer matches, so it
+cannot age silently behind the benchmark.
+
 ## Learning the codebase
 
 [`rejox-docs.md`](rejox-docs.md) is a complete walkthrough of the backend written
