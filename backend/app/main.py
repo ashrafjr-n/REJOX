@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -34,7 +35,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.background import BackgroundTask
 
-from app import jobs, queue, retention, security, sessions
+from app import jobs, logs, queue, retention, security, sessions
 from app.models.analysis import AnalysisReport
 from app.models.ingest import IngestedProject
 from app.models.jobs import JobCreated, JobState
@@ -58,6 +59,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     A deployment that would rather schedule `rejox sweep` from cron sets
     REJOX_RETENTION=off.
     """
+    logs.configure()
     reaper = None
     if not retention.disabled():
         reaper = retention.Reaper()
@@ -86,6 +88,30 @@ _DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 def _cors_origins() -> list[str]:
     raw = os.environ.get("REJOX_CORS_ORIGINS", _DEFAULT_CORS_ORIGINS)
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+@app.middleware("http")
+async def _log_context(request: Request, call_next):
+    """Bind the caller's identity for the life of the request, and record it.
+
+    The identity is already a digest (`key:…` / `acct:…`) — the same value
+    `{run}/owner` holds — so a log line joins to a run's owner directly and no
+    credential is ever written down.
+    """
+    started = time.time()
+    with logs.bound(identity=security.identity_of(request)):
+        response = await call_next(request)
+        # Health checks would otherwise be most of the log volume and carry no
+        # information: a deployment already knows whether it is up.
+        if request.url.path != "/health":
+            logs.event(
+                "http_request",
+                method=request.method,
+                path=request.url.path,
+                status=response.status_code,
+                ms=round((time.time() - started) * 1000),
+            )
+        return response
 
 
 app.add_middleware(
