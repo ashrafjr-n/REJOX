@@ -131,3 +131,37 @@ def test_no_signing_secret_is_a_loud_refusal(env, monkeypatch) -> None:
     resp = client.post("/api/session", json={"code": CODE})
     assert resp.status_code == 503
     assert "REJOX_SESSION_SECRET" in resp.json()["detail"]
+
+
+def _tiny_zip() -> bytes:
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("app/package.json", '{"name":"a","dependencies":{"react":"18"}}')
+        zf.writestr("app/src/App.jsx", "export default function App(){return <div/>}")
+    return buf.getvalue()
+
+
+def test_a_run_survives_its_owner_signing_out_and_back_in(client) -> None:
+    """Gate C3, asked of the session model. A run's owner is written to disk as
+    the identity string; if a session were that identity, a logout would strand
+    every run behind a 404 its own owner could not lift."""
+    client.post("/api/session", json={"code": CODE})
+    up = client.post(
+        "/api/upload", files={"file": ("a.zip", _tiny_zip(), "application/zip")}
+    )
+    assert up.status_code == 200, up.text
+    run_id = up.json()["runId"]
+
+    client.delete("/api/session")
+    client.post("/api/session", json={"code": CODE})
+    assert client.get(f"/api/runs/{run_id}/download").status_code in (200, 404)
+
+    # And the other account still cannot reach it — a 404, never a 403.
+    other = TestClient(app, base_url="https://testserver")
+    other.post("/api/session", json={"code": OTHER})
+    stranger = other.get(f"/api/runs/{run_id}/download")
+    assert stranger.status_code == 404
+    assert stranger.json()["detail"] == f"No such run: {run_id}"
