@@ -67,15 +67,10 @@
     {
       "path": "src/App.tsx",
       "type": "component",
-      "loc": 20
+      "loc": 26
     },
     {
-      "path": "src/assets/hero.png",
-      "type": "asset",
-      "loc": 0
-    },
-    {
-      "path": "src/assets/vite.svg",
+      "path": "src/assets/rejox-logo.svg",
       "type": "asset",
       "loc": 0
     },
@@ -87,17 +82,17 @@
     {
       "path": "src/components/CartBadge.tsx",
       "type": "component",
-      "loc": 22
+      "loc": 28
     },
     {
       "path": "src/components/CartItem.tsx",
       "type": "component",
-      "loc": 40
+      "loc": 46
     },
     {
       "path": "src/components/CartSummary.tsx",
       "type": "component",
-      "loc": 38
+      "loc": 60
     },
     {
       "path": "src/components/ErrorMessage.tsx",
@@ -112,7 +107,7 @@
     {
       "path": "src/components/Footer.tsx",
       "type": "component",
-      "loc": 12
+      "loc": 24
     },
     {
       "path": "src/components/Hero.tsx",
@@ -122,12 +117,12 @@
     {
       "path": "src/components/Layout.tsx",
       "type": "component",
-      "loc": 17
+      "loc": 25
     },
     {
       "path": "src/components/Navbar.tsx",
       "type": "component",
-      "loc": 39
+      "loc": 55
     },
     {
       "path": "src/components/ProductCard.module.css",
@@ -147,7 +142,7 @@
     {
       "path": "src/components/QuantityStepper.tsx",
       "type": "component",
-      "loc": 31
+      "loc": 43
     },
     {
       "path": "src/components/Rating.tsx",
@@ -157,7 +152,7 @@
     {
       "path": "src/components/SettingToggle.tsx",
       "type": "component",
-      "loc": 38
+      "loc": 45
     },
     {
       "path": "src/components/Spinner.tsx",
@@ -202,7 +197,7 @@
     {
       "path": "src/pages/SettingsPage.tsx",
       "type": "component",
-      "loc": 38
+      "loc": 59
     },
     {
       "path": "src/store/cartStore.ts",
@@ -238,7 +233,9 @@
       "exportType": "default",
       "props": [],
       "propsExtends": [],
-      "hooksUsed": [],
+      "hooksUsed": [
+        "useState"
+      ],
       "childComponents": [
         "HomePage",
         "Layout",
@@ -312,7 +309,13 @@
       "name": "CartBadge",
       "file": "src/components/CartBadge.tsx",
       "exportType": "default",
-      "props": [],
+      "props": [
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": true
+        }
+      ],
       "propsExtends": [],
       "hooksUsed": [
         "useCartStore"
@@ -336,15 +339,13 @@
         "font-semibold",
         "h-5",
         "hover:bg-slate-100",
+        "hover:bg-slate-800",
         "items-center",
         "justify-center",
         "min-w-5",
         "px-1",
-        "px-2",
-        "py-1",
-        "relative",
         "rounded-full",
-        "rounded-md",
+        "text-slate-200",
         "text-slate-700",
         "text-white",
         "text-xs"
@@ -384,6 +385,11 @@
           "name": "line",
           "type": "CartLine",
           "optional": false
+        },
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": true
         }
       ],
       "propsExtends": [],
@@ -409,19 +415,19 @@
       "tailwindClasses": [
         "flex",
         "flex-1",
-        "font-medium",
         "gap-3",
         "h-14",
+        "hover:text-red-400",
         "hover:text-red-500",
         "items-center",
-        "line-clamp-1",
         "min-w-0",
         "object-cover",
         "py-3",
         "rounded-md",
+        "text-slate-100",
         "text-slate-400",
         "text-slate-500",
-        "text-sm",
+        "text-slate-900",
         "w-14"
       ],
       "cssModuleImports": [],
@@ -470,7 +476,13 @@
       "name": "CartSummary",
       "file": "src/components/CartSummary.tsx",
       "exportType": "default",
-      "props": [],
+      "props": [
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": true
+        }
+      ],
       "propsExtends": [],
       "hooksUsed": [
         "useCartStore"
@@ -490,26 +502,19 @@
         "tailwind"
       ],
       "tailwindClasses": [
+        "bg-slate-900",
         "bg-white",
         "border-slate-200",
-        "border-t",
+        "border-slate-700",
         "divide-slate-100",
+        "divide-slate-700",
         "divide-y",
-        "flex",
-        "font-semibold",
-        "items-center",
-        "justify-between",
-        "mt-4",
-        "p-4",
-        "p-6",
-        "pt-4",
-        "ring-1",
         "ring-slate-200",
-        "rounded-xl",
-        "text-center",
+        "ring-slate-700",
+        "text-slate-100",
+        "text-slate-400",
         "text-slate-500",
-        "text-sm",
-        "text-xl"
+        "text-slate-900"
       ],
       "cssModuleImports": [],
       "webApis": [],
@@ -540,14 +545,7 @@
           "isBare": true
         }
       ],
-      "layoutHints": [
-        {
-          "elementTag": "div",
-          "hasFlexClass": true,
-          "flexDirection": null,
-          "isGrid": false
-        }
-      ],
+      "layoutHints": [],
       "images": [],
       "inlineStyles": []
     },
@@ -683,7 +681,13 @@
       "name": "Footer",
       "file": "src/components/Footer.tsx",
       "exportType": "default",
-      "props": [],
+      "props": [
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
       "propsExtends": [],
       "hooksUsed": [],
       "childComponents": [],
@@ -697,21 +701,12 @@
         "tailwind"
       ],
       "tailwindClasses": [
+        "bg-slate-900",
         "bg-white",
         "border-slate-200",
-        "border-t",
-        "flex",
-        "flex-col",
-        "gap-2",
-        "items-center",
-        "justify-between",
-        "max-w-6xl",
-        "mx-auto",
-        "px-4",
-        "py-6",
-        "sm:flex-row",
-        "text-slate-500",
-        "text-sm"
+        "border-slate-800",
+        "text-slate-400",
+        "text-slate-500"
       ],
       "cssModuleImports": [],
       "webApis": [],
@@ -727,14 +722,7 @@
           "isBare": false
         }
       ],
-      "layoutHints": [
-        {
-          "elementTag": "div",
-          "hasFlexClass": true,
-          "flexDirection": "column",
-          "isGrid": false
-        }
-      ],
+      "layoutHints": [],
       "images": [],
       "inlineStyles": []
     },
@@ -819,7 +807,13 @@
       "name": "Layout",
       "file": "src/components/Layout.tsx",
       "exportType": "default",
-      "props": [],
+      "props": [
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
       "propsExtends": [],
       "hooksUsed": [],
       "childComponents": [
@@ -837,28 +831,20 @@
       ],
       "tailwindClasses": [
         "bg-slate-50",
-        "flex",
+        "bg-slate-950",
         "flex-1",
-        "flex-col",
         "max-w-6xl",
-        "min-h-screen",
         "mx-auto",
         "px-4",
         "py-8",
+        "text-slate-100",
         "text-slate-900",
         "w-full"
       ],
       "cssModuleImports": [],
       "webApis": [],
       "textNodes": [],
-      "layoutHints": [
-        {
-          "elementTag": "div",
-          "hasFlexClass": true,
-          "flexDirection": "column",
-          "isGrid": false
-        }
-      ],
+      "layoutHints": [],
       "images": [],
       "inlineStyles": []
     },
@@ -867,7 +853,13 @@
       "name": "Navbar",
       "file": "src/components/Navbar.tsx",
       "exportType": "default",
-      "props": [],
+      "props": [
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
       "propsExtends": [],
       "hooksUsed": [],
       "childComponents": [
@@ -884,15 +876,16 @@
         "tailwind"
       ],
       "tailwindClasses": [
-        "backdrop-blur",
+        "bg-slate-900/90",
         "bg-white/90",
-        "border-b",
         "border-slate-200",
+        "border-slate-800",
         "flex",
         "font-bold",
         "font-medium",
         "gap-1",
         "hover:bg-slate-100",
+        "hover:bg-slate-800",
         "items-center",
         "justify-between",
         "max-w-6xl",
@@ -902,14 +895,13 @@
         "py-1.5",
         "py-3",
         "rounded-md",
-        "sticky",
+        "text-indigo-400",
         "text-indigo-600",
         "text-lg",
+        "text-slate-300",
         "text-slate-600",
         "text-sm",
-        "top-0",
-        "transition-colors",
-        "z-10"
+        "transition-colors"
       ],
       "cssModuleImports": [],
       "webApis": [],
@@ -1103,6 +1095,11 @@
           "name": "onChange",
           "type": "(quantity: number) => void",
           "optional": false
+        },
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": true
         }
       ],
       "propsExtends": [],
@@ -1121,18 +1118,15 @@
       ],
       "tailwindClasses": [
         "bg-slate-100",
+        "bg-slate-700",
         "flex",
-        "font-medium",
         "gap-2",
-        "h-7",
         "hover:bg-slate-200",
+        "hover:bg-slate-600",
         "items-center",
-        "rounded-md",
-        "text-center",
+        "text-slate-100",
         "text-slate-700",
-        "text-sm",
-        "w-6",
-        "w-7"
+        "text-slate-900"
       ],
       "cssModuleImports": [],
       "webApis": [],
@@ -1239,6 +1233,11 @@
           "name": "onChange",
           "type": "(checked: boolean) => void",
           "optional": false
+        },
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": true
         }
       ],
       "propsExtends": [],
@@ -1259,15 +1258,16 @@
       "tailwindClasses": [
         "bg-indigo-600",
         "bg-slate-300",
+        "bg-slate-600",
         "flex",
-        "font-medium",
         "gap-4",
         "items-center",
         "justify-between",
         "py-4",
+        "text-slate-100",
+        "text-slate-400",
         "text-slate-500",
         "text-slate-900",
-        "text-sm",
         "translate-x-0.5",
         "translate-x-5"
       ],
@@ -1577,7 +1577,18 @@
       "name": "SettingsPage",
       "file": "src/pages/SettingsPage.tsx",
       "exportType": "default",
-      "props": [],
+      "props": [
+        {
+          "name": "darkMode",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "setDarkMode",
+          "type": "(value: boolean) => void",
+          "optional": false
+        }
+      ],
       "propsExtends": [],
       "hooksUsed": [
         "useState"
@@ -1600,22 +1611,19 @@
         "tailwind"
       ],
       "tailwindClasses": [
+        "bg-slate-900",
         "bg-white",
         "divide-slate-100",
-        "divide-y",
+        "divide-slate-700",
         "flex",
         "flex-col",
-        "font-bold",
         "gap-8",
-        "mb-4",
-        "mt-2",
-        "px-4",
-        "ring-1",
         "ring-slate-200",
-        "rounded-xl",
-        "text-2xl",
+        "ring-slate-700",
+        "text-slate-100",
+        "text-slate-400",
         "text-slate-500",
-        "text-xl"
+        "text-slate-900"
       ],
       "cssModuleImports": [],
       "webApis": [],
@@ -1666,14 +1674,30 @@
       "componentName": "HomePage",
       "file": "src/pages/HomePage.tsx",
       "hasParams": false,
-      "params": []
+      "params": [],
+      "elementProps": [],
+      "hostState": [
+        {
+          "value": "darkMode",
+          "setter": "setDarkMode",
+          "initializer": "false"
+        }
+      ]
     },
     {
       "path": "products",
       "componentName": "ProductsPage",
       "file": "src/pages/ProductsPage.tsx",
       "hasParams": false,
-      "params": []
+      "params": [],
+      "elementProps": [],
+      "hostState": [
+        {
+          "value": "darkMode",
+          "setter": "setDarkMode",
+          "initializer": "false"
+        }
+      ]
     },
     {
       "path": "products/:id",
@@ -1682,6 +1706,14 @@
       "hasParams": true,
       "params": [
         "id"
+      ],
+      "elementProps": [],
+      "hostState": [
+        {
+          "value": "darkMode",
+          "setter": "setDarkMode",
+          "initializer": "false"
+        }
       ]
     },
     {
@@ -1689,7 +1721,24 @@
       "componentName": "SettingsPage",
       "file": "src/pages/SettingsPage.tsx",
       "hasParams": false,
-      "params": []
+      "params": [],
+      "elementProps": [
+        {
+          "name": "darkMode",
+          "binding": "darkMode"
+        },
+        {
+          "name": "setDarkMode",
+          "binding": "setDarkMode"
+        }
+      ],
+      "hostState": [
+        {
+          "value": "darkMode",
+          "setter": "setDarkMode",
+          "initializer": "false"
+        }
+      ]
     }
   ],
   "stateManagement": {
@@ -1759,392 +1808,392 @@
   ],
   "edges": [
     {
-      "from": "src/App.tsx",
+      "from_": "src/App.tsx",
       "to": "src/components/Layout.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/App.tsx",
+      "from_": "src/App.tsx",
       "to": "src/pages/HomePage.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/App.tsx",
+      "from_": "src/App.tsx",
       "to": "src/pages/ProductsPage.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/App.tsx",
+      "from_": "src/App.tsx",
       "to": "src/pages/ProductDetailPage.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/App.tsx",
+      "from_": "src/App.tsx",
       "to": "src/pages/SettingsPage.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/api/products.ts",
+      "from_": "src/api/products.ts",
       "to": "src/api/client.ts",
       "kind": "imports"
     },
     {
-      "from": "src/api/products.ts",
+      "from_": "src/api/products.ts",
       "to": "src/lib/types.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/CartBadge.tsx",
+      "from_": "src/components/CartBadge.tsx",
       "to": "src/store/cartStore.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/CartItem.tsx",
+      "from_": "src/components/CartItem.tsx",
       "to": "src/lib/types.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/CartItem.tsx",
+      "from_": "src/components/CartItem.tsx",
       "to": "src/store/cartStore.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/CartItem.tsx",
+      "from_": "src/components/CartItem.tsx",
       "to": "src/components/QuantityStepper.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/CartSummary.tsx",
+      "from_": "src/components/CartSummary.tsx",
       "to": "src/store/cartStore.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/CartSummary.tsx",
+      "from_": "src/components/CartSummary.tsx",
       "to": "src/components/CartItem.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/CartSummary.tsx",
+      "from_": "src/components/CartSummary.tsx",
       "to": "src/components/Button.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/Hero.tsx",
+      "from_": "src/components/Hero.tsx",
       "to": "src/components/Button.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/Layout.tsx",
+      "from_": "src/components/Layout.tsx",
       "to": "src/components/Navbar.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/Layout.tsx",
+      "from_": "src/components/Layout.tsx",
       "to": "src/components/Footer.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/Navbar.tsx",
+      "from_": "src/components/Navbar.tsx",
       "to": "src/components/CartBadge.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/ProductCard.tsx",
+      "from_": "src/components/ProductCard.tsx",
       "to": "src/lib/types.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/ProductCard.tsx",
+      "from_": "src/components/ProductCard.tsx",
       "to": "src/store/cartStore.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/ProductCard.tsx",
+      "from_": "src/components/ProductCard.tsx",
       "to": "src/components/Rating.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/ProductCard.tsx",
+      "from_": "src/components/ProductCard.tsx",
       "to": "src/components/Button.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/components/ProductCard.tsx",
+      "from_": "src/components/ProductCard.tsx",
       "to": "src/components/ProductCard.module.css",
       "kind": "imports"
     },
     {
-      "from": "src/components/ProductGrid.tsx",
+      "from_": "src/components/ProductGrid.tsx",
       "to": "src/lib/types.ts",
       "kind": "imports"
     },
     {
-      "from": "src/components/ProductGrid.tsx",
+      "from_": "src/components/ProductGrid.tsx",
       "to": "src/components/ProductCard.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/main.tsx",
+      "from_": "src/main.tsx",
       "to": "src/index.css",
       "kind": "imports"
     },
     {
-      "from": "src/main.tsx",
+      "from_": "src/main.tsx",
       "to": "src/App.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/HomePage.tsx",
+      "from_": "src/pages/HomePage.tsx",
       "to": "src/components/Hero.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/HomePage.tsx",
+      "from_": "src/pages/HomePage.tsx",
       "to": "src/components/FeatureCard.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx",
+      "from_": "src/pages/ProductDetailPage.tsx",
       "to": "src/api/products.ts",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx",
+      "from_": "src/pages/ProductDetailPage.tsx",
       "to": "src/hooks/useFetch.ts",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx",
+      "from_": "src/pages/ProductDetailPage.tsx",
       "to": "src/store/cartStore.ts",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx",
+      "from_": "src/pages/ProductDetailPage.tsx",
       "to": "src/components/Spinner.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx",
+      "from_": "src/pages/ProductDetailPage.tsx",
       "to": "src/components/ErrorMessage.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx",
+      "from_": "src/pages/ProductDetailPage.tsx",
       "to": "src/components/Rating.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx",
+      "from_": "src/pages/ProductDetailPage.tsx",
       "to": "src/components/Button.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductsPage.tsx",
+      "from_": "src/pages/ProductsPage.tsx",
       "to": "src/api/products.ts",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductsPage.tsx",
+      "from_": "src/pages/ProductsPage.tsx",
       "to": "src/hooks/useFetch.ts",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductsPage.tsx",
+      "from_": "src/pages/ProductsPage.tsx",
       "to": "src/components/ProductGrid.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductsPage.tsx",
+      "from_": "src/pages/ProductsPage.tsx",
       "to": "src/components/Spinner.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/ProductsPage.tsx",
+      "from_": "src/pages/ProductsPage.tsx",
       "to": "src/components/ErrorMessage.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/SettingsPage.tsx",
+      "from_": "src/pages/SettingsPage.tsx",
       "to": "src/components/SettingToggle.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/pages/SettingsPage.tsx",
+      "from_": "src/pages/SettingsPage.tsx",
       "to": "src/components/CartSummary.tsx",
       "kind": "imports"
     },
     {
-      "from": "src/store/cartStore.ts",
+      "from_": "src/store/cartStore.ts",
       "to": "src/lib/types.ts",
       "kind": "imports"
     },
     {
-      "from": "src/App.tsx#App",
+      "from_": "src/App.tsx#App",
       "to": "src/pages/HomePage.tsx#HomePage",
       "kind": "renders"
     },
     {
-      "from": "src/App.tsx#App",
+      "from_": "src/App.tsx#App",
       "to": "src/components/Layout.tsx#Layout",
       "kind": "renders"
     },
     {
-      "from": "src/App.tsx#App",
+      "from_": "src/App.tsx#App",
       "to": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
       "kind": "renders"
     },
     {
-      "from": "src/App.tsx#App",
+      "from_": "src/App.tsx#App",
       "to": "src/pages/ProductsPage.tsx#ProductsPage",
       "kind": "renders"
     },
     {
-      "from": "src/App.tsx#App",
+      "from_": "src/App.tsx#App",
       "to": "src/pages/SettingsPage.tsx#SettingsPage",
       "kind": "renders"
     },
     {
-      "from": "src/components/CartBadge.tsx#CartBadge",
+      "from_": "src/components/CartBadge.tsx#CartBadge",
       "to": "src/store/cartStore.ts#useCartStore",
       "kind": "uses-store"
     },
     {
-      "from": "src/components/CartItem.tsx#CartItem",
+      "from_": "src/components/CartItem.tsx#CartItem",
       "to": "src/components/QuantityStepper.tsx#QuantityStepper",
       "kind": "renders"
     },
     {
-      "from": "src/components/CartItem.tsx#CartItem",
+      "from_": "src/components/CartItem.tsx#CartItem",
       "to": "src/store/cartStore.ts#useCartStore",
       "kind": "uses-store"
     },
     {
-      "from": "src/components/CartSummary.tsx#CartSummary",
+      "from_": "src/components/CartSummary.tsx#CartSummary",
       "to": "src/components/Button.tsx#Button",
       "kind": "renders"
     },
     {
-      "from": "src/components/CartSummary.tsx#CartSummary",
+      "from_": "src/components/CartSummary.tsx#CartSummary",
       "to": "src/components/CartItem.tsx#CartItem",
       "kind": "renders"
     },
     {
-      "from": "src/components/CartSummary.tsx#CartSummary",
+      "from_": "src/components/CartSummary.tsx#CartSummary",
       "to": "src/store/cartStore.ts#useCartStore",
       "kind": "uses-store"
     },
     {
-      "from": "src/components/Hero.tsx#Hero",
+      "from_": "src/components/Hero.tsx#Hero",
       "to": "src/components/Button.tsx#Button",
       "kind": "renders"
     },
     {
-      "from": "src/components/Layout.tsx#Layout",
+      "from_": "src/components/Layout.tsx#Layout",
       "to": "src/components/Footer.tsx#Footer",
       "kind": "renders"
     },
     {
-      "from": "src/components/Layout.tsx#Layout",
+      "from_": "src/components/Layout.tsx#Layout",
       "to": "src/components/Navbar.tsx#Navbar",
       "kind": "renders"
     },
     {
-      "from": "src/components/Navbar.tsx#Navbar",
+      "from_": "src/components/Navbar.tsx#Navbar",
       "to": "src/components/CartBadge.tsx#CartBadge",
       "kind": "renders"
     },
     {
-      "from": "src/components/ProductCard.tsx#ProductCard",
+      "from_": "src/components/ProductCard.tsx#ProductCard",
       "to": "src/components/Button.tsx#Button",
       "kind": "renders"
     },
     {
-      "from": "src/components/ProductCard.tsx#ProductCard",
+      "from_": "src/components/ProductCard.tsx#ProductCard",
       "to": "src/components/Rating.tsx#Rating",
       "kind": "renders"
     },
     {
-      "from": "src/components/ProductCard.tsx#ProductCard",
+      "from_": "src/components/ProductCard.tsx#ProductCard",
       "to": "src/store/cartStore.ts#useCartStore",
       "kind": "uses-store"
     },
     {
-      "from": "src/components/ProductGrid.tsx#ProductGrid",
+      "from_": "src/components/ProductGrid.tsx#ProductGrid",
       "to": "src/components/ProductCard.tsx#ProductCard",
       "kind": "renders"
     },
     {
-      "from": "src/pages/HomePage.tsx#HomePage",
+      "from_": "src/pages/HomePage.tsx#HomePage",
       "to": "src/components/FeatureCard.tsx#FeatureCard",
       "kind": "renders"
     },
     {
-      "from": "src/pages/HomePage.tsx#HomePage",
+      "from_": "src/pages/HomePage.tsx#HomePage",
       "to": "src/components/Hero.tsx#Hero",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "from_": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
       "to": "src/components/Button.tsx#Button",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "from_": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
       "to": "src/components/ErrorMessage.tsx#ErrorMessage",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "from_": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
       "to": "src/components/Rating.tsx#Rating",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "from_": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
       "to": "src/components/Spinner.tsx#Spinner",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "from_": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
       "to": "src/store/cartStore.ts#useCartStore",
       "kind": "uses-store"
     },
     {
-      "from": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
+      "from_": "src/pages/ProductDetailPage.tsx#ProductDetailPage",
       "to": "src/hooks/useFetch.ts#useFetch",
       "kind": "uses-hook"
     },
     {
-      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "from_": "src/pages/ProductsPage.tsx#ProductsPage",
       "to": "src/components/ErrorMessage.tsx#ErrorMessage",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "from_": "src/pages/ProductsPage.tsx#ProductsPage",
       "to": "src/components/ProductGrid.tsx#ProductGrid",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "from_": "src/pages/ProductsPage.tsx#ProductsPage",
       "to": "src/components/Spinner.tsx#Spinner",
       "kind": "renders"
     },
     {
-      "from": "src/pages/ProductsPage.tsx#ProductsPage",
+      "from_": "src/pages/ProductsPage.tsx#ProductsPage",
       "to": "src/hooks/useFetch.ts#useFetch",
       "kind": "uses-hook"
     },
     {
-      "from": "src/pages/SettingsPage.tsx#SettingsPage",
+      "from_": "src/pages/SettingsPage.tsx#SettingsPage",
       "to": "src/components/CartSummary.tsx#CartSummary",
       "kind": "renders"
     },
     {
-      "from": "src/pages/SettingsPage.tsx#SettingsPage",
+      "from_": "src/pages/SettingsPage.tsx#SettingsPage",
       "to": "src/components/SettingToggle.tsx#SettingToggle",
       "kind": "renders"
     },
     {
-      "from": "src/api/products.ts",
+      "from_": "src/api/products.ts",
       "to": "src/api/client.ts",
       "kind": "calls-api"
     }
