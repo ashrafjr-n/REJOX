@@ -49,7 +49,13 @@ class QueueError(RuntimeError):
     fall back to running the work in-process."""
 
 
-def _env_int(name: str, default: int) -> int:
+def env_int(name: str, default: int) -> int:
+    """Read an integer setting, falling back to the default on anything unusable.
+
+    Public because ``app.jobs`` reads its own ceilings the same way, and two
+    parsers that disagree about what ``REJOX_JOB_HEARTBEAT=""`` means is exactly
+    the kind of drift that only shows up in production.
+    """
     raw = os.environ.get(name, "").strip()
     if not raw:
         return default
@@ -90,7 +96,7 @@ def get_queue():
     # essentially forever, which turns an unreachable Redis into a POST
     # /api/migrate that hangs for minutes instead of answering 503 — the client
     # cannot tell "queue is down" from "still thinking".
-    timeout = _env_int("REJOX_REDIS_TIMEOUT", DEFAULT_REDIS_TIMEOUT_SECONDS)
+    timeout = env_int("REJOX_REDIS_TIMEOUT", DEFAULT_REDIS_TIMEOUT_SECONDS)
     connection = Redis.from_url(
         redis_url(),
         socket_connect_timeout=timeout,
@@ -100,7 +106,7 @@ def get_queue():
     return Queue(
         queue_name(),
         connection=connection,
-        default_timeout=_env_int("REJOX_JOB_TIMEOUT", DEFAULT_JOB_TIMEOUT_SECONDS),
+        default_timeout=env_int("REJOX_JOB_TIMEOUT", DEFAULT_JOB_TIMEOUT_SECONDS),
     )
 
 
@@ -129,7 +135,7 @@ def _enqueue_rq(job_id: str, payload: dict[str, Any]) -> None:
             job_id,
             **payload,
             job_id=job_id,  # RQ's own id == ours, so the record is findable
-            result_ttl=_env_int("REJOX_RESULT_TTL", DEFAULT_RESULT_TTL_SECONDS),
+            result_ttl=env_int("REJOX_RESULT_TTL", DEFAULT_RESULT_TTL_SECONDS),
         )
     except QueueError:
         raise
