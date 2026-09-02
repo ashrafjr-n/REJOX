@@ -3,14 +3,25 @@
 This is the "rules write the code" half of the navigation resolver. Given a
 :class:`NavigatorSpec` (whatever chose it — a rule default or the LLM's shape
 decision) and the route table, it emits a complete, syntactically valid
-``AppNavigator.tsx``. It never consults an LLM and never emits a TODO: the
-route table makes screen wiring mechanical.
+``AppNavigator.tsx``. It never consults an LLM: the route table makes screen
+wiring mechanical.
+
+The one thing the route table cannot make mechanical is a route element that
+carried props — ``<Route element={<Settings darkMode={x} />}>``. A `Screen`
+registers a component, not an element, so those props have nowhere to ride
+along. Where they are plain reads of the routing component's own ``useState``,
+that is not a judgment call but a relocation: ``AppNavigator`` *is* what that
+component's routing half becomes, so the state moves with it and the screen is
+written in `Screen`'s render-callback form. Anything richer than a plain read
+(a spread, a derived expression, a value from a context) leaves a
+``NAV_SCREEN_PROPS`` TODO instead — see ``docs/CONVERSION-RULES.md``.
 """
 
 from __future__ import annotations
 
 from app.ai.navigation.models import NavigatorSpec, NavigatorType, NestedNavigator
 from app.models.analysis import RouteMapping
+from app.models.knowledge_graph import RouteHostState
 
 # navigator type → (creator fn, module, JSX var prefix)
 _CREATORS = {
@@ -96,13 +107,93 @@ def _screen_line(var: str, name: str, component: str) -> str:
     return f'        <{var}.Screen name="{name}" component={{{component}}} />'
 
 
+def _route_for(screen: str, routes: list[RouteMapping]) -> RouteMapping | None:
+    return next((r for r in routes if r.screenName == screen), None)
+
+
+def _hoistable_state(route: RouteMapping | None) -> list[RouteHostState] | None:
+    """The routing component's state this screen's element props need.
+
+    ``[]`` means the screen carried no props — an ordinary ``component={X}``
+    line. ``None`` means at least one prop is not a plain read of that state, so
+    nothing can be relocated and the screen owes a TODO instead.
+    """
+    if route is None or not route.elementProps:
+        return []
+
+    by_value = {s.value: s for s in route.hostState}
+    by_setter = {s.setter: s for s in route.hostState if s.setter}
+
+    needed: list[RouteHostState] = []
+    for prop in route.elementProps:
+        state = by_value.get(prop.binding) or by_setter.get(prop.binding) if prop.binding else None
+        if state is None:
+            return None
+        if state not in needed:
+            needed.append(state)
+    return needed
+
+
+def _state_line(state: RouteHostState) -> str:
+    names = state.value if state.setter is None else f"{state.value}, {state.setter}"
+    return f"  const [{names}] = useState({state.initializer});"
+
+
+def _relocatable(route: RouteMapping | None, can_hoist: bool) -> list[RouteHostState] | None:
+    """:func:`_hoistable_state`, narrowed by where the screen is being written.
+
+    Only ``AppNavigator`` can hoist. A nested navigator is its own component, so
+    declaring the state there would create a *second*, independent copy of it —
+    two `useState`s that drift apart on the first render. A nested screen that
+    carried props therefore owes the same TODO as an unresolvable one.
+    """
+    hoisted = _hoistable_state(route)
+    if hoisted and not can_hoist:
+        return None
+    return hoisted
+
+
+def _screen_block(
+    var: str, name: str, component: str, route: RouteMapping | None, can_hoist: bool
+) -> str:
+    """One screen — a plain line, a render callback, or a line owing a TODO."""
+    relocatable = _relocatable(route, can_hoist)
+
+    if relocatable is None and route is not None:
+        carried = ", ".join(p.name for p in route.elementProps)
+        return (
+            f"        {{/* REJOX-TODO(NAV_SCREEN_PROPS): the route passed {carried}; "
+            f"a Screen takes a component, not an element. Lift the value to a "
+            f"context/store, or pass it through initialParams. */}}\n"
+            + _screen_line(var, name, component)
+        )
+
+    if not relocatable or route is None:
+        return _screen_line(var, name, component)
+
+    props = " ".join(f"{p.name}={{{p.binding}}}" for p in route.elementProps)
+    return (
+        f'        <{var}.Screen name="{name}">\n'
+        f"          {{() => <{component} {props} />}}\n"
+        f"        </{var}.Screen>"
+    )
+
+
+def unhoistable_screens(spec: NavigatorSpec, routes: list[RouteMapping]) -> list[str]:
+    """Screens whose element props could not be relocated — one TODO each."""
+    nested = [(s, False) for n in spec.nested for s in n.screens]
+    top = [(s, True) for s in spec.screens]
+    return [s for s, can_hoist in [*top, *nested] if _relocatable(_route_for(s, routes), can_hoist) is None]
+
+
 def _nested_navigator_block(nested: NestedNavigator, routes: list[RouteMapping]) -> tuple[str, str]:
     """(creator-var declaration, function component) for one nested navigator."""
     creator, _, prefix = _CREATORS[nested.type]
     var = f"{nested.parent}{prefix}"
     decl = f"const {var} = {creator}();"
     lines = "\n".join(
-        _screen_line(var, s, _component_for(s, routes) or s) for s in nested.screens
+        _screen_block(var, s, _component_for(s, routes) or s, _route_for(s, routes), can_hoist=False)
+        for s in nested.screens
     )
     fn = (
         f"function {_nested_component(nested.parent)}() {{\n"
@@ -151,15 +242,30 @@ def generate_navigator(spec: NavigatorSpec, routes: list[RouteMapping]) -> str:
     top_var_decl = f"const {prefix} = {creator}();"
     initial = spec.screens[0]
 
+    # A nested parent is a generated navigator, not a route — it never carries
+    # element props of its own, so it is written as a plain screen line.
     screen_lines = []
+    hoisted: list[RouteHostState] = []
     for s in spec.screens:
-        component = _nested_component(s) if s in nested_by_parent else (_component_for(s, routes) or s)
-        screen_lines.append(_screen_line(prefix, s, component))
+        nested = s in nested_by_parent
+        component = _nested_component(s) if nested else (_component_for(s, routes) or s)
+        route = None if nested else _route_for(s, routes)
+        screen_lines.append(_screen_block(prefix, s, component, route, can_hoist=True))
+        for state in _relocatable(route, can_hoist=True) or []:
+            if state not in hoisted:
+                hoisted.append(state)
     screens = "\n".join(screen_lines)
+
+    # The routing component's state comes with its routing half.
+    if hoisted:
+        imports.insert(0, "import { useState } from 'react';")
+    state_block = "".join(f"{_state_line(s)}\n" for s in hoisted)
 
     app = (
         "export function AppNavigator() {\n"
-        "  return (\n"
+        f"{state_block}"
+        + ("\n" if state_block else "")
+        + "  return (\n"
         "    <NavigationContainer>\n"
         f'      <{prefix}.Navigator initialRouteName="{initial}">\n'
         f"{screens}\n"

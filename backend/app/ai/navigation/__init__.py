@@ -12,6 +12,7 @@ from app.ai.navigation.generator import (
     build_navigator_spec,
     generate_navigator,
     stack_spec_from_routes,
+    unhoistable_screens,
 )
 from app.ai.navigation.models import (
     NavigatorSpec,
@@ -47,4 +48,5 @@ __all__ = [
     "resolve_nav_container",
     "shape_prompt",
     "stack_spec_from_routes",
+    "unhoistable_screens",
 ]
