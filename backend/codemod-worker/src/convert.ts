@@ -5,12 +5,14 @@
  * the RN code plus structured warnings and the `unhandled` list (the AI
  * Resolution Engine residue). The transform order matters:
  *
- *   navigation → events → elements → images → text → styles → propsTypes
- *   → imports → TODO header
+ *   navigation → events → attributes → elements → images → text → styles
+ *   → propsTypes → imports → TODO header
  *
  *   - navigation runs first, while <Link>/<NavLink>/useParams are intact;
  *   - events run while host tags are still lowercase, so only graph-proven
  *     project components are ever touched;
+ *   - attributes run for the same reason, and before elements: a DOM-only
+ *     attribute has to go while its tag still says which ones those are;
  *   - images run after elements (img is already <Image>);
  *   - text-wrapping runs after element renames so parent tags are already RN;
  *   - imports run last, over the fully-transformed file.
@@ -20,6 +22,7 @@ import { IndentationText, Project, QuoteKind } from 'ts-morph';
 import type { ConvertResult, Ctx, Options } from './types';
 import { transformNavigation } from './transforms/navigation';
 import { transformEvents } from './transforms/events';
+import { transformAttributes } from './transforms/attributes';
 import { transformElements } from './transforms/elements';
 import { transformImages } from './transforms/images';
 import { transformText } from './transforms/text';
@@ -81,6 +84,7 @@ export function convert(
 
   transformNavigation(sf, ctx);
   transformEvents(sf, ctx);
+  transformAttributes(sf, ctx);
   transformElements(sf, ctx);
   transformImages(sf, ctx);
   transformText(sf, ctx);
