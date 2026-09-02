@@ -63,6 +63,21 @@ _WORKERS: dict[str, threading.Thread] = {}
 _LOCK = threading.Lock()
 
 
+class MigrationFailed(RuntimeError):
+    """Raised by :func:`run_job` once a migration has ended in ``failed``.
+
+    Not how the failure is *reported* — the terminal event in ``job.json`` is
+    that, and it is written before this is raised. This exists so the process
+    that ran the job hears about it too.
+
+    Without it, ``run_job`` returned cleanly from every failure (it catches
+    everything, on purpose) and RQ logged `Successfully completed` / `Job OK`
+    for a migration that had failed. An operator grepping the worker log for
+    trouble found a green line, which is worse than an absent one: silence
+    invites a question, "Job OK" ends it. Observed at gate E0, 2026-09-03.
+    """
+
+
 def _now() -> float:
     return time.time()
 
@@ -344,9 +359,11 @@ def run_job(
     function the `thread` backend runs, so there is exactly one migration code
     path regardless of where it executes.
 
-    Never raises: every failure becomes a terminal ``failed`` event, because a
-    job that vanished without saying why is the one thing the event stream must
-    not allow.
+    Every failure becomes a terminal ``failed`` event first — a job that
+    vanished without saying why is the one thing the event stream must not
+    allow. Only then, if the job ended ``failed``, does this raise
+    :class:`MigrationFailed`, so the process running it records the same outcome
+    the job did. The event stream never depends on that raise.
     """
     source_root = Path(source_root)
     out_dir = Path(out_dir)
@@ -399,6 +416,15 @@ def run_job(
             )
     finally:
         stop_heartbeat.set()
+
+    # The terminal event is written by now, either way. Tell the runner what it
+    # was: a worker's own record of this job must not contradict the job's.
+    final = get_job(job_id)
+    if final.status == "failed":
+        detail = final.error.message if final.error else "no error recorded"
+        kind = final.error.type if final.error else "MigrationError"
+        where = final.error.stage if final.error and final.error.stage else stage
+        raise MigrationFailed(f"{job_id} failed during {where} — {kind}: {detail}")
 
 
 def register_worker(job_id: str, thread: threading.Thread) -> None:

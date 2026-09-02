@@ -376,3 +376,49 @@ def test_the_heartbeat_keeps_a_silent_job_alive(tmp_path, monkeypatch) -> None:
     finally:
         stop.set()
         jobs_mod._REGISTRY.clear()
+
+
+def test_a_failed_migration_tells_its_runner_so(tmp_path, monkeypatch) -> None:
+    """Gate E0 caught RQ logging `Job OK` for a migration that failed, because
+    `run_job` swallowed everything and returned cleanly. The terminal event must
+    still be written first — that contract is unchanged — but the runner has to
+    hear about it too, or the worker's log contradicts the job's own state."""
+    import app.jobs as jobs_mod
+    from app.pipeline import workspace
+
+    monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    jobs_mod._REGISTRY.clear()
+
+    run = workspace.new_run()
+    job = jobs_mod.create_job(run.runId)
+    # A source root that does not exist: the intelligence stage cannot proceed.
+    with pytest.raises(jobs_mod.MigrationFailed) as excinfo:
+        jobs_mod.run_job(
+            job.jobId,
+            source_root=tmp_path / "nowhere",
+            run_id=run.runId,
+            out_dir=run.output_dir,
+            answers={},
+            install=False,
+            run_bundle=False,
+        )
+
+    # The raise names where and why, so a worker log line is worth reading.
+    assert job.jobId in str(excinfo.value)
+    assert "intelligence" in str(excinfo.value)
+
+    # And the terminal event was written BEFORE the raise — the event stream
+    # never depends on anyone catching it.
+    state = jobs_mod.get_job(job.jobId)
+    assert state.status == "failed"
+    assert state.events[-1].type == "failed"
+    jobs_mod._REGISTRY.clear()
+
+
+def test_a_succeeding_migration_raises_nothing(tmp_path, monkeypatch, client) -> None:
+    """The other half: the raise must fire on failure only, or every clean run
+    would report as a crash and the log would lie in the opposite direction."""
+    run_id = _upload(client)
+    job_id = _start_emit_only(client, run_id)
+    state = _await(client, job_id)
+    assert state["status"] == "succeeded"
