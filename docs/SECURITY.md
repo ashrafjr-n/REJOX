@@ -85,10 +85,48 @@ reintroducing it quietly.
 
 `app/security.py`:
 
-- **Identity**: a shared API key (`Authorization: Bearer` or `X-API-Key`) from
-  `REJOX_API_KEYS`, compared as digests in constant time. With no keys
+- **Identity**: two credentials, because the two clients cannot use the same
+  one. `key:<digest>` from a shared API key (`Authorization: Bearer` or
+  `X-API-Key`, from `REJOX_API_KEYS`) for CLI and CI. `acct:<digest>` from a
+  browser session cookie minted from an invite code (`REJOX_INVITE_CODES`, see
+  `app/sessions.py`). Both compared as digests in constant time. With neither
   configured the API returns **503 and says so** rather than serving everyone;
-  `REJOX_ALLOW_ANONYMOUS=1` opts a dev machine out.
+  `REJOX_ALLOW_ANONYMOUS=1` opts a dev machine out. The header is consulted
+  first: a caller that presented a key meant to act as that key, and a stray
+  cookie must not silently override it.
+- **A session carries an account, never a session id.** The identity is derived
+  from the invite code, so it is stable across signing out and back in. This is
+  not a detail: the identity string is what `{run}/owner` stores and what the
+  rate limiter counts, so a per-session identity would orphan every run its
+  owner had on logout and hand them a fresh budget on login.
+- **The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`**, signed with
+  HMAC-SHA256 over `{account, iat, exp}`. `REJOX_SESSION_SECRET` has no default:
+  a shared fallback would let anyone mint a session for any deployment. `Lax`
+  rather than `None` is what keeps CSRF off this surface without a token, and it
+  works because the browser app and the API are served from **one origin** — the
+  Vite dev server proxies `/api`, and a production deployment puts a reverse
+  proxy in the same shape. Serving them on separate origins would require
+  `SameSite=None` plus credentialed CORS, and is not supported.
+- **No session store.** Nothing is kept server-side; the cookie is self-
+  describing and signed. Revocation is per *account* and immediate: every
+  request re-checks that the account still matches a configured invite code, so
+  removing a code kills its sessions on the next request. What this does not
+  offer is revoking one session while leaving that account's others alive — a
+  trade taken deliberately rather than adding a second Redis-backed seam.
+- **Storage ceilings** (gate E1). `REJOX_ACCOUNT_QUOTA_BYTES` bounds one
+  identity's total footprint across all its runs, checked on upload;
+  `REJOX_MIN_FREE_BYTES` refuses uploads while the volume is nearly full. They
+  answer different problems and say so differently: over quota is **413** (your
+  runs, and they expire), low disk is **503** (the server's problem, and nothing
+  you do helps).
+
+  The 2 GB default, so it can be recomputed rather than believed: gate B7
+  measured ~40 MB per run of ordinary use, so 2 GB is roughly 50 runs held at
+  once — far more than a real user has in flight, and small enough not to be a
+  disk. The ceiling exists because the other two limits do not compose: the rate
+  limit caps requests (10 uploads/minute) and the archive guard caps a single
+  upload (500 MB expanded), and 10 x 500 MB is 300 GB/hour held for a 24h
+  retention window. Change either input and this number should be recomputed.
 - **Budgets**: fixed-window per-identity limits, separate per bucket, strictest
   on the stages that cost money (`migrate`) or CPU (`upload`, `pipeline`).
 - **Where the counters live** is one setting, `REJOX_RATE_STORE`. `memory`
