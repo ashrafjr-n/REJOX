@@ -1184,13 +1184,18 @@ checklist lie by omission.
 
 ### C0 — a server with no keys refuses to serve
 
-**Proves:** the refusal default. Shipping with an empty `REJOX_API_KEYS` must
+**Proves:** the refusal default. Shipping with no credentials configured must
 not quietly mean "open to the internet".
+
+Since 2026-09-03 there are TWO credentials — `REJOX_API_KEYS` for CLI clients
+and `REJOX_INVITE_CODES` for browser sessions — and a server needs at least one.
+Both must be empty for the refusal to fire, so both are emptied here.
 
 **Command:**
 
 ```bash
-docker compose -f docker-compose.yml run --rm -e REJOX_API_KEYS= -e REJOX_ALLOW_ANONYMOUS= \
+docker compose -f docker-compose.yml run --rm \
+  -e REJOX_API_KEYS= -e REJOX_INVITE_CODES= -e REJOX_ALLOW_ANONYMOUS= \
   -p 8001:8000 api uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 sleep 5
 curl -s -o /tmp/b -w '%{http_code}\n' -X POST localhost:8001/api/parse \
@@ -1198,9 +1203,16 @@ curl -s -o /tmp/b -w '%{http_code}\n' -X POST localhost:8001/api/parse \
 cat /tmp/b
 ```
 
-**Required output:** HTTP `503`, with a body that names `REJOX_API_KEYS` and
-`REJOX_ALLOW_ANONYMOUS`. Note that the compose file itself refuses to start
-without the variable — record which of the two refusals fired.
+**Required output:** HTTP `503`, with a body naming `REJOX_API_KEYS`,
+`REJOX_INVITE_CODES` and `REJOX_ALLOW_ANONYMOUS`.
+
+Note a deliberate change from the 2026-08-31 signature below, which recorded
+"two refusals": the compose file used to guard `REJOX_API_KEYS` with `:?` and
+refuse to start without it. It cannot any more — a server running on invite
+codes alone has no API keys, and that is now a valid configuration. Compose
+therefore guards neither credential, and the app's 503 is the whole of this
+refusal. Confirm it is still the app that refuses, and that emptying only ONE
+of the two does not trip it.
 
 **Evidence:**
 
