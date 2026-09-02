@@ -47,6 +47,10 @@ console = Console()
 # The Ask questions the emit/scaffold pipeline actually consumes, in order.
 _CORE_QUESTION_IDS = ["project-type", "styling-engine", "navigation-library", "icons", "storage"]
 
+# The command that starts the emitted project. Named once so the panel that
+# prints it and the test that asserts it cannot drift apart.
+_RUN_COMMAND = "npx expo start"
+
 
 # --- small render helpers ----------------------------------------------------
 
@@ -373,6 +377,25 @@ def _render_validation(validation, scores, repair=None) -> None:
         )
 
 
+def _project_panel(out_dir: Path) -> Panel:
+    """Where the project landed, and the two commands that start it.
+
+    Each command sits on its own line rather than being joined with ``&&``:
+    Rich wraps the panel to the console width, and a wrapped ``cd <long path> &&
+    npx expo start`` breaks *inside* the command — the exact break point depends
+    on how long the path happens to be, so the same panel is copy-pasteable on
+    one machine and mangled on the next. A command short enough never to wrap
+    cannot be broken by a narrow terminal.
+    """
+    return Panel(
+        f"[bold]{out_dir}[/]\n\n"
+        f"[dim]Run it:[/]\n"
+        f"  [bold cyan]cd {out_dir}[/]\n"
+        f"  [bold cyan]{_RUN_COMMAND}[/]",
+        title="React Native project", expand=False, border_style="green",
+    )
+
+
 def _render_final(emission, validation, scores, out_dir, counter, cache, proposal, nav_shape) -> None:
     _stage("Done — migration summary")
     converted = [f for f in emission.files if f.sourceFile]
@@ -408,10 +431,7 @@ def _render_final(emission, validation, scores, out_dir, counter, cache, proposa
         console.print(tt)
 
     console.print()
-    console.print(Panel(
-        f"[bold]{out_dir}[/]\n\n[dim]Run it:[/]  [bold cyan]cd {out_dir} && npx expo start[/]",
-        title="React Native project", expand=False, border_style="green",
-    ))
+    console.print(_project_panel(out_dir))
 
 
 # --- provider seam -----------------------------------------------------------
