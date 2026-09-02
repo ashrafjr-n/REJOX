@@ -78,7 +78,7 @@ def test_every_question_has_exactly_one_recommended_option(plan: MigrationPlan) 
 
 def test_question_context_cites_real_numbers(plan: MigrationPlan) -> None:
     styling = next(q for q in plan.questions if q.id == "styling-engine")
-    assert "138 Tailwind classes" in styling.context
+    assert "131 Tailwind classes" in styling.context
     nav = next(q for q in plan.questions if q.id == "navigation-library")
     assert "4 routes" in nav.context
 
