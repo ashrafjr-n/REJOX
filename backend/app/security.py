@@ -5,10 +5,25 @@ spend freely: `/api/migrate` installs a dependency tree, type-checks and bundles
 a project, and the AI Resolution Engine spends a metered Gemini quota. So the
 HTTP surface has two gates, both deliberately simple:
 
-**Identity** — a shared API key, sent as ``Authorization: Bearer <key>`` or
-``X-API-Key``. Keys come from ``REJOX_API_KEYS`` (comma-separated). This is not
-user accounts; it is the smallest thing that stops the endpoint being open to
-the internet, and the identity it establishes is what the rate limiter counts.
+**Identity** — established from one of two sources, because the two clients of
+this API cannot use the same credential:
+
+``key:<digest>``
+    A shared API key, sent as ``Authorization: Bearer <key>`` or ``X-API-Key``,
+    from ``REJOX_API_KEYS``. The credential for a CLI, CI job or script.
+
+``acct:<digest>``
+    A browser session cookie carrying an account, minted from an invite code —
+    see :mod:`app.sessions`. Browsers get this because two of the surfaces they
+    use (``EventSource`` and a download link) cannot send a header at all.
+
+Both resolve to a **stable** identity string, which is what makes them
+interchangeable everywhere it is used: the rate limiter counts it, and
+``{run}/owner`` stores it. An account survives logging out and back in, so a run
+does not change hands and a budget cannot be reset by re-authenticating.
+
+The header is consulted first: a caller that presented a key meant to act as
+that key, and a stray cookie must not silently override it.
 
 **Budget** — a fixed-window limit per identity, stricter for the stages that
 cost real money or CPU than for reads.
@@ -44,6 +59,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import HTTPException, Request
+
+from app import sessions
 
 # Fixed-window budgets, per identity. Reads are cheap; the pipeline stages that
 # install dependencies or spend LLM quota are not.
@@ -100,28 +117,44 @@ def _presented_key(request: Request) -> Optional[str]:
 def identify(request: Request) -> str:
     """Authenticate the caller and return the identity the limiter counts.
 
-    Returns the key's digest prefix for an authenticated caller, or
+    ``key:<digest>`` for an API key, ``acct:<digest>`` for a browser session, or
     ``ip:<addr>`` when anonymous access is explicitly allowed.
     """
     keys = _configured_keys()
-    if not keys:
+    codes = sessions.configured_codes()
+    if not keys and not codes:
         if _env_flag("REJOX_ALLOW_ANONYMOUS"):
             return f"ip:{request.client.host if request.client else 'unknown'}"
         raise HTTPException(
             status_code=503,
             detail=(
-                "This Rejox server has no API keys configured, so it will not "
-                "serve requests. Set REJOX_API_KEYS (comma-separated), or "
+                "This Rejox server has no API keys or invite codes configured, "
+                "so it will not serve requests. Set REJOX_API_KEYS or "
+                "REJOX_INVITE_CODES (comma-separated), or "
                 "REJOX_ALLOW_ANONYMOUS=1 for a local development server."
             ),
         )
 
     presented = _presented_key(request)
     if presented is None:
+        # No key offered: this is a browser, or nothing at all.
+        account = sessions.account_from_request(request)
+        if account is not None:
+            return f"acct:{account}"
         raise HTTPException(
             status_code=401,
-            detail="Missing API key. Send `Authorization: Bearer <key>` or `X-API-Key`.",
+            detail=(
+                "Not signed in. Send `Authorization: Bearer <key>` / `X-API-Key`, "
+                "or POST an invite code to /api/session for a browser session."
+            ),
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not keys:
+        # Keys are not in use on this server, so a presented key cannot match
+        # one. Say that rather than the misleading "Invalid API key".
+        raise HTTPException(
+            status_code=401,
+            detail="This server accepts invite-code sessions, not API keys.",
         )
     # Compare digests in constant time so a wrong key leaks no timing signal.
     presented_digest = _digest(presented)
