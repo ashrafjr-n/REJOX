@@ -91,7 +91,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
+      # Full history, not the default depth-1 clone: the showcase export dates
+      # itself from the last commit that touched test-projects/sample-app, and
+      # a shallow checkout has no such commit to find — it would silently date
+      # the export from HEAD instead and fail the staleness gate on every push.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
