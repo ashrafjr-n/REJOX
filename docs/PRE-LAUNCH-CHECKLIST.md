@@ -751,9 +751,17 @@ it had when the API died, is red.
 
 Let it run to completion and confirm it reaches `succeeded`.
 
+Since 2026-09-02 this gate also separates the heartbeat from the wedge it
+replaced: here the WORKER never died, so its beats keep landing in job.json
+across the API restart and the job must stay `running`. A `WorkerLost` failure
+in this scenario would mean the grace is too narrow, not that B4 passed.
+
 **Evidence:**
 
 ```text
+⟲ RE-RED 2026-09-02 by the jobs.py heartbeat change. The signature below stands
+as the record of the last time this was observed, and must be re-earned.
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 Job c4ac349c… started, waited for status `running`, then:
 $ docker compose restart api
