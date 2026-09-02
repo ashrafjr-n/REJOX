@@ -117,7 +117,7 @@ function HealthIndicator() {
 /** Height reserved for the fixed capsule header (top: 20px + its own height). */
 const HEADER_SPACE = 84
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children }: { children?: ReactNode }) {
   const stage = usePipelineStore((s) => s.stage)
   const reset = usePipelineStore((s) => s.reset)
   // Same state the capsule uses, so the step bar tracks it exactly: parked
