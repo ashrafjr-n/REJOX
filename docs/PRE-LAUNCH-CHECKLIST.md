@@ -72,9 +72,15 @@ Re-run 2026-09-01 against the same host, commit `4468bc4`, by
 all green in one pass. That run also caught B5 passing for the wrong reason —
 see its entry.
 
+2026-09-02: `backend/app/jobs.py` and `backend/app/queue.py` changed, to fix the
+B6 finding. By the re-signing table above that invalidates **all of section B**,
+so every B signature below is marked `⟲ re-red` and kept in place to be
+re-earned — `./verify-deployment.sh` covers B0, B1, B2, B3 and B5 in one pass;
+B4, B6 and B7 are run by hand. Nothing here was re-signed on a green test suite.
+
 **Three gates found release blockers that code review had not.** A0, B2 and C3
-were red on their first run and are signed with the failure kept in place; B6 is
-red and stays red. Every signature below carries the output it came from.
+were red on their first run and are signed with the failure kept in place. Every
+signature below carries the output it came from.
 
 | Gate | Proves | Status |
 | --- | --- | --- |
@@ -88,14 +94,14 @@ red and stays red. Every signature below carries the output it came from.
 | A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
 | A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped |
 | A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped |
-| B0 | all three services come up and stay up | ☑ signed |
-| B1 | the worker is registered with Redis and takes jobs | ☑ signed |
-| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed |
-| B3 | the emitted project is downloadable and real | ☑ signed |
-| B4 | an API restart does not lose an in-flight job | ☑ signed |
-| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly |
-| B6 | a killed worker does not silently strand a job | ☒ **RED** — a killed worker wedges the job at `running` for ever |
-| B7 | retention actually deletes a run workspace | ☑ signed |
+| B0 | all three services come up and stay up | ⟲ **re-red** — was: signed |
+| B1 | the worker is registered with Redis and takes jobs | ⟲ **re-red** — was: signed |
+| B2 | a full migration completes through the queue | ⟲ **re-red** — was: signed — RED first (API served stale state), fixed |
+| B3 | the emitted project is downloadable and real | ⟲ **re-red** — was: signed |
+| B4 | an API restart does not lose an in-flight job | ⟲ **re-red** — was: signed |
+| B5 | Redis down answers 503 — fast, and never in-process | ⟲ **re-red** — was: signed — 503 in <1s, queue refusal asserted directly |
+| B6 | a killed worker does not silently strand a job | ⟲ **fix landed, unrun** — heartbeat + `WorkerLost`; needs the live re-run |
+| B7 | retention actually deletes a run workspace | ⟲ **re-red** — was: signed |
 | C0 | a server with no keys refuses to serve | ☑ signed |
 | C1 | a wrong key is rejected | ☑ signed |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed |
@@ -873,6 +879,33 @@ as a known gap, not something to sign around.
 **Evidence:**
 
 ```text
+UNSIGNED — the finding below was fixed on 2026-09-02; the gate has NOT been
+re-run against a live daemon since, and a fix asserted only by unit tests is
+exactly what this document refuses to accept.
+
+WHAT CHANGED (commit V1.2–V1.5, `backend/app/jobs.py`): the process executing a
+migration stamps `updatedAt` into job.json every REJOX_JOB_HEARTBEAT seconds
+(default 10), started in `run_job` and stopped in its `finally`. `get_job` and
+`events_after` reconcile the persisted path only: a `running` job with no beat
+for REJOX_JOB_HEARTBEAT_GRACE seconds (default 60) gets a terminal `failed`
+event of type `WorkerLost`, written back to job.json so every later reader
+agrees. A heartbeat appends no event — nothing happened — it only moves the
+timestamp.
+
+The migration is still LOST, not recovered: nothing re-queues it. This gate
+asks what an operator sees, and the answer is now a failure with a reason
+instead of `running` for ever.
+
+$ pytest -q tests/test_jobs.py -k "worker_died or heartbeating or queued_job_is_never or heartbeat_keeps"
+4 passed
+
+TO SIGN, the command at the top of this gate must be run again and produce:
+  - 10s after `docker compose kill worker`, before the grace expires: running
+  - after the grace (>60s): {"status":"failed","error":{"type":"WorkerLost",…}}
+  - restarting the worker does not move it back to running.
+
+--- the original finding, kept in place ---
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4 — RED, recorded as a finding rather than a pass.
 
 Job b3c1357d… running, then `docker compose kill worker`:
@@ -899,6 +932,9 @@ that will never change.
 Not a launch blocker on its own — but it must be fixed or documented in
 docs/SECURITY.md as a known gap before real users can be told what "running"
 means.
+
+[2026-09-02: fixed, see above. docs/SECURITY.md now describes the residue —
+the job is lost and reported, not recovered.]
 ```
 
 ---
