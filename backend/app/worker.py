@@ -4,8 +4,13 @@
 
 Run one or more of these alongside the API when ``REJOX_QUEUE=rq``. Each worker
 executes ``app.jobs.run_job`` for one migration at a time, so the fleet's
-capacity is simply how many workers you run — and a worker that dies mid-job
-returns that job to the queue rather than losing it.
+capacity is simply how many workers you run.
+
+A worker that dies mid-job does NOT return that job to the queue — RQ holds the
+execution as ``started`` and nothing re-queues it (observed, gate B6). What
+happens instead is that the job stops heartbeating into ``job.json`` and the
+next reader marks it terminally ``failed``: the migration is lost, but the
+client is told so rather than polling ``running`` for ever.
 
 A worker needs the same environment the API has: the run workspace (so it can
 read the uploaded source and write ``job.json``), the sandbox configuration (it
