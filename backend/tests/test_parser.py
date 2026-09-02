@@ -6,6 +6,9 @@ and assert concrete, expected numbers — this is the gate for the stage.
 
 from __future__ import annotations
 
+import difflib
+import itertools
+import json
 from pathlib import Path
 
 import pytest
@@ -13,11 +16,17 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.knowledge_graph import KnowledgeGraph
-from app.pipeline.intelligence import IntelligenceError, build_knowledge_graph
+from app.pipeline.intelligence import (
+    IntelligenceError,
+    build_knowledge_graph,
+    render_graph_fixture,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_APP = REPO_ROOT / "test-projects" / "sample-app"
-BROKEN_PROJECT = Path(__file__).resolve().parent / "fixtures" / "broken-project"
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+BROKEN_PROJECT = FIXTURES / "broken-project"
+COMMITTED_GRAPH = FIXTURES / "sample-app.kg.json"
 
 EXPECTED_COMPONENTS = {
     "App", "Button", "CartBadge", "CartItem", "CartSummary", "ErrorMessage",
@@ -165,6 +174,39 @@ def test_tailwind_classes_present_on_styled_components(kg: KnowledgeGraph) -> No
 def test_edges_cover_all_kinds(kg: KnowledgeGraph) -> None:
     kinds = {e.kind for e in kg.edges}
     assert {"imports", "renders", "uses-hook", "uses-store", "calls-api"} <= kinds
+
+
+# --- The committed fixture ---------------------------------------------------
+
+
+def test_committed_fixture_equals_a_fresh_parse(kg: KnowledgeGraph) -> None:
+    """Most of the suite reads the committed graph instead of re-parsing, so a
+    fixture that has aged behind the benchmark makes every one of those tests
+    assert about a project that no longer exists. This module parses for real —
+    so it is the one place that can prove the file is still current."""
+    fresh = render_graph_fixture(kg, project_path=SAMPLE_APP)
+    committed = COMMITTED_GRAPH.read_text(encoding="utf-8")
+    if fresh == committed:
+        return
+    # A raw assert would diff two 49 KB strings; the first few differing lines
+    # say what drifted, and the command says what to do about it.
+    drift = itertools.islice(
+        difflib.unified_diff(
+            committed.splitlines(), fresh.splitlines(),
+            "committed", "fresh parse", lineterm="", n=1,
+        ),
+        24,
+    )
+    pytest.fail(
+        "backend/tests/fixtures/sample-app.kg.json is stale — "
+        "re-run `rejox export-graph`.\n" + "\n".join(drift)
+    )
+
+
+def test_committed_fixture_carries_no_absolute_path() -> None:
+    committed = COMMITTED_GRAPH.read_text(encoding="utf-8")
+    assert str(REPO_ROOT) not in committed
+    assert json.loads(committed)["project"]["root"] == "test-projects/sample-app"
 
 
 # --- Graceful degradation ---------------------------------------------------
