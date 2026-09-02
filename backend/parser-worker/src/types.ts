@@ -115,6 +115,15 @@ export interface Route {
   file: string | null;
   hasParams: boolean;
   params: string[];
+  /**
+   * Props the route's element passes to its component
+   * (`<Route element={<Settings darkMode={x} />}>` → `["darkMode"]`).
+   *
+   * A `Stack.Screen` registers a component, not an element, so these have
+   * nowhere to travel — the navigator generator has to answer for them rather
+   * than drop them on the floor.
+   */
+  elementProps: string[];
 }
 
 export interface Store {

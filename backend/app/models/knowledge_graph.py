@@ -139,6 +139,10 @@ class Route(KGBase):
     file: Optional[str] = None
     hasParams: bool = False
     params: list[str] = Field(default_factory=list)
+    # Props the route's element passes to its component. A React Navigation
+    # screen registers a component, not an element, so these cannot travel with
+    # it — see NAV_SCREEN_PROPS in docs/CONVERSION-RULES.md.
+    elementProps: list[str] = Field(default_factory=list)
 
 
 # --- State management -------------------------------------------------------

@@ -20,19 +20,32 @@ function stringAttr(attr: Node | undefined): string | null {
   return null;
 }
 
-function componentNameFromElement(attr: Node | undefined): string | null {
+/** The `<X … />` inside `element={…}`, as an opening/self-closing tag. */
+function elementTag(attr: Node | undefined) {
   if (!attr || !Node.isJsxAttribute(attr)) return null;
   const init = attr.getInitializer();
   if (!init || !Node.isJsxExpression(init)) return null;
   const expr = init.getExpression();
   if (!expr) return null;
-  if (Node.isJsxSelfClosingElement(expr)) {
-    return expr.getTagNameNode().getText();
-  }
-  if (Node.isJsxElement(expr)) {
-    return expr.getOpeningElement().getTagNameNode().getText();
-  }
+  if (Node.isJsxSelfClosingElement(expr)) return expr;
+  if (Node.isJsxElement(expr)) return expr.getOpeningElement();
   return null;
+}
+
+function componentNameFromElement(attr: Node | undefined): string | null {
+  return elementTag(attr)?.getTagNameNode().getText() ?? null;
+}
+
+/**
+ * Named props on the route's element. Spreads (`{...rest}`) have no name to
+ * report, so they are counted under `...` rather than passed over in silence.
+ */
+function elementPropsFrom(attr: Node | undefined): string[] {
+  const tag = elementTag(attr);
+  if (!tag) return [];
+  return tag
+    .getAttributes()
+    .map((a) => (Node.isJsxAttribute(a) ? a.getNameNode().getText() : '...'));
 }
 
 function paramsFromPath(path: string): string[] {
@@ -83,6 +96,7 @@ export function extractRoutes(
       file,
       hasParams: params.length > 0,
       params,
+      elementProps: elementPropsFrom(attrMap.get('element')),
     });
   }
 
