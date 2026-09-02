@@ -102,8 +102,8 @@ red and stays red. Every signature below carries the output it came from.
 | C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed |
 | C4 | CORS is never a wildcard | ☑ signed |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
-| D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ job written, passing locally — CI run unsigned |
-| D1 | the compose deployment is exercised in CI | ◐ job + script written — CI run unsigned |
+| D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
+| D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | E0 | a failed migration is diagnosable after the fact | ☐ not run |
 | E1 | one identity cannot fill the disk | ☐ not run |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
@@ -1272,7 +1272,8 @@ runner's daemon, and is required for merge. Paste the green run's URL.
 **Evidence:**
 
 ```text
-PARTIAL — the job exists and passes locally; the CI run itself is unsigned.
+PARTIAL — the job is green on GitHub across three consecutive pushes to
+master; the required-status-check half of this gate is not in place yet.
 
 `.github/workflows/ci.yml` job `containment` (Containment — live daemon,
 section A) runs `pytest -m sandbox_live` from backend/tests/test_sandbox_live.py:
@@ -1288,10 +1289,34 @@ asserting nothing.
 $ pytest -q -m sandbox_live          # macOS, Docker Desktop 29.6.2
 9 passed in 15.89s
 
+2026-09-02 — Ashraf — commit d4386e1. `Containment (live daemon — section A)`
+on GitHub Actions, ubuntu-latest, three consecutive pushes to master:
+
+$ gh run view <id> --json jobs -q '.jobs[] | select(.name|startswith("Containment"))'
+  33581306641  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33581306641
+  33659942702  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33659942702
+  33660487355  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33660487355
+
+The first two of those runs failed overall — on `Backend (integration)`, an
+unrelated job — which is why the evidence is per-job and not per-run. The third
+is the first fully green run on master.
+
 STILL REQUIRED TO SIGN:
-  - a green run of the `containment` job on GitHub, URL pasted here;
   - the job marked as a required status check on master (a repository setting,
     not something this file or the workflow can assert).
+
+    Repository state as of 2026-09-02, checked rather than assumed:
+
+    $ gh api repos/ashrafjr-n/REJOX/branches/master/protection
+      404 Branch not protected
+    $ gh api repos/ashrafjr-n/REJOX/rulesets -q '.[]|{name,enforcement}'
+      {"name":"master gates","enforcement":"active"}   # deletion + non_fast_forward only
+
+    The ruleset deliberately carries no `required_status_checks` rule yet: on
+    this repository that rule also rejects direct pushes to master, so turning
+    it on means moving to pull requests. That is a decision taken before
+    launch, not a line edited into this file — until it is taken, this gate is
+    PARTIAL and says so.
 ```
 
 ---
@@ -1306,7 +1331,8 @@ B5 against it, and fails the build on any of them. Paste the green run's URL.
 **Evidence:**
 
 ```text
-PARTIAL — the job and its script exist; the CI run itself is unsigned.
+PARTIAL — the job is green on GitHub across three consecutive pushes to
+master; the required-status-check half of this gate is not in place yet.
 
 `./verify-deployment.sh` runs A0, A1, A8, A9, B0, B1, B2, B3 and B5 as one
 pass, dumps the API and worker logs on any failure, and exits non-zero.
@@ -1318,9 +1344,18 @@ host, where every path they name is already shared with the daemon, so A1's
 mismatch cannot arise there. Here a worker inside a container asks the host's
 daemon to mount a path — the exact geometry that shipped broken.
 
+2026-09-02 — Ashraf — commit d4386e1. `Deployment (docker compose — sections
+B and C)` on GitHub Actions, ubuntu-latest, the same three pushes:
+
+  33581306641  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33581306641
+  33659942702  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33659942702
+  33660487355  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33660487355
+
 STILL REQUIRED TO SIGN:
-  - a green run of the `deployment` job on GitHub, URL pasted here;
-  - the job marked as a required status check on master.
+  - the job marked as a required status check on master. See the same note
+    under D0: the `master gates` ruleset exists and is active, but carries only
+    `deletion` and `non_fast_forward`; required status checks would also block
+    direct pushes to master, and that move is deferred to pre-launch.
 ```
 
 ---
