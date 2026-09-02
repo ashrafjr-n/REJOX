@@ -80,11 +80,18 @@ signed green. B7 was RED on its first attempt and found a live bug in
 `rejox sweep --dry-run`; it is signed on the re-run after the fix, with the
 finding kept.
 
-Fixing B7 changed `backend/app/pipeline/workspace.py`, which the table above
-says invalidates **C3** — so C3 was re-red rather than argued out of, and then
-re-earned: a second `./verify-deployment.sh` pass on commit `ee6df56`, a tree
-that carries the change, green on all eight of its checks. Sections **A, B and
-C are now signed in full**.
+2026-09-03, later the same day: the session/auth pass landed — invite-code
+sessions (`app/sessions.py`, `app/security.py`, `app/main.py`), structured
+logging (`app/logs.py`, `app/jobs.py`), and the E1 storage quota
+(`app/security.py`, `app/pipeline/workspace.py`). By the table above that
+invalidates **all of B and all of C**, and every one of those signatures is
+marked `⟲ re-red` and kept in place to be re-earned. **E0 and E1 must be re-run
+too** — both have had their findings addressed in code, and code is not
+evidence.
+
+Nothing in this file has been signed on the strength of that work. The previous
+state — A, B and C signed in full, earned across three passes earlier the same
+day — is preserved below each gate as the record of what was last observed.
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
@@ -102,24 +109,24 @@ signature below carries the output it came from.
 | A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
 | A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped |
 | A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped |
-| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2) |
-| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2) |
-| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2) |
-| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2) |
-| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker |
-| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2) |
-| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2) |
-| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G |
-| C0 | a server with no keys refuses to serve | ☑ signed |
-| C1 | a wrong key is rejected | ☑ signed |
-| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed |
-| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 |
-| C4 | CORS is never a wildcard | ☑ signed |
-| C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
+| B0 | all three services come up and stay up | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2) |
+| B1 | the worker is registered with Redis and takes jobs | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2) |
+| B2 | a full migration completes through the queue | ⟲ **re-red** — was: signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2) |
+| B3 | the emitted project is downloadable and real | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2) |
+| B4 | an API restart does not lose an in-flight job | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker |
+| B5 | Redis down answers 503 — fast, and never in-process | ⟲ **re-red** — was: signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2) |
+| B6 | a killed worker does not silently strand a job | ⟲ **re-red** — was: signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2) |
+| B7 | retention actually deletes a run workspace | ⟲ **re-red** — was: signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G |
+| C0 | a server with no keys refuses to serve | ⟲ **re-red** — was: signed |
+| C1 | a wrong key is rejected | ⟲ **re-red** — was: signed |
+| C2 | the rate limit is shared across API replicas | ⟲ **re-red** — was: signed — 2 replicas, 40 requests, 10 allowed |
+| C3 | a run belongs to one identity and no other | ⟲ **re-red** — was: signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 |
+| C4 | CORS is never a wildcard | ⟲ **re-red** — was: signed |
+| C5 | an oversized body is refused before it costs anything | ⟲ **re-red** — was: signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
-| E0 | a failed migration is diagnosable after the fact | ☒ **RED** — the `Job OK` lie is fixed; the silence (no run/job logging) remains |
-| E1 | one identity cannot fill the disk | ☒ **RED** on Q1 (300 GB/hour, unbounded) — Q2 not run |
+| E0 | a failed migration is diagnosable after the fact | ☒ **RED** — both findings now fixed in code; awaiting the re-run |
+| E1 | one identity cannot fill the disk | ☒ **RED** — quota + free-space floor now shipped; awaiting the re-run |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
 ---
