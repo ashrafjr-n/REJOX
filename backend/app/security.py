@@ -352,6 +352,19 @@ _BUCKET_LIMITS = {
 }
 
 
+def identity_of(request: Request) -> Optional[str]:
+    """The caller's identity if one can be established, else ``None``.
+
+    Never raises and never charges a budget: this is for logging, which must not
+    be able to change whether a request succeeds. `identify()` remains the only
+    thing that decides that.
+    """
+    try:
+        return identify(request)
+    except HTTPException:
+        return None
+
+
 def guard(request: Request, bucket: str) -> str:
     """Authenticate, then charge one request against ``bucket``'s budget."""
     identity = identify(request)

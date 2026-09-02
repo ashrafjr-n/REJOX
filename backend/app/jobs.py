@@ -40,6 +40,7 @@ from app.pipeline.analyzer import analyze_graph
 from app.pipeline.intelligence import build_knowledge_graph
 from app.pipeline.migrate import run_migration
 from app.pipeline.planner import plan_migration
+from app import logs
 from app.queue import env_int
 
 # How often the process executing a job stamps ``job.json`` to say it is still
@@ -228,6 +229,18 @@ def _emit_sink(job_id: str):
                 state.error = error
             snapshot = state.model_copy(deep=True)
         _persist(snapshot)
+        # Logged outside the lock, and after the state is durable: the log is a
+        # record of what happened, so it must not be able to claim more than
+        # job.json does. Gate E0 — before this, no stage boundary was logged at
+        # all and a failure named neither its stage nor its reason.
+        if type == "failed":
+            logs.failure(
+                "job_failed", stage=stage, seq=seq,
+                errorType=error.type if error else None,
+                reason=error.message if error else message,
+            )
+        else:
+            logs.event(f"job_{type}", stage=stage, seq=seq)
 
     return emit
 
@@ -311,6 +324,14 @@ def _fail_abandoned(state: JobState) -> JobState:
     state.error = error
     state.updatedAt = event.ts
     _persist(state)
+    # The process that was running this job is gone, so it will never log the
+    # failure itself. THIS is the only party that can, and gate E0 found the
+    # silence where this line now goes.
+    with logs.bound(run_id=state.runId, job_id=state.jobId):
+        logs.failure(
+            "job_abandoned", stage=stage, errorType="WorkerLost",
+            silentForSeconds=round(silent_for, 1), graceSeconds=_heartbeat_grace(),
+        )
     return state
 
 
@@ -368,6 +389,10 @@ def run_job(
     source_root = Path(source_root)
     out_dir = Path(out_dir)
     emit = _emit_sink(job_id)
+    # Bound here rather than passed down: every line logged by every stage below
+    # carries the run and job without any of them having to know about logging.
+    binding = logs.bound(run_id=run_id, job_id=job_id)
+    binding.__enter__()
 
     with _LOCK:
         state = _REGISTRY.get(job_id)
@@ -416,6 +441,7 @@ def run_job(
             )
     finally:
         stop_heartbeat.set()
+        binding.__exit__(None, None, None)
 
     # The terminal event is written by now, either way. Tell the runner what it
     # was: a worker's own record of this job must not contradict the job's.

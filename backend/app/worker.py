@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import sys
 
-from app import queue
+from app import logs, queue
 from app.pipeline.sandbox import SandboxError, SandboxPolicy, assert_safe_for_untrusted_input
 
 
@@ -57,6 +57,7 @@ def main() -> int:
         print(f"Refusing to start: {exc}", file=sys.stderr)
         return 1
 
+    logs.configure()
     policy = SandboxPolicy.from_env()
     q = queue.get_queue()
     print(
