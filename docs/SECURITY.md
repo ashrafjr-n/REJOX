@@ -226,14 +226,16 @@ Stated plainly, because a security document that only lists wins is marketing:
   The event stream never depends on that raise, and the `thread` backend
   swallows it (there is no second record to correct in-process).
 
-  *Still open — a failure nothing logs at all.* There is still no structured,
-  run/job-keyed logging: only `app/retention.py` logs, so no stage boundary is
-  recorded, and a job whose worker was killed (`WorkerLost`) produces no log
-  line about ending at all — the process that ruled it lost is the API, which
-  logs nothing. The full picture is available from `GET /api/jobs/{id}` per job,
-  but there is still no way to see a failure rate or to go from a job id to a
-  cause without querying that job. E0 stays RED on this half. The fix is
-  scheduled with the session/auth work, because it touches `app/main.py`.
+  *Also fixed — a failure nothing logged at all.* `app/logs.py` now emits one
+  JSON line per event, carrying the run id, job id and the caller's identity
+  digest, bound through `contextvars` so every stage carries them without being
+  handed them. Lines are written at each stage boundary, at every terminal
+  event, at each HTTP request, and — the case that had nothing at all — when the
+  API's reconciler rules a job `WorkerLost`, which is the only party still alive
+  to say so. Identity is logged as the same `key:`/`acct:` digest `{run}/owner`
+  holds, so a log line joins to a run's owner; a raw key or invite code is never
+  written. Gate E0 must be re-run to be signed: this is a description of code
+  until that happens.
 - **Retention has no notion of an in-flight run.** The sweeper reaps by age
   alone, so a short `REJOX_RUN_TTL_SECONDS` and a long migration can delete a
   workspace out from under a running job. Harmless at the 24h default.
