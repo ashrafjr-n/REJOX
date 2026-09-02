@@ -12,6 +12,7 @@ import type {
   JobCreated,
   JobState,
   PlanResponse,
+  SessionState,
   SourceRequest,
   ValidationError,
 } from '../types/api'
@@ -130,6 +131,41 @@ export async function getJob(jobId: string): Promise<JobState> {
   try {
     const { data } = await api.get<JobState>(`/api/jobs/${jobId}`)
     return data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+// --- Session ------------------------------------------------------------------
+//
+// The cookie behind these is httpOnly, so nothing here ever holds or reads it.
+// These three calls are the whole of the browser's relationship with it: ask
+// whether we are signed in, sign in, sign out.
+
+/** Whether this browser holds a valid session, and which account it names. */
+export async function getSession(): Promise<SessionState> {
+  try {
+    const { data } = await api.get<SessionState>('/api/session')
+    return data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+/** Exchange an invite code for a session cookie. */
+export async function signIn(code: string): Promise<SessionState> {
+  try {
+    const { data } = await api.post<SessionState>('/api/session', { code })
+    return data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+/** Drop the session cookie. Idempotent. */
+export async function signOut(): Promise<void> {
+  try {
+    await api.delete('/api/session')
   } catch (err) {
     throw toApiError(err)
   }

@@ -54,6 +54,9 @@ export type UnsupportedItem = Schemas['UnsupportedItem']
 export type JobCreated = Schemas['JobCreated']
 export type JobState = Schemas['JobState']
 export type JobStatus = JobState['status']
+
+// Session — the browser's half of identity (the cookie itself is httpOnly).
+export type SessionState = Schemas['SessionState']
 export type MigrationEvent = Schemas['MigrationEvent']
 export type MigrationEventData = Schemas['MigrationEventData']
 export type MigrationEventType = MigrationEvent['type']

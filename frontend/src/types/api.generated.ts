@@ -24,6 +24,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session Read
+         * @description Whether this browser is signed in. Never 401s — it IS the check.
+         */
+        get: operations["session_read_api_session_get"];
+        put?: never;
+        /**
+         * Session Create
+         * @description Exchange an invite code for an httpOnly session cookie.
+         */
+        post: operations["session_create_api_session_post"];
+        /**
+         * Session Delete
+         * @description Sign out. Idempotent: clearing a cookie that is not there is fine.
+         */
+        delete: operations["session_delete_api_session_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/upload": {
         parameters: {
             query?: never;
@@ -1060,6 +1088,35 @@ export interface components {
             hasParams: boolean;
             /** Params */
             params?: string[];
+            /** Elementprops */
+            elementProps?: components["schemas"]["RouteElementProp"][];
+            /** Hoststate */
+            hostState?: components["schemas"]["RouteHostState"][];
+        };
+        /**
+         * RouteElementProp
+         * @description A prop on a route's element, and the binding it reads (when it is one).
+         */
+        RouteElementProp: {
+            /** Name */
+            name: string;
+            /** Binding */
+            binding?: string | null;
+        };
+        /**
+         * RouteHostState
+         * @description A ``const [value, setter] = useState(initializer)`` in the routing component.
+         */
+        RouteHostState: {
+            /** Value */
+            value: string;
+            /** Setter */
+            setter?: string | null;
+            /**
+             * Initializer
+             * @default
+             */
+            initializer: string;
         };
         /**
          * RouteMapping
@@ -1079,6 +1136,10 @@ export interface components {
              * @default false
              */
             hasParams: boolean;
+            /** Elementprops */
+            elementProps?: components["schemas"]["RouteElementProp"][];
+            /** Hoststate */
+            hostState?: components["schemas"]["RouteHostState"][];
         };
         /** RoutingReport */
         RoutingReport: {
@@ -1110,6 +1171,24 @@ export interface components {
             reason: string;
             /** Evidence */
             evidence: string;
+        };
+        /** SessionRequest */
+        SessionRequest: {
+            /**
+             * Code
+             * @description An invite code from REJOX_INVITE_CODES.
+             */
+            code: string;
+        };
+        /** SessionState */
+        SessionState: {
+            /** Signedin */
+            signedIn: boolean;
+            /**
+             * Account
+             * @description The account id — a digest, never the code.
+             */
+            account?: string | null;
         };
         /**
          * SkippedFile
@@ -1397,6 +1476,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    session_read_api_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
+                };
+            };
+        };
+    };
+    session_create_api_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_delete_api_session_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
                 };
             };
         };
