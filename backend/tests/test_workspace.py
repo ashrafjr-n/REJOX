@@ -82,3 +82,26 @@ def test_sweep_reaps_only_old_runs(ws) -> None:
     assert fresh.runId not in removed
     assert not old.root.exists()
     assert fresh.root.is_dir()
+
+
+def test_the_sweep_preview_names_exactly_what_the_sweep_deletes(ws) -> None:
+    """Observed at gate B7 (2026-09-03): `rejox sweep --dry-run` had its own copy
+    of the expiry predicate, without the run-id filter, so it announced it would
+    reap a directory the real sweep then left in place. A retention preview that
+    overstates what it deletes is worse than no preview at all."""
+    old = workspace.new_run()
+    past = time.time() - 10_000
+    os.utime(old.root, (past, past))
+
+    # Something in the workspace root that is NOT a run — a probe, a stray dir.
+    not_a_run = workspace.workspace_root() / "gate-probe"
+    not_a_run.mkdir()
+    os.utime(not_a_run, (past, past))
+
+    previewed = workspace.expired_runs(3600)
+    removed = workspace.sweep(ttl_seconds=3600)
+
+    assert previewed == removed
+    assert "gate-probe" not in previewed
+    assert not_a_run.is_dir()
+    assert old.runId in removed
