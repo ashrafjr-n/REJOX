@@ -158,11 +158,16 @@ Stated plainly, because a security document that only lists wins is marketing:
   `REJOX_SANDBOX_IMAGE` to a digest in production.
 - **`ingest_github` clones a URL the caller supplies.** The clone itself is
   shallow and unauthenticated, but it is outbound traffic the caller controls.
-- **A job whose worker dies is wedged at `running` for ever.** `job.json` — what
-  `/api/jobs/{id}` serves — is only written by the process executing the job, and
-  nothing reconciles it against RQ's registries. Kill a worker mid-migration and
-  the client polls a job that will never change status and never reports an
-  error. Observed, 2026-08-31; see B6 in
+- **A job whose worker dies is lost — reported, not recovered.** The migration
+  itself is not resumed or re-queued: RQ holds the execution as `started` and
+  nothing picks it back up. What was fixed (2026-09-02) is the silence around
+  it. The process executing a job stamps a heartbeat into `job.json` every
+  `REJOX_JOB_HEARTBEAT` seconds; a reader that finds a `running` job with no
+  beat for `REJOX_JOB_HEARTBEAT_GRACE` seconds writes a terminal `failed` event
+  (`WorkerLost`) instead of serving `running` for ever. The remaining trade-off
+  is the mirror of it: a live worker frozen longer than the grace is declared
+  lost, and resurrects if it thaws — widen the grace on a contended host. The
+  wedge as originally observed (2026-08-31) is recorded under B6 in
   [`PRE-LAUNCH-CHECKLIST.md`](PRE-LAUNCH-CHECKLIST.md).
 - **Retention has no notion of an in-flight run.** The sweeper reaps by age
   alone, so a short `REJOX_RUN_TTL_SECONDS` and a long migration can delete a
