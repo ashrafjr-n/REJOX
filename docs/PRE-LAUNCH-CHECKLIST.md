@@ -72,11 +72,19 @@ Re-run 2026-09-01 against the same host, commit `4468bc4`, by
 all green in one pass. That run also caught B5 passing for the wrong reason —
 see its entry.
 
-2026-09-02: `backend/app/jobs.py` and `backend/app/queue.py` changed, to fix the
-B6 finding. By the re-signing table above that invalidates **all of section B**,
-so every B signature below is marked `⟲ re-red` and kept in place to be
-re-earned — `./verify-deployment.sh` covers B0, B1, B2, B3 and B5 in one pass;
-B4, B6 and B7 are run by hand. Nothing here was re-signed on a green test suite.
+Re-run 2026-09-03 against the same host, commit `9990f35`, after the jobs.py
+heartbeat change re-red all of section B: **A0, A1, A8, A9, B0, B1, B2, B3, B5,
+C2 and C3 green in one `./verify-deployment.sh` pass**, then **B4, B6 and B7 by
+hand** — the three that script does not cover. B6, red since 2026-08-31, is now
+signed green. B7 was RED on its first attempt and found a live bug in
+`rejox sweep --dry-run`; it is signed on the re-run after the fix, with the
+finding kept.
+
+One gate is red again as a consequence: fixing B7 changed
+`backend/app/pipeline/workspace.py`, which the table above says invalidates
+**C3**. C3 was observed green in this same pass, minutes before that change, and
+the change touches expiry rather than ownership — but the trigger is mechanical
+on purpose, so C3 is marked re-red rather than argued out of.
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
@@ -94,18 +102,18 @@ signature below carries the output it came from.
 | A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
 | A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped |
 | A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped |
-| B0 | all three services come up and stay up | ⟲ **re-red** — was: signed |
-| B1 | the worker is registered with Redis and takes jobs | ⟲ **re-red** — was: signed |
-| B2 | a full migration completes through the queue | ⟲ **re-red** — was: signed — RED first (API served stale state), fixed |
-| B3 | the emitted project is downloadable and real | ⟲ **re-red** — was: signed |
-| B4 | an API restart does not lose an in-flight job | ⟲ **re-red** — was: signed |
-| B5 | Redis down answers 503 — fast, and never in-process | ⟲ **re-red** — was: signed — 503 in <1s, queue refusal asserted directly |
-| B6 | a killed worker does not silently strand a job | ⟲ **fix landed, unrun** — heartbeat + `WorkerLost`; needs the live re-run |
-| B7 | retention actually deletes a run workspace | ⟲ **re-red** — was: signed |
+| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 |
+| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 |
+| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 |
+| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 |
+| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03; also proves the heartbeat spares a live worker |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 |
+| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03 |
+| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed 2026-09-03 |
 | C0 | a server with no keys refuses to serve | ☑ signed |
 | C1 | a wrong key is rejected | ☑ signed |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed |
-| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed |
+| C3 | a run belongs to one identity and no other | ⟲ **re-red** — was: signed — RED first (a second identity downloaded another's run), fixed (workspace.py changed 2026-09-03) |
 | C4 | CORS is never a wildcard | ☑ signed |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
@@ -575,6 +583,13 @@ loop looks identical to a healthy one in the first thirty seconds.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
+$ ./verify-deployment.sh
+  PASS  health — {"status":"ok"}
+  PASS  redis is running — running
+  PASS  api is running — running
+  PASS  worker is running — running
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ docker compose up -d && curl -s localhost:8000/health
 SERVICE   STATUS
@@ -611,6 +626,9 @@ running.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
+  PASS  1 worker(s) registered
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ docker compose exec -T redis redis-cli SMEMBERS rq:workers
 rq:worker:4e77d2a87f544af59d24b8fa146e9c5a
@@ -664,6 +682,12 @@ not run what it claims to have run.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
+  PASS  uploaded — runId d65beb218874464a86a081ff39d1402e
+  PASS  enqueued — jobId db80f12823fd4ec6ac1431b2c25a0c74
+  PASS  migration status — succeeded
+  PASS  a sibling sandbox container was observed on the host during the run
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ POST /api/upload  → runId aec3597124ea4c42a309ed7e4adb9738
 $ POST /api/migrate → 202 {"jobId":"a2ee8714…","status":"queued"}
@@ -714,6 +738,11 @@ but contains three files is red.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
+  PASS  download — 200
+  PASS  41 files in the archive
+  PASS  no mount probe leaked into the artifact — 0
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ curl -o out.zip -w '%{http_code} %{size_download}' .../api/runs/aec3597…/download
 http=200 bytes=118200
@@ -759,6 +788,23 @@ in this scenario would mean the grace is too narrow, not that B4 passed.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change, and it is this gate that proves the heartbeat does not misfire on a live worker.
+
+Job 832f53499f8f4cbbb748348df5a2f0e0, run 819ba6e5260d45989b5dd198430baec9.
+The worker reported REJOX_JOB_HEARTBEAT=10 REJOX_JOB_HEARTBEAT_GRACE=60 —
+forwarded by compose, read from inside the container, not assumed.
+
+before restart: {"status":"running","nevents":1}
+$ docker compose restart api
+$ curl /health   -> {"status":"ok"}
+after restart:  {"status":"running","nevents":1}
+events before=1 after=1
+final:          {"status":"succeeded","nevents":12,"error":null}
+
+The worker never died here, so its beats kept landing across the API restart:
+the job stayed `running` and finished. A WorkerLost in this scenario would have
+meant the grace was too narrow. It did not appear.
+
 ⟲ RE-RED 2026-09-02 by the jobs.py heartbeat change. The signature below stands
 as the record of the last time this was observed, and must be re-earned.
 
@@ -826,6 +872,13 @@ accepted work; anything else means it failed for a reason nobody predicted.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 9990f35 — re-signed after the jobs.py heartbeat change (B6).
+  PASS  status with Redis down — 503
+  PASS  answered in 0s (must not hang)
+  PASS  the body names Redis: {"detail":"Rate-limit store at redis://redis:6379/0 is
+        unreachable: Error -2 connecting to redis:6379. Name or service not known."}
+  PASS  the queue itself refuses, never a thread fallback — QUEUE-REFUSED
+
 Signed: 2026-09-01 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 4468bc4 — re-signed after REJOX_RATE_STORE=redis changed which refusal answers first.
 
 $ docker compose stop redis
@@ -887,9 +940,36 @@ as a known gap, not something to sign around.
 **Evidence:**
 
 ```text
-UNSIGNED — the finding below was fixed on 2026-09-02; the gate has NOT been
-re-run against a live daemon since, and a fix asserted only by unit tests is
-exactly what this document refuses to accept.
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 9990f35 — GREEN. This gate has been red once (2026-08-31, below) and that record stays.
+
+Job db527195781c4450aa589ce54404a907, run b7233ed36954421ba07fa3b3600834e8.
+
+before the kill:      {"status":"running","nevents":1,"error":null}
+$ docker compose kill worker
++10s (inside grace):  {"status":"running","error":null}
++70s (past grace):    {"status":"failed","error":{"type":"WorkerLost","message":
+                       "The process running this migration stopped without
+                        reporting a result (no heartbeat for 72s, past the 60s
+                        grace). The migration did not complete; start it
+                        again.","stage":"emit"}}
+the terminal event:   {"seq":2,"type":"failed","stage":"emit","message":"…"}
+$ docker compose start worker
++60s after restart:   {"status":"failed","error":"WorkerLost"}
+
+$ docker compose exec -T redis redis-cli HGET rq:job:db527195… status
+started
+$ docker compose exec -T redis redis-cli ZRANGE rq:wip:rejox-migrations 0 -1
+db527195781c4450aa589ce54404a907:48af1a0ef08d4672a019bc19db8e5cd7
+
+RQ's own view is unchanged from the 2026-08-31 finding — the execution is still
+held as `started`, still in the wip set, and the restarted worker did not pick
+it back up. That is the point: the migration is NOT recovered. What changed is
+that the API no longer reports it as `running`. It answers `failed`, names the
+stage it died in, and says what to do. The client stops polling.
+
+Both edges were observed, not just the one that passes: at +10s, inside the
+grace, the job was still `running` — the reconciler does not fire early. And a
+restarted worker did not resurrect it.
 
 WHAT CHANGED (commit V1.2–V1.5, `backend/app/jobs.py`): the process executing a
 migration stamps `updatedAt` into job.json every REJOX_JOB_HEARTBEAT seconds
@@ -907,10 +987,7 @@ instead of `running` for ever.
 $ pytest -q tests/test_jobs.py -k "worker_died or heartbeating or queued_job_is_never or heartbeat_keeps"
 4 passed
 
-TO SIGN, the command at the top of this gate must be run again and produce:
-  - 10s after `docker compose kill worker`, before the grace expires: running
-  - after the grace (>60s): {"status":"failed","error":{"type":"WorkerLost",…}}
-  - restarting the worker does not move it back to running.
+That is what the run above observed, on all three points.
 
 --- the original finding, kept in place ---
 
@@ -973,6 +1050,45 @@ docker compose exec -T api sh -c 'du -sh /data/workspaces'
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit c1d4fea — GREEN, on the second attempt. THE FIRST ATTEMPT WAS RED, and the finding is below.
+
+$ ls .../workspaces          -> 3 runs + gate-probe   (entries: 4, 772K)
+$ rejox sweep --dry-run  (REJOX_RUN_TTL_SECONDS=1)
+  would reap 6148df18b05f46928456659cfe3ae0ac
+  would reap 8347749544bd4b02a8c3e8cd036f079e
+  would reap fa8812950d7c42178b2d81bc95068613
+  3 run(s) past a 1s window (dry run — nothing deleted)
+$ rejox sweep            (REJOX_RUN_TTL_SECONDS=1)
+  reaped 6148df18b05f46928456659cfe3ae0ac
+  reaped 8347749544bd4b02a8c3e8cd036f079e
+  reaped fa8812950d7c42178b2d81bc95068613
+  3 run(s) reaped past a 1s window.
+$ ls .../workspaces          -> gate-probe            (entries: 1, 4.0K)
+
+The preview named exactly what the sweep deleted, the files are genuinely gone
+(772K -> 4.0K), and the one directory that is not a run was neither claimed nor
+touched.
+
+FIRST ATTEMPT WAS RED — 2026-09-03, commit 9990f35, and this is why the gate
+asks for the final listing rather than just the sweep's own count:
+
+  $ rejox sweep --dry-run   ->  15 run(s), including `gate-probe`
+  $ rejox sweep             ->  14 run(s) reaped
+  $ ls .../workspaces       ->  gate-probe still there
+
+FINDING: `rejox sweep --dry-run` carried its own copy of the expiry predicate
+(app/cli.py) and had dropped the run-id filter that workspace.sweep() applies,
+so the preview announced it would delete a directory the real sweep would never
+touch. A retention preview that overstates what it deletes is worse than no
+preview: it is exactly the tool an operator uses to decide whether a sweep is
+safe to run. Fixed in commit 29237e2 by making `workspace.expired_runs()` the
+one definition both ask, with a regression test (commit c1d4fea) that fails if
+the two ever disagree again.
+
+The 2026-08-31 signature below shows the same discrepancy in the opposite
+direction (dry run named 3, sweep reaped 4) and it was not chased. It was the
+same bug.
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ ls .../workspaces | wc -l ; du -sh .../workspaces
 5    1.1G
