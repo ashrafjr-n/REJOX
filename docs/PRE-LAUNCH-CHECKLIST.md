@@ -118,7 +118,7 @@ signature below carries the output it came from.
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
-| E0 | a failed migration is diagnosable after the fact | ☐ not run — fixture + gate written 2026-09-03 |
+| E0 | a failed migration is diagnosable after the fact | ☒ **RED** — the logs name no stage or reason, and report a failed job as `Job OK` |
 | E1 | one identity cannot fill the disk | ☐ not run |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
@@ -1612,7 +1612,66 @@ worth more than a green mark that nobody tested.
 **Evidence:**
 
 ```text
-(unsigned — the fixture exists, the gate has not been run)
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit e03470c — RED, recorded as a finding rather than a pass.
+
+Both failures were produced as specified. Both were fully described by
+/api/jobs/{id}. NEITHER was described by the retained logs.
+
+CASE 1 — the upload is wrong (broken-app), job 4f9edbdd…, run 2112bc9a…
+  /api/jobs said:  {"status":"failed","error":{"type":"NothingToMigrate",
+                    "stage":"analyze","message":"No React components found in
+                    project 'broken-app' (9 files, 0 components, 0 routes,
+                    4 dependencies)... Check that the uploaded root is the app
+                    directory (not a wrapper folder), and that it contains
+                    .jsx/.tsx sources."}}
+  the logs said:   worker-1 | Successfully completed app.jobs.run_job(
+                              '4f9edbdd…') job in 0:00:01.255977s
+                   worker-1 | rejox-migrations: Job OK (4f9edbdd…)
+
+CASE 2 — the capacity died, job 9cfe01f0…, run 6db9665b…
+  /api/jobs said:  {"status":"failed","error":{"type":"WorkerLost",
+                    "stage":"emit","message":"...no heartbeat for 77s, past the
+                    60s grace..."}}
+  the logs said:   one line, the job STARTING. Nothing about it ending. The
+                   worker was killed, and the process that ruled the job lost
+                   was the API, which logs nothing.
+
+  1. Which stage failed, from the logs alone?   NO — for either case.
+  2. Why, from the logs alone?                  NO — for either case.
+  3. Correlation, grep -c "$JOB":               case 1: 6    case 2: 5
+     Non-zero, but not a win: every one of those lines is either uvicorn's
+     access log for the client's own polling (GET /api/jobs/{id} 200 OK) or
+     RQ's record of dispatching the job. None reports an outcome.
+
+  $ grep -icE "nothingtomigrate|workerlost|analyze|traceback|exception" logs
+    0
+  30 log lines retained in total, for two migrations and two failures.
+
+FINDING 1 — THE LOGS DO NOT SAY. No stage, no reason, no error type, for either
+class of failure. Confirmed by inspection beforehand and now observed: only
+`backend/app/retention.py` logs anything; the API, the worker, the jobs layer
+and every pipeline stage emit no application log lines at all.
+
+FINDING 2 — WORSE, THE LOGS SAY THE OPPOSITE. For case 1, RQ reported
+"Successfully completed" and "Job OK" for a migration that FAILED. This is a
+direct consequence of a deliberate design decision documented in
+`app/jobs.py`: `run_job` "never raises — every failure becomes a terminal
+`failed` event". RQ sees a clean return and reports success. So an operator
+grepping the worker logs for trouble finds a green line for a failed job, which
+is worse than silence: silence prompts a question, "Job OK" ends one.
+
+An operator handed only a job id today can learn nothing about why it failed
+without querying the API for that specific job. There is no path from a
+complaint to a cause, and no way to notice a rising failure rate at all.
+
+THE FIX (not applied here, by decision): structured logging carrying the run id
+and job id on every line, emitted at each stage boundary and on every terminal
+event, plus a non-OK signal to RQ — or an explicit log line at the terminal
+`failed` — so the worker's own record stops contradicting the job's. Deferred
+deliberately to be done together with the session/auth work, because both touch
+`app/main.py` and both re-red all of section C; doing them in one pass means one
+re-signing round instead of two.
+
 
 test-projects/broken-app was added 2026-09-03 for this gate, with
 backend/tests/test_broken_fixture.py pinning it: it asserts the fixture still
