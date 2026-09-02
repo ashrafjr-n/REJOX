@@ -373,6 +373,69 @@ def guard(request: Request, bucket: str) -> str:
     return identity
 
 
+# One identity's total footprint across all its runs. The rate limit caps
+# requests and the archive guard caps a single upload; without this, neither
+# caps their SUM — 10 uploads/minute at 500 MB expanded is 300 GB/hour, held for
+# a 24h retention window (gate E1). Sized from measurement: gate B7 observed
+# ~40 MB per run of ordinary use, so 2 GB is roughly 50 runs in flight — enough
+# that a real user never meets it, small enough that it is not a disk.
+DEFAULT_ACCOUNT_QUOTA_BYTES = 2 * 1024 * 1024 * 1024
+# Refuse new uploads while the volume is this close to full, so the server stops
+# accepting work before it cannot finish what it has.
+DEFAULT_MIN_FREE_BYTES = 2 * 1024 * 1024 * 1024
+
+
+def account_quota_bytes() -> int:
+    return _env_int("REJOX_ACCOUNT_QUOTA_BYTES", DEFAULT_ACCOUNT_QUOTA_BYTES)
+
+
+def min_free_bytes() -> int:
+    return _env_int("REJOX_MIN_FREE_BYTES", DEFAULT_MIN_FREE_BYTES)
+
+
+def _gb(n: int) -> str:
+    return f"{n / (1024 ** 3):.1f} GB"
+
+
+def guard_storage(identity: str) -> None:
+    """Refuse an upload that the disk, or this identity's quota, cannot take.
+
+    Two different refusals on purpose, because they are two different problems
+    and the caller can only act on one of them:
+
+    ``413`` — this identity is over ITS ceiling. Their own runs are the cause,
+    and deleting one, or waiting for the retention window, fixes it.
+    ``503`` — the SERVER is nearly out of disk. Nothing the caller does helps,
+    and telling them their data is too large would be a lie.
+    """
+    from app.pipeline import workspace  # noqa: PLC0415 - avoids an import cycle
+
+    free = workspace.free_bytes()
+    floor = min_free_bytes()
+    if free < floor:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"The server is low on storage ({_gb(free)} free, needs "
+                f"{_gb(floor)}) and is not accepting uploads. This is a server "
+                "condition, not a problem with your upload; try again later."
+            ),
+        )
+
+    quota = account_quota_bytes()
+    used = workspace.footprint(identity)
+    if used >= quota:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Storage quota reached: your runs occupy {_gb(used)} of "
+                f"{_gb(quota)}. Runs are deleted automatically at the end of "
+                "their retention window; download what you need and wait, or "
+                "ask the operator to raise REJOX_ACCOUNT_QUOTA_BYTES."
+            ),
+        )
+
+
 def max_concurrent_migrations() -> int:
     return _env_int(
         "REJOX_MAX_CONCURRENT_MIGRATIONS", DEFAULT_MAX_CONCURRENT_MIGRATIONS
