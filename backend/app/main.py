@@ -28,13 +28,13 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional, TypeVar
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.background import BackgroundTask
 
-from app import jobs, queue, retention
+from app import jobs, queue, retention, security, sessions
 from app.models.analysis import AnalysisReport
 from app.models.ingest import IngestedProject
 from app.models.jobs import JobCreated, JobState
@@ -221,6 +221,76 @@ def _plan(report: AnalysisReport, kg: KnowledgeGraph) -> MigrationPlan:
         return plan_migration(report, kg)
     except PlannerError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# --- Session -----------------------------------------------------------------
+#
+# The only routes on this surface that are NOT behind `guard()`: signing in is
+# how a browser acquires the identity everything else requires. They carry their
+# own budget instead, under the `upload` bucket, so guessing invite codes costs
+# an attacker the same as uploading.
+
+
+class SessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(..., description="An invite code from REJOX_INVITE_CODES.")
+
+
+class SessionState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    signedIn: bool
+    account: Optional[str] = Field(
+        default=None, description="The account id — a digest, never the code."
+    )
+
+
+@app.post("/api/session", response_model=SessionState)
+def session_create(request: Request, req: SessionRequest, response: Response) -> SessionState:
+    """Exchange an invite code for an httpOnly session cookie."""
+    codes = sessions.configured_codes()
+    if not codes:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "This server has no invite codes configured, so it cannot issue "
+                "browser sessions. Set REJOX_INVITE_CODES, or use an API key."
+            ),
+        )
+    # Rate-limited by source address: there is no identity yet, and without this
+    # the code space could be walked for free.
+    security.limiter.check(
+        "upload",
+        f"ip:{request.client.host if request.client else 'unknown'}",
+        security._env_int("REJOX_RATE_UPLOAD", security.DEFAULT_UPLOAD_LIMIT),
+    )
+
+    account = sessions.account_id(req.code)
+    if not sessions.known_account(account):
+        # Constant-time inside known_account; one message for every rejection so
+        # a wrong code cannot be told from a revoked one.
+        raise HTTPException(status_code=401, detail="Invalid invite code.")
+
+    try:
+        sessions.attach(response, account)
+    except sessions.SigningKeyMissing as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return SessionState(signedIn=True, account=account)
+
+
+@app.get("/api/session", response_model=SessionState)
+def session_read(request: Request) -> SessionState:
+    """Whether this browser is signed in. Never 401s — it IS the check."""
+    account = sessions.account_from_request(request)
+    return SessionState(signedIn=account is not None, account=account)
+
+
+@app.delete("/api/session", response_model=SessionState)
+def session_delete(response: Response) -> SessionState:
+    """Sign out. Idempotent: clearing a cookie that is not there is fine."""
+    sessions.clear(response)
+    return SessionState(signedIn=False)
 
 
 # --- Upload stage ------------------------------------------------------------
