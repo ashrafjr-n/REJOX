@@ -779,6 +779,60 @@ def export_showcase(
     console.print(t)
 
 
+@app.command(name="export-graph")
+def export_graph(
+    project_path: Path = typer.Option(
+        None, "--project", help="Project to parse (default: the committed sample-app benchmark)."
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Where to write the graph (default: backend/tests/fixtures/<name>.kg.json)."
+    ),
+) -> None:
+    """Regenerate a committed Knowledge Graph fixture from a real parse.
+
+    The fixture at ``backend/tests/fixtures/sample-app.kg.json`` is what most of
+    the test suite reads instead of re-parsing the benchmark. Hand-maintaining
+    it means it silently ages behind the project it claims to describe, so this
+    command is the only sanctioned way to produce it: a real parser-worker run,
+    written with a portable ``project.root``. ``test_parser.py`` fails when the
+    committed file no longer equals what this command would write.
+    """
+    from app.pipeline.intelligence import (
+        BENCHMARK_PROJECT,
+        FIXTURES_DIR,
+        render_graph_fixture,
+    )
+
+    src = (project_path or BENCHMARK_PROJECT).expanduser().resolve()
+    if not src.is_dir():
+        console.print(f"[red]Not a directory:[/] {src}")
+        raise typer.Exit(code=1)
+
+    _stage("Intelligence — parsing the project")
+    try:
+        with console.status("[cyan]Building the knowledge graph…[/]", spinner="dots"):
+            kg = build_knowledge_graph(src)
+    except IntelligenceError as exc:
+        console.print(f"[red]Parse failed:[/] {exc}")
+        raise typer.Exit(code=1)
+
+    payload = render_graph_fixture(kg, project_path=src)
+    path = out.expanduser().resolve() if out else (FIXTURES_DIR / f"{kg.project.name}.kg.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(payload, encoding="utf-8")
+
+    _stage("Done — graph fixture written")
+    t = Table.grid(padding=(0, 3))
+    t.add_column(style="dim"); t.add_column()
+    t.add_row("Fixture", f"[bold]{path}[/] [dim]({len(payload.encode('utf-8')) / 1024:.1f} KB)[/]")
+    t.add_row("Parsed from", str(src))
+    t.add_row("Files", str(len(kg.files)))
+    t.add_row("Components", f"[bold]{len(kg.components)}[/]")
+    t.add_row("Routes", str(len(kg.routes)))
+    t.add_row("Warnings", str(len(kg.warnings)))
+    console.print(t)
+
+
 @app.command()
 def sweep(
     ttl: Optional[int] = typer.Option(
