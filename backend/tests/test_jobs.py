@@ -249,3 +249,117 @@ def test_the_api_sees_a_job_another_process_is_advancing(tmp_path, monkeypatch) 
     assert jobs_mod.get_job(job.jobId).status == "running"
     _events, status = jobs_mod.events_after(job.jobId, 0)
     assert status == "running"
+
+
+# --- A worker that dies (pre-launch gate B6) ---------------------------------
+
+
+def _worker_wrote(run, *, status: str, updated_at: float):
+    """Rewrite job.json the way another process would, then hand it back."""
+    from app.models.jobs import JobState
+
+    state = JobState.model_validate_json((run.root / "job.json").read_text())
+    state.status = status  # type: ignore[assignment]
+    state.updatedAt = updated_at
+    (run.root / "job.json").write_text(state.model_dump_json())
+    return state
+
+
+def test_a_job_whose_worker_died_is_reported_failed(tmp_path, monkeypatch) -> None:
+    """The B6 wedge: an API that serves job.json can only tell a live worker
+    from a dead one by whether the file is still moving. A `running` job with no
+    heartbeat past the grace must end as `failed`, with an error saying why —
+    not stay `running` for a client to poll for ever."""
+    import app.jobs as jobs_mod
+    from app.pipeline import workspace
+
+    monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    monkeypatch.setenv("REJOX_JOB_HEARTBEAT_GRACE", "30")
+    jobs_mod._REGISTRY.clear()
+
+    run = workspace.new_run()
+    job = jobs_mod.create_job(run.runId)
+
+    # A worker picked it up, ran, and was killed 31s ago — one second past grace.
+    _worker_wrote(run, status="running", updated_at=time.time() - 31)
+
+    state = jobs_mod.get_job(job.jobId)
+    assert state.status == "failed"
+    assert state.error is not None and state.error.type == "WorkerLost"
+    assert state.events[-1].type == "failed"
+
+    # And it is written back, so every later reader agrees without re-deciding.
+    persisted = jobs_mod._load_persisted(job.jobId)
+    assert persisted is not None and persisted.status == "failed"
+
+
+def test_a_job_still_heartbeating_is_left_alone(tmp_path, monkeypatch) -> None:
+    """The other half, and the one that costs real money if it is wrong: a
+    migration that is merely slow and silent — npm install can be — must not be
+    declared lost while its worker is still stamping the file."""
+    import app.jobs as jobs_mod
+    from app.pipeline import workspace
+
+    monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    monkeypatch.setenv("REJOX_JOB_HEARTBEAT_GRACE", "30")
+    jobs_mod._REGISTRY.clear()
+
+    run = workspace.new_run()
+    job = jobs_mod.create_job(run.runId)
+    _worker_wrote(run, status="running", updated_at=time.time() - 5)
+
+    assert jobs_mod.get_job(job.jobId).status == "running"
+    _events, status = jobs_mod.events_after(job.jobId, 0)
+    assert status == "running"
+
+
+def test_a_queued_job_is_never_declared_lost(tmp_path, monkeypatch) -> None:
+    """A job waiting in the queue has no executor by definition — an old
+    `queued` means the fleet is busy, not that anything died."""
+    import app.jobs as jobs_mod
+    from app.pipeline import workspace
+
+    monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    monkeypatch.setenv("REJOX_JOB_HEARTBEAT_GRACE", "30")
+    jobs_mod._REGISTRY.clear()
+
+    run = workspace.new_run()
+    job = jobs_mod.create_job(run.runId)
+    _worker_wrote(run, status="queued", updated_at=time.time() - 600)
+
+    assert jobs_mod.get_job(job.jobId).status == "queued"
+
+
+def test_the_heartbeat_keeps_a_silent_job_alive(tmp_path, monkeypatch) -> None:
+    """The heartbeat is what makes staleness mean something. Beating on a job
+    that emits nothing must move `updatedAt` — and must stop moving it the
+    moment the job is stopped."""
+    import app.jobs as jobs_mod
+    from app.pipeline import workspace
+
+    monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    monkeypatch.setenv("REJOX_JOB_HEARTBEAT", "1")
+    jobs_mod._REGISTRY.clear()
+
+    run = workspace.new_run()
+    job = jobs_mod.create_job(run.runId)
+    state = jobs_mod._load_persisted(job.jobId)
+    assert state is not None
+    state.status = "running"
+    jobs_mod._REGISTRY[job.jobId] = state
+    before = state.updatedAt
+
+    stop = jobs_mod._start_heartbeat(job.jobId)
+    try:
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if jobs_mod._load_persisted(job.jobId).updatedAt > before:  # type: ignore[union-attr]
+                break
+            time.sleep(0.1)
+        else:
+            pytest.fail("the heartbeat never stamped job.json")
+        # No event was invented to do it: a beat is not something that happened.
+        assert jobs_mod._load_persisted(job.jobId).events == []  # type: ignore[union-attr]
+    finally:
+        stop.set()
+        jobs_mod._REGISTRY.clear()
