@@ -19,6 +19,8 @@ written in `Screen`'s render-callback form. Anything richer than a plain read
 
 from __future__ import annotations
 
+from typing import Optional
+
 from app.ai.navigation.models import NavigatorSpec, NavigatorType, NestedNavigator
 from app.models.analysis import RouteMapping
 from app.models.knowledge_graph import RouteHostState
@@ -206,8 +208,21 @@ def _nested_navigator_block(nested: NestedNavigator, routes: list[RouteMapping])
     return decl, fn
 
 
-def generate_navigator(spec: NavigatorSpec, routes: list[RouteMapping]) -> str:
-    """Generate ``AppNavigator.tsx`` source for ``spec``. Complete, no TODO."""
+def generate_navigator(
+    spec: NavigatorSpec,
+    routes: list[RouteMapping],
+    import_paths: Optional[dict[str, str]] = None,
+) -> str:
+    """Generate ``AppNavigator.tsx`` source for ``spec``. Complete, no TODO.
+
+    ``import_paths`` maps a component name to its real import path relative to
+    ``src/navigation/``, taken from where emission actually put the file. Not
+    every routed screen lives under ``pages/``: a real project routed a
+    ``PageNotFound`` that sat in ``src/components/``, and assuming the
+    directory produced an import to a file that was never written there.
+    Anything missing from the map falls back to the ``screens/`` convention.
+    """
+    import_paths = import_paths or {}
     creator, module, prefix = _CREATORS[spec.type]
     nested_by_parent = {n.parent: n for n in spec.nested}
 
@@ -229,7 +244,7 @@ def generate_navigator(spec: NavigatorSpec, routes: list[RouteMapping]) -> str:
     for fn, mod in sorted(creators):
         imports.append(f"import {{ {fn} }} from '{mod}';")
     for comp in components:
-        imports.append(f"import {comp} from '../screens/{comp}';")
+        imports.append(f"import {comp} from '{import_paths.get(comp, f'../screens/{comp}')}';")
 
     # Nested navigator components (declared before AppNavigator).
     nested_decls: list[str] = []
