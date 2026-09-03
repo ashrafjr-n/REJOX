@@ -97,9 +97,14 @@ and the HTTP and operability gates by hand (C0, C1, C4, C5, E0, E1).
 **E0 and E1 are signed green for the first time.** E0 had been red twice — a
 silence, then a `Job OK` line for a job that had failed — and both cases are now
 explained from the retained logs alone. E1 had no bound at all; it now has one,
-and a documented answer to what a full disk does. Sections **A, B, C are signed
-in full, and E is signed except E2**, which needs real LLM spend and is a budget
-decision rather than an engineering one.
+and a documented answer to what a full disk does. Sections **A, B, C and D are signed in full, and E is signed except E2**, which
+needs real LLM spend and is a budget decision rather than an engineering one.
+
+D0 and D1 were signed last, on 2026-09-03, when required status checks were
+turned on for `master`. That was deferred deliberately rather than forgotten:
+requiring the checks also stops direct pushes, so it changes how the repository
+is worked in day to day, and it was left until the engineering it guards was
+finished. **28 of 29 gates are signed.**
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
