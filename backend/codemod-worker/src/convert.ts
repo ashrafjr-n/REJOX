@@ -20,6 +20,7 @@
 
 import { IndentationText, Project, QuoteKind } from 'ts-morph';
 import type { ConvertResult, Ctx, Options } from './types';
+import { commentSafe } from './util';
 import { transformNavigation } from './transforms/navigation';
 import { transformEvents } from './transforms/events';
 import { transformAttributes } from './transforms/attributes';
@@ -43,7 +44,7 @@ function newProject(): Project {
 
 function renderTodoHeader(ctx: Ctx): string {
   if (ctx.todos.length === 0) return '';
-  const lines = ctx.todos.map((t) => `// REJOX-TODO(${t.code}): ${t.message}`);
+  const lines = ctx.todos.map((t) => `// REJOX-TODO(${t.code}): ${commentSafe(t.message)}`);
   return (
     `// ===== REJOX-TODO: ${ctx.todos.length} item(s) need attention =====\n` +
     lines.join('\n') +

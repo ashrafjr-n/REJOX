@@ -89,6 +89,23 @@ export function enclosingComponentBody(node: Node) {
   return body && Node.isBlock(body) ? body : undefined;
 }
 
+/**
+ * Make arbitrary source-derived text safe to embed in a generated comment.
+ *
+ * `recordUnhandled`/`recordWarning` messages, and the NAV_LINK inline note,
+ * often quote a raw attribute value's `.getText()` verbatim. That text is
+ * whatever the original author wrote — including, in a real repo, a JSX
+ * string attribute spanning a literal newline (`to="/foo\n  "`, valid JSX).
+ * Spliced raw into a `// ...` comment, an embedded newline ends the comment
+ * early and turns the rest into new, almost certainly invalid, code; spliced
+ * into a `/* ... *\/` comment, an embedded `*\/` closes it early the same way.
+ * This text is read by a person, never re-parsed as code, so collapsing it to
+ * one line loses nothing.
+ */
+export function commentSafe(text: string): string {
+  return text.replace(/\s*[\r\n]+\s*/g, ' ').replace(/\*\//g, '* /');
+}
+
 /** Record an unhandled item + a matching TODO line. */
 export function recordUnhandled(
   ctx: Ctx,
