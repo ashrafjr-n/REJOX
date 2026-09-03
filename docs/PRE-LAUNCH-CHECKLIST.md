@@ -89,9 +89,17 @@ marked `⟲ re-red` and kept in place to be re-earned. **E0 and E1 must be re-ru
 too** — both have had their findings addressed in code, and code is not
 evidence.
 
-Nothing in this file has been signed on the strength of that work. The previous
-state — A, B and C signed in full, earned across three passes earlier the same
-day — is preserved below each gate as the record of what was last observed.
+That work was then verified in three passes on commit `701095d`, and every gate
+above is signed from their output: `./verify-deployment.sh` (0 FAIL — A0, A1,
+A8, A9, B0, B1, B2, B3, B5, C2, C3), the manual deployment gates (B4, B6, B7),
+and the HTTP and operability gates by hand (C0, C1, C4, C5, E0, E1).
+
+**E0 and E1 are signed green for the first time.** E0 had been red twice — a
+silence, then a `Job OK` line for a job that had failed — and both cases are now
+explained from the retained logs alone. E1 had no bound at all; it now has one,
+and a documented answer to what a full disk does. Sections **A, B, C are signed
+in full, and E is signed except E2**, which needs real LLM spend and is a budget
+decision rather than an engineering one.
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
