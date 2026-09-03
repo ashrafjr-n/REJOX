@@ -203,3 +203,76 @@ def test_todo_count_matches_emitted_markers(emitted: EmittedProject) -> None:
     # todoCount is the ground-truth residue count from the emitted TODO markers.
     assert emitted.todoCount == sum(len(f.todoCodes) for f in emitted.files)
     assert emitted.todoCount > 0
+
+
+# --- Plain JavaScript / .jsx sources -----------------------------------------
+#
+# sample-app above is 100% TypeScript, so it can never exercise the .js/.jsx
+# path through emit_project — which is exactly how a real .jsx-only project
+# (most React apps in the wild) was silently emitting an empty RN project:
+# every source file fell outside the old `.endswith((".ts", ".tsx"))` filter
+# and simply vanished, with no entry in `skipped` to explain why.
+
+JS_SRC_ROOT = REPO_ROOT / "test-projects" / "plain-js-app"
+
+
+@pytest.fixture(scope="module")
+def emitted_js(tmp_path_factory: pytest.TempPathFactory) -> EmittedProject:
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    kg = build_knowledge_graph(JS_SRC_ROOT)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-js")
+    return emit_project(
+        plan, ANSWERS, kg, out, report=report, source_root=JS_SRC_ROOT
+    )
+
+
+def test_jsx_components_are_converted(emitted_js: EmittedProject) -> None:
+    """The real regression: Header/Home/About are .jsx, not .tsx — before the
+    fix these fell out of the file filter and were dropped without a trace."""
+    converted = {f.sourceFile for f in emitted_js.files if f.sourceFile}
+    assert "src/components/Header.jsx" in converted
+    assert "src/pages/Home.jsx" in converted
+    assert "src/pages/About.jsx" in converted
+
+
+def test_jsx_target_extension_is_rewritten_to_tsx(emitted_js: EmittedProject) -> None:
+    # tsconfig.json only includes **/*.ts and **/*.tsx (scaffold.py) — a .jsx
+    # source emitted with its original extension would silently never be
+    # type-checked at all.
+    by_source = {f.sourceFile: f.path for f in emitted_js.files if f.sourceFile}
+    assert by_source["src/components/Header.jsx"] == "src/components/Header.tsx"
+    assert by_source["src/pages/Home.jsx"] == "src/screens/Home.tsx"
+    assert by_source["src/pages/About.jsx"] == "src/screens/About.tsx"
+
+
+def test_js_entry_files_are_not_duplicated(emitted_js: EmittedProject) -> None:
+    """src/main.jsx and src/App.jsx are regenerated wholesale (navigator +
+    App.tsx) — they must not ALSO run through the generic per-file loop and
+    leak a second, stray copy into the output tree."""
+    paths = [f.path for f in emitted_js.files]
+    assert "src/main.jsx" not in paths
+    assert "src/main.tsx" not in paths
+    assert "src/App.jsx" not in paths
+    assert paths.count("App.tsx") == 1
+
+
+def test_navigator_imports_resolve_to_emitted_screens(emitted_js: EmittedProject) -> None:
+    # The failure mode this bug produced end-to-end: AppNavigator.tsx imports
+    # screens that were never written, so tsc/Metro fail on a dangling import.
+    nav = (_out(emitted_js) / "src" / "navigation" / "AppNavigator.tsx").read_text()
+    assert "../screens/Home" in nav
+    assert "../screens/About" in nav
+    assert (_out(emitted_js) / "src" / "screens" / "Home.tsx").is_file()
+    assert (_out(emitted_js) / "src" / "screens" / "About.tsx").is_file()
+
+
+def test_app_provenance_matches_the_real_source_extension(emitted_js: EmittedProject) -> None:
+    # Previously hardcoded to the literal "src/App.tsx" regardless of the
+    # project's real extension — wrong provenance for any .jsx project.
+    app = next(f for f in emitted_js.files if f.path == "App.tsx")
+    nav = next(f for f in emitted_js.files if f.path == "src/navigation/AppNavigator.tsx")
+    assert app.sourceFile == "src/App.jsx"
+    assert nav.sourceFile == "src/App.jsx"
