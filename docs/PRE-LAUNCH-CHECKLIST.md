@@ -113,10 +113,10 @@ signature below carries the output it came from.
 | B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
 | B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
 | B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
-| B4 | an API restart does not lose an in-flight job | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker |
+| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker; re-signed 2026-09-03 (session pass) |
 | B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
-| B6 | a killed worker does not silently strand a job | ⟲ **re-red** — was: signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2) |
-| B7 | retention actually deletes a run workspace | ⟲ **re-red** — was: signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G |
+| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2); re-signed 2026-09-03 (session pass) |
+| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G; re-signed 2026-09-03 (session pass) |
 | C0 | a server with no keys refuses to serve | ⟲ **re-red** — was: signed |
 | C1 | a wrong key is rejected | ⟲ **re-red** — was: signed |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass) |
@@ -830,6 +830,14 @@ in this scenario would mean the grace is too narrow, not that B4 passed.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
+
+Job 68a15e4b…, run 3d70b1c0… (see p2 log).
+before restart: {"status":"running","nevents":1}
+$ curl /health   -> {"status":"ok"}
+after restart:  {"status":"running","nevents":1}
+final:          {"status":"succeeded","nevents":12,"error":null}
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0).
 
 Job 5555ba3c22364e6d8b7b3150c4807359, run 96a1b17933fd4c6bb5e6c189ade31db1.
@@ -1003,6 +1011,16 @@ as a known gap, not something to sign around.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass. GREEN, unchanged.
+
+Job 01f5054e25d544ba913a37408bf2ec9c, run 127d80f8ff3949fba2d3be4899fd3c72.
++10s (inside grace):  {"status":"running","error":null}
++70s (past grace):    {"status":"failed","error":{"type":"WorkerLost",
+                       "stage":"emit","message":"...no heartbeat for 72s..."}}
+$ docker compose start worker
++60s after restart:   {"status":"failed","error":"WorkerLost"}
+$ redis-cli HGET rq:job:01f5054e… status   -> started
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after the MigrationFailed change (gate E0). GREEN, unchanged.
 
 Job 71743a5f5e1b47a1b19a5819dfe1b4b8, run a6b678641c184520b698065da56cb634.
@@ -1129,6 +1147,13 @@ docker compose exec -T api sh -c 'du -sh /data/workspaces'
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
+
+$ ls .../workspaces   -> 14 entries, 723M
+$ rejox sweep --dry-run  (TTL=1s)  -> 13 run(s)
+$ rejox sweep            (TTL=1s)  -> 13 run(s) reaped, the SAME 13
+$ ls .../workspaces   -> 1 entry (gate-probe), 4.0K
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after the MigrationFailed change, and the first run of this gate at real scale.
 
 $ ls .../workspaces   -> 28 entries, 1.1G
