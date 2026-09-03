@@ -55,6 +55,27 @@ controlled by `REJOX_CORS_ORIGINS` (default `http://localhost:5173,http://127.0.
 > **[`docs/SECURITY.md`](docs/SECURITY.md)** before deploying this anywhere — it
 > lists both the guarantees and the known gaps.
 
+`dev.sh` runs anonymous on purpose — it is the fast path, and it never exercises
+sign-in. To work on the real session flow locally instead, skip `dev.sh` and set
+a credential by hand:
+
+```bash
+export REJOX_INVITE_CODES=dev-code
+export REJOX_SESSION_SECRET="$(openssl rand -hex 32)"
+export REJOX_ALLOW_ANONYMOUS=1 REJOX_COOKIE_INSECURE=1   # both, see below
+export REJOX_ALLOW_UNSANDBOXED=1 REJOX_ALLOW_LOCAL_PATH=1
+(cd backend && uvicorn app.main:app --reload) &
+(cd frontend && npm run dev)
+```
+
+The session cookie is `Secure`, so a browser will not send it back over plain
+`http` — `REJOX_COOKIE_INSECURE=1` drops that for local work. It is refused
+unless `REJOX_ALLOW_ANONYMOUS=1` is also set, which is what stops it being
+switched on by accident on a server that is otherwise configured for real use.
+Sign-in still works normally: with invite codes configured, anonymous access is
+never reached. The dev server proxies `/api` to the backend, so the browser sees
+one origin and `SameSite=Lax` behaves exactly as it does in production.
+
 **End-to-end browser test** (real stack, real backend numbers)
 
 ```bash
