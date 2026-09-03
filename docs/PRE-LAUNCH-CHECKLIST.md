@@ -117,16 +117,16 @@ signature below carries the output it came from.
 | B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
 | B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2); re-signed 2026-09-03 (session pass) |
 | B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G; re-signed 2026-09-03 (session pass) |
-| C0 | a server with no keys refuses to serve | ⟲ **re-red** — was: signed |
-| C1 | a wrong key is rejected | ⟲ **re-red** — was: signed |
+| C0 | a server with no keys refuses to serve | ☑ signed — re-signed 2026-09-03; refuses only when BOTH credentials are absent |
+| C1 | a wrong key is rejected | ☑ signed — re-signed 2026-09-03; bad key, forged cookie and bad invite code all 401 |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass) |
 | C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03; re-signed 2026-09-03 (session pass) |
-| C4 | CORS is never a wildcard | ⟲ **re-red** — was: signed |
-| C5 | an oversized body is refused before it costs anything | ⟲ **re-red** — was: signed — refused at 400, API peak 80 MiB |
+| C4 | CORS is never a wildcard | ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin |
+| C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03 |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
 | D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
-| E0 | a failed migration is diagnosable after the fact | ☒ **RED** — both findings now fixed in code; awaiting the re-run |
-| E1 | one identity cannot fill the disk | ☒ **RED** — quota + free-space floor now shipped; awaiting the re-run |
+| E0 | a failed migration is diagnosable after the fact | ☑ signed — RED twice (silence, then a `Job OK` lie), both fixed 2026-09-03 |
+| E1 | one identity cannot fill the disk | ☑ signed — RED first (300 GB/hour, unbounded), quota + free-space floor 2026-09-03 |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
 ---
@@ -1272,6 +1272,30 @@ of the two does not trip it.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
+
+All three cases, because with two credentials the refusal must fire on NEITHER
+being present and not on either one being absent:
+
+  both emptied      -> 503  "This Rejox server has no API keys or invite codes
+                             configured, so it will not serve requests. Set
+                             REJOX_API_KEYS or REJOX_INVITE_CODES
+                             (comma-separated), or REJOX_ALLOW_ANONYMOUS=1 for
+                             a local development server."
+  keys emptied,
+  codes kept        -> 401  "Not signed in. …"   (serves; asks who you are)
+  codes emptied,
+  keys kept         -> 401  "Not signed in. …"   (serves; asks who you are)
+
+The 503 names all three variables. The two asymmetric cases do NOT refuse to
+serve, which is the property the two-credential model added and the reason this
+gate's command changed: a server running on invite codes alone has no API keys,
+and that is a valid configuration rather than a misconfiguration.
+
+Only ONE refusal now, not the two recorded in 2026-08-31: the compose file used
+to guard REJOX_API_KEYS with `:?` and could not keep doing so. The app's 503 is
+the whole of it.
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 Two refusals, both fired:
 $ env -u REJOX_API_KEYS docker compose --env-file /dev/null config
@@ -1310,6 +1334,21 @@ validation took over).
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
+
+  no-key          = 401
+  bad-key         = 401
+  good-key        = 403
+  bad-cookie      = 401     (a forged/unsigned cookie value)
+  bad-invite-code = 401     (POST /api/session with a code that is not configured)
+  session-create  = 200     then, with that cookie: with-session = 403
+
+`good-key` and `with-session` are 403, not 401, and that is the pass: 403 is
+/api/parse refusing a local `path` (REJOX_ALLOW_LOCAL_PATH unset — the same
+refusal C3 records). Authentication succeeded and the handler refused for its
+own reason, which is what "not 401" is asking. A valid session reaching a
+guarded route the same way a valid key does is the point.
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ POST /api/parse  (no key)                      no-key=401
 $ POST /api/parse  -H 'X-API-Key: definitely-not-a-key'   bad-key=401
@@ -1513,6 +1552,21 @@ the second.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
+
+  Origin: https://evil.example
+    access-control-allow-methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+    (NO access-control-allow-origin — the browser blocks without it)
+
+  Origin: http://localhost:5173   (the configured one)
+    access-control-allow-methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+    access-control-allow-origin: http://localhost:5173
+
+Echoed exactly, never `*`. Note that credentialed CORS is deliberately NOT
+enabled: the browser app and the API are served from one origin, so the session
+cookie never needs a cross-origin exemption. That is what allows SameSite=Lax,
+and it is why this gate did not have to be weakened for sessions.
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ OPTIONS /api/parse -H 'Origin: https://evil.example' ... | grep -ci allow-origin
 0        (no access-control-allow-origin header at all)
@@ -1554,6 +1608,19 @@ than application code.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
+
+$ head -c 200000000 /dev/urandom > big.zip     # 200 MB, over the 100 MB limit
+  status = 400
+  body   = {"detail":"Rejected upload: archive is 200000000 bytes, over the
+            104857600-byte limit."}
+  API container peak during the upload: 55.87 MiB / 7.749 GiB
+
+Refused with the limit named, and the API's memory stayed bounded — the body was
+not buffered whole. The standing note from 2026-08-31 still applies: the limit
+is applied after the body arrives, so a reverse proxy body cap is what makes it
+cheap at the edge rather than merely safe.
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ head -c 200000000 /dev/urandom > big.zip     # 191 MiB, over the 100 MB limit
 $ POST /api/upload -F file=@big.zip
@@ -1756,6 +1823,53 @@ worth more than a green mark that nobody tested.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — GREEN. This gate has been RED twice (both records kept below); both findings are now fixed and observed fixed.
+
+Both failures produced again, and this time BOTH are explainable from the
+retained logs alone.
+
+CASE 1 — the upload is wrong (broken-app), job 0ebbba0e…, run 03b42a8a…
+  worker-1 | {"ts":…, "level":"error", "event":"job_failed",
+              "runId":"03b42a8ac3f94c04825565378c168d14",
+              "jobId":"0ebbba0e1f4a44b6a37e094e69196123",
+              "stage":"analyze", "seq":1, "errorType":"NothingToMigrate",
+              "reason":"No React components found in project 'broken-app' …"}
+  worker-1 | app.jobs.MigrationFailed: 0ebbba0e… failed during analyze —
+             NothingToMigrate: No React components found in project 'broken-app'
+
+CASE 2 — the capacity died, job 7b7d49eb…, run 314ff297…
+  worker-1 | {"event":"job_stage_started", "runId":"314ff297…",
+              "jobId":"7b7d49eb…", "stage":"emit"}
+  api-1    | {"ts":…, "level":"error", "event":"job_abandoned",
+              "runId":"314ff2979f634e7ca91d9093a37349e6",
+              "jobId":"7b7d49ebaf8142dd8ed50388dad269e2",
+              "identity":"key:83e4801971123254", "stage":"emit",
+              "errorType":"WorkerLost", "silentForSeconds":…, "graceSeconds":60}
+
+  1. Which stage failed, from the logs alone?   YES — `analyze` and `emit`.
+  2. Why, from the logs alone?                  YES — NothingToMigrate with the
+                                                project's own numbers, and
+                                                WorkerLost with how long it was
+                                                silent and against what grace.
+  3. Correlation, grep -c "$JOB":  case 1 = 10, case 2 = 9
+     (and by run: 2 and 3). Unlike the 2026-09-03 RED run, these are not all
+     the client's own polling: they include the stage boundary, the terminal
+     event and the ruling.
+
+  $ grep -icE 'nothingtomigrate|workerlost|job_failed|job_abandoned'  -> 3
+  $ grep -cE '<the api key>|<the invite code>|<the session secret>'   -> 0
+  54 log lines retained in total.
+
+Case 2 is the one worth dwelling on. The process that was running that job was
+killed; it logged the stage it entered and then nothing, for ever. The line that
+explains it comes from `api-1` — the reconciler in the API process, the only
+party still alive to rule the job lost. That line is what this gate was red for.
+
+Credentials do not appear anywhere in the output: identity is logged as the same
+`key:`/`acct:` digest `{run}/owner` holds, so a log line joins to a run's owner
+without the key ever being written down.
+
+--- the two RED records, kept in place ---
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit e03470c — RED, recorded as a finding rather than a pass.
 
 Both failures were produced as specified. Both were fully described by
@@ -1886,6 +2000,36 @@ deliberately in a scratch environment and find out.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — GREEN. RED on its first pass (the arithmetic below); both questions are now answered.
+
+Configured, read from inside the container rather than assumed:
+  REJOX_ACCOUNT_QUOTA_BYTES = 2147483648   REJOX_MIN_FREE_BYTES = 2147483648
+
+QUESTION 1 — how much disk can one identity consume in a retention window?
+  Bounded, at last, by REJOX_ACCOUNT_QUOTA_BYTES. Observed:
+    upload within quota                     -> 200
+    same upload, quota lowered              -> 413
+      {"detail":"Storage quota reached: your runs occupy … of … . Runs are
+       deleted automatically at the end of their retention window; download what
+       you need and wait, or ask the operator to raise
+       REJOX_ACCOUNT_QUOTA_BYTES."}
+  The footprint is walked from the filesystem per upload, so it cannot drift
+  from what is actually on disk.
+
+QUESTION 2 — what does the API do when /data is full?
+    free-space floor raised above the disk   -> 503
+  It refuses new uploads, and says it is a server condition rather than blaming
+  the caller's archive. That is now a decision rather than a discovery.
+
+LIMIT OF THIS SIGNATURE, stated rather than buried: question 2 was exercised by
+raising REJOX_MIN_FREE_BYTES above the free space, which proves the refusal path
+and the message. It does NOT prove what happens if the volume genuinely fills
+*during* a migration that is already running — a write failing mid-emit is a
+different question, and the free-space floor is what is supposed to stop the
+disk ever getting there. Filling a real volume to find out still needs a
+size-capped scratch volume; on this host /private/tmp is the boot disk.
+
+--- the RED first pass, kept in place ---
 (unsigned — question 2 has not been run. Question 1 is answered below, and it
 is already red.)
 
