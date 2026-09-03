@@ -189,7 +189,7 @@ def generate_scaffold(
     }))
 
     # tsconfig.json
-    includes = ["**/*.ts", "**/*.tsx"]
+    includes = ["**/*.ts", "**/*.tsx", "expo-env.d.ts"]
     if nativewind:
         includes.append("nativewind-env.d.ts")
     write("tsconfig.json", _render("tsconfig.json.tmpl", {
@@ -219,6 +219,10 @@ def generate_scaffold(
         "METRO_IMPORTS": metro_imports,
         "METRO_EXPORT": metro_export,
     }))
+
+    # Ambient types for static assets. Always written: the web shim that
+    # declared these (vite-env.d.ts) is deliberately never migrated.
+    write("expo-env.d.ts", _render("expo-env.d.ts.tmpl", {}))
 
     # NativeWind extras
     if nativewind:
