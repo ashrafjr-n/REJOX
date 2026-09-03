@@ -338,3 +338,27 @@ def test_routed_screen_outside_pages_is_imported_from_where_it_landed(
     assert (_out(emitted_js) / "src" / "components" / "NotFound.tsx").is_file()
     # Screens that DO live under pages/ still resolve to screens/.
     assert "from '../screens/Home'" in nav
+
+
+def test_web_only_and_build_only_files_never_reach_the_rn_project(
+    emitted_js: EmittedProject,
+) -> None:
+    """One list, three classes that must never be migrated.
+
+    `vite-env.d.ts` reached a real migrated project because the exclusion rules
+    were scattered per-loop instead of stated once: it references `vite/client`
+    types the RN project does not have. Test files are the same category — the
+    runtime app does not include them, and @testing-library/react has no RN
+    equivalent, so copying them guarantees a broken type-check.
+    """
+    reasons = {s.path: s.reason for s in emitted_js.skipped}
+    emitted_paths = {f.path for f in emitted_js.files}
+
+    assert "src/vite-env.d.ts" in reasons
+    assert "bundler types" in reasons["src/vite-env.d.ts"]
+    assert "src/App.test.jsx" in reasons
+    assert "test file" in reasons["src/App.test.jsx"]
+    assert "index.html" in reasons
+
+    # And none of them landed in the tree under any name.
+    assert not any("vite-env" in p or ".test." in p for p in emitted_paths)

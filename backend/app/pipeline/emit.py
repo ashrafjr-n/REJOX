@@ -70,8 +70,42 @@ _SOURCE_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx")
 # src/main.jsx are recognized too (see _regenerated_source_paths).
 _REGENERATED_STEMS = {"src/App", "src/main"}
 
-# Web-only assets/files that have no place in an RN project.
+# --- What never reaches the React Native project -----------------------------
+#
+# ONE list rather than a check per loop. Everything below is web-only or
+# build-only: emitting it produces a file that cannot work in React Native, and
+# scattering these rules is how `vite-env.d.ts` (which references `vite/client`
+# types the RN project does not have) reached a migrated project unnoticed.
+# Every rule returns the reason that lands in REJOX-REPORT.md, so a skip is
+# always an auditable decision and never a silent omission.
+
 _WEB_ONLY_ASSET_NAMES = {"favicon.svg", "favicon.ico", "vite.svg"}
+
+# Ambient type shims that describe a WEB build — they reference bundler types
+# that do not exist in an RN project and declare web asset modules.
+_BUILD_SHIM_NAMES = {"vite-env.d.ts", "react-app-env.d.ts", "next-env.d.ts"}
+
+# Tests are not the runtime app, and their web testing libraries
+# (@testing-library/react, jsdom) have no React Native equivalent.
+_TEST_FILE_RE = re.compile(r"\.(test|spec)\.[jt]sx?$")
+
+
+def _never_migrate(rel_path: str) -> Optional[str]:
+    """Why this file must never reach the RN project, or ``None`` to migrate it."""
+    name = posixpath.basename(rel_path)
+    if name == "index.html":
+        return "web-only (HTML entry — the scaffold provides the RN entry point)"
+    if rel_path.startswith("public/"):
+        return "web-only asset (public/ is a web static directory)"
+    if name in _WEB_ONLY_ASSET_NAMES:
+        return "web-only asset (favicon/static)"
+    if name in _BUILD_SHIM_NAMES:
+        return "web build shim (references bundler types React Native does not have)"
+    if _TEST_FILE_RE.search(name):
+        return "test file (not the runtime app; its web testing libraries have no RN equivalent)"
+    if name.endswith(".css"):
+        return "web-only (global CSS is handled by the scaffold)"
+    return None
 
 _TODO_RE = re.compile(r"REJOX-TODO\(([A-Z_]+)\)")
 
@@ -272,6 +306,10 @@ def emit_project(
         and f.path not in regenerated_paths
     )
     for src_rel in source_ts:
+        never = _never_migrate(src_rel)
+        if never is not None:
+            skipped.append(SkippedFile(path=src_rel, reason=never))
+            continue
         abs_src = src_root / src_rel
         if not abs_src.is_file():
             skipped.append(SkippedFile(path=src_rel, reason="source file not found on disk"))
@@ -391,9 +429,9 @@ def emit_project(
 
     # 4. assets — copy real assets, skip web-only ones with a note.
     for asset in kg.assets:
-        name = Path(asset.path).name
-        if asset.path.startswith("public/") or name in _WEB_ONLY_ASSET_NAMES:
-            skipped.append(SkippedFile(path=asset.path, reason="web-only asset (favicon/static)"))
+        never = _never_migrate(asset.path)
+        if never is not None:
+            skipped.append(SkippedFile(path=asset.path, reason=never))
             continue
         abs_asset = src_root / asset.path
         if not abs_asset.is_file():
@@ -411,15 +449,16 @@ def emit_project(
             )
         )
 
-    # Note the web-only source files we never emit.
-    for web_only in ("index.html", "src/index.css"):
-        if any(f.path == web_only for f in kg.files):
-            skipped.append(
-                SkippedFile(
-                    path=web_only,
-                    reason="web-only (HTML entry / global CSS handled by the scaffold)",
-                )
-            )
+    # Note every remaining web-only file the project carries but we never emit
+    # (HTML entry, global CSS, …) — driven by the same list, so a new kind of
+    # web-only file is reported here the moment it is recognised above.
+    already = {s.path for s in skipped} | {f.path for f in files}
+    for f in kg.files:
+        if f.path in already:
+            continue
+        never = _never_migrate(f.path)
+        if never is not None:
+            skipped.append(SkippedFile(path=f.path, reason=never))
 
     todo_count = sum(len(f.todoCodes) for f in files) + sum(
         len(f.unhandled) for f in files
