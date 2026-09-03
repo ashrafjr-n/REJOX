@@ -128,7 +128,7 @@ signature below carries the output it came from.
 | C0 | a server with no keys refuses to serve | ☑ signed — re-signed 2026-09-03; refuses only when BOTH credentials are absent |
 | C1 | a wrong key is rejected | ☑ signed — re-signed 2026-09-03; bad key, forged cookie and bad invite code all 401 |
 | C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass) |
-| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03; re-signed 2026-09-03 (session pass) |
+| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3) |
 | C4 | CORS is never a wildcard | ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03 |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |

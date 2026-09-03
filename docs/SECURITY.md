@@ -234,8 +234,10 @@ Stated plainly, because a security document that only lists wins is marketing:
   API's reconciler rules a job `WorkerLost`, which is the only party still alive
   to say so. Identity is logged as the same `key:`/`acct:` digest `{run}/owner`
   holds, so a log line joins to a run's owner; a raw key or invite code is never
-  written. Gate E0 must be re-run to be signed: this is a description of code
-  until that happens.
+  written. Verified against a live deployment on 2026-09-03 and gate E0 is
+  signed green: a killed worker's job was explained from the container logs
+  alone, from an `api-1` line naming the run, the job, the stage and the grace
+  it missed — the case that previously produced no log line at all.
 - **Retention has no notion of an in-flight run.** The sweeper reaps by age
   alone, so a short `REJOX_RUN_TTL_SECONDS` and a long migration can delete a
   workspace out from under a running job. Harmless at the 24h default.
