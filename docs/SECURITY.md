@@ -120,6 +120,14 @@ reintroducing it quietly.
   runs, and they expire), low disk is **503** (the server's problem, and nothing
   you do helps).
 
+  *Known cosmetic issue:* those messages render sizes as GB to one decimal
+  place, so a quota configured well below 1 GB reads as "0.0 GB of 0.0 GB". The
+  numbers are correct at the shipped default and anywhere near it; only an
+  unusually small `REJOX_ACCOUNT_QUOTA_BYTES` makes the text unhelpful. Left
+  alone deliberately: the fix is one format string in `app/security.py`, and by
+  the re-signing table any change there re-reds all of section **C**, which is
+  three verification passes for a rounding artifact.
+
   The 2 GB default, so it can be recomputed rather than believed: gate B7
   measured ~40 MB per run of ordinary use, so 2 GB is roughly 50 runs held at
   once — far more than a real user has in flight, and small enough not to be a
