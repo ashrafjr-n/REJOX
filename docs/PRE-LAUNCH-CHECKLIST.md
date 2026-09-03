@@ -2123,6 +2123,15 @@ For scale on ordinary use: gate B7's run the same day accumulated 1.1 GB across
 uses the 500 MB ceiling instead, so the gap between normal and hostile is ~12x
 per upload before the rate limit is even considered.
 
+NOTE, 2026-09-03 (session pass) — that 40 MB/run is UNVALIDATED gate traffic:
+none of those 28 workspaces retained an `npm install`. A VALIDATED run keeps
+the node_modules that install produces inside the run workspace — measured at
+391 MB for test-projects/sample-app on this host. `REJOX_ACCOUNT_QUOTA_BYTES`'s
+default (2 GB) is sized off the 40 MB figure and reads as ~50 runs; against a
+validated run it is ~5. Does not change question 1's finding above (still no
+bound worth the name), but the default's own sizing comment (`app/security.py`, `.env.example`, `docs/SECURITY.md`) has been corrected to
+say so.
+
 QUESTION 2 IS STILL OPEN: what the API actually does when /data is full is
 unknown, and this gate is not signed until it has been observed. Note before
 running it: the command says "fill the volume deliberately in a scratch
