@@ -19,6 +19,7 @@ from app.models.knowledge_graph import KnowledgeGraph
 from app.pipeline.analyzer import analyze_graph
 from app.pipeline.emit import emit_project
 from app.pipeline.planner import plan_migration
+from app.pipeline.transformer import TransformerError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "test-projects" / "sample-app"
@@ -276,3 +277,44 @@ def test_app_provenance_matches_the_real_source_extension(emitted_js: EmittedPro
     nav = next(f for f in emitted_js.files if f.path == "src/navigation/AppNavigator.tsx")
     assert app.sourceFile == "src/App.jsx"
     assert nav.sourceFile == "src/App.jsx"
+
+
+def test_one_failing_transform_does_not_abort_the_whole_migration(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real .jsx repo hit a codemod-worker edge case (a JSX attribute string
+    spanning a literal newline) that the worker correctly refused to emit —
+    and that refusal, uncaught, took the ENTIRE migration down: every other
+    file that transforms cleanly was lost too, with no partial output.
+
+    One file the codemod-worker cannot safely handle must be isolated: skipped
+    with a reason, not allowed to abort every other file's conversion.
+    """
+    from app.pipeline.intelligence import build_knowledge_graph
+    import app.pipeline.emit as emit_module
+
+    kg = build_knowledge_graph(JS_SRC_ROOT)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+
+    real_transform = emit_module.transform_component
+
+    def flaky_transform(file: Path, options: object = None) -> object:
+        if str(file).endswith("Header.jsx"):
+            raise TransformerError("simulated codemod-worker refusal for this test")
+        return real_transform(file, options)
+
+    monkeypatch.setattr(emit_module, "transform_component", flaky_transform)
+
+    out = tmp_path_factory.mktemp("emit-js-flaky")
+    emitted = emit_project(plan, ANSWERS, kg, out, report=report, source_root=JS_SRC_ROOT)
+
+    failed = [s for s in emitted.skipped if s.path == "src/components/Header.jsx"]
+    assert len(failed) == 1
+    assert "transform failed" in failed[0].reason
+
+    # The other files converted normally — the failure did not cascade.
+    converted = {f.sourceFile for f in emitted.files if f.sourceFile}
+    assert "src/pages/Home.jsx" in converted
+    assert "src/pages/About.jsx" in converted
+    assert "src/components/Header.jsx" not in converted
