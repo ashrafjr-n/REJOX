@@ -109,18 +109,18 @@ signature below carries the output it came from.
 | A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
 | A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped |
 | A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped |
-| B0 | all three services come up and stay up | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2) |
-| B1 | the worker is registered with Redis and takes jobs | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2) |
-| B2 | a full migration completes through the queue | ⟲ **re-red** — was: signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2) |
-| B3 | the emitted project is downloadable and real | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2) |
+| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
+| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
+| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
+| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
 | B4 | an API restart does not lose an in-flight job | ⟲ **re-red** — was: signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker |
-| B5 | Redis down answers 503 — fast, and never in-process | ⟲ **re-red** — was: signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2) |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
 | B6 | a killed worker does not silently strand a job | ⟲ **re-red** — was: signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2) |
 | B7 | retention actually deletes a run workspace | ⟲ **re-red** — was: signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G |
 | C0 | a server with no keys refuses to serve | ⟲ **re-red** — was: signed |
 | C1 | a wrong key is rejected | ⟲ **re-red** — was: signed |
-| C2 | the rate limit is shared across API replicas | ⟲ **re-red** — was: signed — 2 replicas, 40 requests, 10 allowed |
-| C3 | a run belongs to one identity and no other | ⟲ **re-red** — was: signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 |
+| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass) |
+| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03; re-signed 2026-09-03 (session pass) |
 | C4 | CORS is never a wildcard | ⟲ **re-red** — was: signed |
 | C5 | an oversized body is refused before it costs anything | ⟲ **re-red** — was: signed — refused at 400, API peak 80 MiB |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
@@ -590,6 +590,10 @@ loop looks identical to a healthy one in the first thirty seconds.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass (invite-code sessions, structured logging, storage quota). 0 FAIL across the whole pass.
+  PASS  health — {"status":"ok"}
+  PASS  redis / api / worker running
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
   PASS  health — {"status":"ok"}
 
@@ -636,6 +640,9 @@ running.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass (invite-code sessions, structured logging, storage quota). 0 FAIL across the whole pass.
+  PASS  1 worker(s) registered
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
   PASS  1 worker(s) registered
 
@@ -695,6 +702,12 @@ not run what it claims to have run.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass (invite-code sessions, structured logging, storage quota). 0 FAIL across the whole pass.
+  PASS  uploaded — runId 0eb505d7b1a2466a91eed25d3c4d60f9
+  PASS  enqueued — jobId 268203879bcd4101877d3e1001527151
+  PASS  migration status — succeeded
+  PASS  a sibling sandbox container was observed on the host during the run
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
   PASS  migration status — succeeded
   PASS  a sibling sandbox container was observed on the host during the run
@@ -758,6 +771,11 @@ but contains three files is red.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass (invite-code sessions, structured logging, storage quota). 0 FAIL across the whole pass.
+  PASS  download — 200
+  PASS  41 files in the archive
+  PASS  no mount probe leaked into the artifact — 0
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
   PASS  download — 200
   PASS  41 files in the archive
@@ -908,6 +926,11 @@ accepted work; anything else means it failed for a reason nobody predicted.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass (invite-code sessions, structured logging, storage quota). 0 FAIL across the whole pass.
+  PASS  status with Redis down — 503
+  PASS  answered in 1s (must not hang)
+  PASS  the queue itself refuses, never a thread fallback — QUEUE-REFUSED
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 3c27cdf — re-signed after `run_job` was changed to raise MigrationFailed (gate E0, finding 2). 0 FAIL across the whole pass.
   PASS  status with Redis down — 503
   PASS  the queue itself refuses, never a thread fallback — QUEUE-REFUSED
@@ -1305,6 +1328,11 @@ failure this gate exists to catch.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass (invite-code sessions, structured logging, storage quota). 0 FAIL across the whole pass.
+  PASS  API replicas running — 2
+  PASS  requests allowed across 2 replicas (limit 10) — 10
+  PASS  both replicas served (5 via :8000, 5 via :8001)
+
 Signed: 2026-09-01 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 4468bc4 — GREEN, first run of this gate. It was never red; it was unrunnable, because there was nothing to share.
 
 Two API replicas on :8000 and :8001, REJOX_RATE_STORE=redis,
@@ -1365,6 +1393,18 @@ which walks past ownership entirely — a run's source lives at a path.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass (invite-code sessions, structured logging, storage quota). 0 FAIL across the whole pass.
+  PASS  download as the owner — 200
+  PASS  download as a stranger — 404
+  PASS  job / event stream / plan as a stranger — 404
+  PASS  the two messages have the same shape — No such run: 0eb505d7…
+  PASS  local-path mode is refused — 403
+
+  Run under an API key. The session model's half of this question — that a run
+  survives its owner signing out and back in, because the identity is the
+  ACCOUNT and not the session — is asserted in backend/tests/test_sessions.py
+  and is not something this script exercises.
+
 Signed: 2026-09-03 — Ashraf (./verify-deployment.sh, Docker Desktop 29.6.2, macOS) — commit ee6df56 — re-signed after `workspace.py` changed (the B7 fix), on a tree that carries that change.
 
 Run 33b756361c2f4a0283267622ded455b0, job 1df12266a1b940358bf60cf069f22918.
