@@ -43,7 +43,11 @@ from app.ai.navigation import build_navigator_spec, generate_navigator, unhoista
 from app.pipeline.analyzer import analyze_graph
 from app.pipeline.resolve_apply import apply_resolutions
 from app.pipeline.scaffold import generate_scaffold
-from app.pipeline.transformer import build_transform_options, transform_component
+from app.pipeline.transformer import (
+    TransformerError,
+    build_transform_options,
+    transform_component,
+)
 
 # Answer keys used by the Ask stage (questionId form) → codemod-worker option
 # keys (camelCase). The scaffold reads the questionId form directly.
@@ -250,7 +254,17 @@ def emit_project(
         if not abs_src.is_file():
             skipped.append(SkippedFile(path=src_rel, reason="source file not found on disk"))
             continue
-        result = transform_component(abs_src, options)
+        # One file's transform is isolated from the rest of the migration: an
+        # edge case the codemod-worker cannot safely handle (rare — it already
+        # refuses to emit code it cannot prove is syntactically valid) must not
+        # take down every other file that transforms cleanly.
+        try:
+            result = transform_component(abs_src, options)
+        except TransformerError as exc:
+            skipped.append(
+                SkippedFile(path=src_rel, reason=f"transform failed, left out of the migration: {exc}")
+            )
+            continue
 
         # NAV_CONTAINER (tier 2): a shared <Layout>/<Outlet>/<Routes> component
         # is router structure, subsumed by the generated navigator. Skip it
