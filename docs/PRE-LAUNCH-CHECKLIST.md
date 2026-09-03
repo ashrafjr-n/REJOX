@@ -97,9 +97,14 @@ and the HTTP and operability gates by hand (C0, C1, C4, C5, E0, E1).
 **E0 and E1 are signed green for the first time.** E0 had been red twice — a
 silence, then a `Job OK` line for a job that had failed — and both cases are now
 explained from the retained logs alone. E1 had no bound at all; it now has one,
-and a documented answer to what a full disk does. Sections **A, B, C are signed
-in full, and E is signed except E2**, which needs real LLM spend and is a budget
-decision rather than an engineering one.
+and a documented answer to what a full disk does. Sections **A, B, C and D are signed in full, and E is signed except E2**, which
+needs real LLM spend and is a budget decision rather than an engineering one.
+
+D0 and D1 were signed last, on 2026-09-03, when required status checks were
+turned on for `master`. That was deferred deliberately rather than forgotten:
+requiring the checks also stops direct pushes, so it changes how the repository
+is worked in day to day, and it was left until the engineering it guards was
+finished. **28 of 29 gates are signed.**
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
@@ -131,8 +136,8 @@ signature below carries the output it came from.
 | C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3) |
 | C4 | CORS is never a wildcard | ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03 |
-| D0 | docker mode is exercised in CI, not just on someone's laptop | ◐ green in CI ×3 — awaiting the required-status-check setting |
-| D1 | the compose deployment is exercised in CI | ◐ green in CI ×3 — awaiting the required-status-check setting |
+| D0 | docker mode is exercised in CI, not just on someone's laptop | ☑ signed — green in CI ×3, and required on master 2026-09-03 |
+| D1 | the compose deployment is exercised in CI | ☑ signed — green in CI ×3, and required on master 2026-09-03 |
 | E0 | a failed migration is diagnosable after the fact | ☑ signed — RED twice (silence, then a `Job OK` lie), both fixed 2026-09-03 |
 | E1 | one identity cannot fill the disk | ☑ signed — RED first (300 GB/hour, unbounded), quota + free-space floor 2026-09-03 |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
@@ -1667,6 +1672,37 @@ runner's daemon, and is required for merge. Paste the green run's URL.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf — commit 510ee0f — both halves of this gate are now in place.
+
+The green CI runs were already recorded below. The half that was missing was the
+repository setting, and it is now set:
+
+$ gh api repos/ashrafjr-n/REJOX/rules/branches/master -q '.[].type'
+  deletion
+  non_fast_forward
+  pull_request
+  required_status_checks
+
+$ gh api repos/ashrafjr-n/REJOX/rulesets/22139154 \
+    -q '.rules[]|select(.type=="required_status_checks")
+        |.parameters.required_status_checks[].context'
+  Backend (fast)
+  Containment (live daemon — section A)          <- D0
+  Deployment (docker compose — sections B and C) <- D1
+  Backend (integration — npm + tsc + Metro)
+  Frontend (types + lint + build)
+  Backend image builds
+
+All six are required, not only the two these gates name: every one of them
+passes today, so requiring them costs nothing and stops master going red by
+merge. The `pull_request` rule is what carries them — master no longer takes a
+direct push, so the checks cannot be walked past.
+
+Honest about what this signature rests on: the read-back above, from the
+endpoint that reports what actually applies to `master`, rather than an
+attempted push. The first rejected direct push will be the behavioural
+confirmation, and it belongs in this block when it happens.
+
 PARTIAL — the job is green on GitHub across three consecutive pushes to
 master; the required-status-check half of this gate is not in place yet.
 
@@ -1696,11 +1732,8 @@ The first two of those runs failed overall — on `Backend (integration)`, an
 unrelated job — which is why the evidence is per-job and not per-run. The third
 is the first fully green run on master.
 
-STILL REQUIRED TO SIGN:
-  - the job marked as a required status check on master (a repository setting,
-    not something this file or the workflow can assert).
-
-    Repository state as of 2026-09-02, checked rather than assumed:
+SATISFIED 2026-09-03 — see the signature at the top of this block. The state
+below is the record of what it looked like before:
 
     $ gh api repos/ashrafjr-n/REJOX/branches/master/protection
       404 Branch not protected
@@ -1726,6 +1759,37 @@ B5 against it, and fails the build on any of them. Paste the green run's URL.
 **Evidence:**
 
 ```text
+Signed: 2026-09-03 — Ashraf — commit 510ee0f — both halves of this gate are now in place.
+
+The green CI runs were already recorded below. The half that was missing was the
+repository setting, and it is now set:
+
+$ gh api repos/ashrafjr-n/REJOX/rules/branches/master -q '.[].type'
+  deletion
+  non_fast_forward
+  pull_request
+  required_status_checks
+
+$ gh api repos/ashrafjr-n/REJOX/rulesets/22139154 \
+    -q '.rules[]|select(.type=="required_status_checks")
+        |.parameters.required_status_checks[].context'
+  Backend (fast)
+  Containment (live daemon — section A)          <- D0
+  Deployment (docker compose — sections B and C) <- D1
+  Backend (integration — npm + tsc + Metro)
+  Frontend (types + lint + build)
+  Backend image builds
+
+All six are required, not only the two these gates name: every one of them
+passes today, so requiring them costs nothing and stops master going red by
+merge. The `pull_request` rule is what carries them — master no longer takes a
+direct push, so the checks cannot be walked past.
+
+Honest about what this signature rests on: the read-back above, from the
+endpoint that reports what actually applies to `master`, rather than an
+attempted push. The first rejected direct push will be the behavioural
+confirmation, and it belongs in this block when it happens.
+
 PARTIAL — the job is green on GitHub across three consecutive pushes to
 master; the required-status-check half of this gate is not in place yet.
 
@@ -1746,11 +1810,8 @@ B and C)` on GitHub Actions, ubuntu-latest, the same three pushes:
   33659942702  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33659942702
   33660487355  success   https://github.com/ashrafjr-n/REJOX/actions/runs/33660487355
 
-STILL REQUIRED TO SIGN:
-  - the job marked as a required status check on master. See the same note
-    under D0: the `master gates` ruleset exists and is active, but carries only
-    `deletion` and `non_fast_forward`; required status checks would also block
-    direct pushes to master, and that move is deferred to pre-launch.
+SATISFIED 2026-09-03 — see the signature at the top of this block. The note
+below is the record of why it was deferred until then.
 ```
 
 ---
