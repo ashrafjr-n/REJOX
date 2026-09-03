@@ -26,6 +26,7 @@ validated reality rather than a static prediction.
 
 from __future__ import annotations
 
+import posixpath
 import re
 import shutil
 from collections import Counter
@@ -117,6 +118,25 @@ def _regenerated_source_paths(kg: KnowledgeGraph) -> dict[str, str]:
     return found
 
 
+def _screen_import_paths(kg: KnowledgeGraph, emitted: set[str]) -> dict[str, str]:
+    """Component name → its import path relative to ``src/navigation/``.
+
+    Derived from where each file ACTUALLY landed, not from a directory
+    convention: a routed screen does not have to live under ``pages/``, and
+    assuming it does writes an import to a file that was never emitted.
+    Components that were not emitted (skipped, or not on disk) are left out, so
+    the generator falls back to its own default for them.
+    """
+    paths: dict[str, str] = {}
+    for c in kg.components:
+        target = _target_rel(c.file)
+        if target not in emitted or c.name in paths:
+            continue
+        rel = posixpath.relpath(target, "src/navigation")
+        paths[c.name] = posixpath.splitext(rel)[0]
+    return paths
+
+
 def _provenance(result: TransformResult) -> ConfidenceSource:
     if result.unhandled:
         return ConfidenceSource.UNHANDLED
@@ -133,7 +153,9 @@ def _todo_codes(code: str) -> list[str]:
 
 
 def _navigator_source(
-    routes: list[RouteMapping], nav_shape: str
+    routes: list[RouteMapping],
+    nav_shape: str,
+    import_paths: Optional[dict[str, str]] = None,
 ) -> tuple[str, list[str]]:
     """Generate ``src/navigation/AppNavigator.tsx`` for the CHOSEN shape.
 
@@ -150,7 +172,7 @@ def _navigator_source(
     """
     spec = build_navigator_spec(nav_shape, routes)
     todos = ["NAV_SCREEN_PROPS"] if unhoistable_screens(spec, routes) else []
-    return generate_navigator(spec, routes), todos
+    return generate_navigator(spec, routes, import_paths), todos
 
 
 def _app_source(has_navigator: bool, nativewind: bool, app_name: str) -> str:
@@ -332,7 +354,13 @@ def emit_project(
     has_navigator = bool(report.routing.library and report.routing.routes)
     if has_navigator:
         nav_shape = answers.get("navigator-shape", "stack")
-        nav_src, nav_todos = _navigator_source(report.routing.routes, nav_shape)
+        # Import each screen from where it was actually written, not from the
+        # directory a screen is assumed to live in.
+        nav_src, nav_todos = _navigator_source(
+            report.routing.routes,
+            nav_shape,
+            _screen_import_paths(kg, {f.path for f in files}),
+        )
         nav_rel = "src/navigation/AppNavigator.tsx"
         nav_path = out_dir / nav_rel
         nav_path.parent.mkdir(parents=True, exist_ok=True)

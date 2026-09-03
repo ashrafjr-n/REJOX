@@ -318,3 +318,23 @@ def test_one_failing_transform_does_not_abort_the_whole_migration(
     assert "src/pages/Home.jsx" in converted
     assert "src/pages/About.jsx" in converted
     assert "src/components/Header.jsx" not in converted
+
+
+def test_routed_screen_outside_pages_is_imported_from_where_it_landed(
+    emitted_js: EmittedProject,
+) -> None:
+    """A routed screen does not have to live under pages/.
+
+    `NotFound` is routed but sits in src/components/. The navigator used to
+    import every screen from '../screens/<name>' on the assumption that routed
+    components live under pages/ — which wrote an import to a file that was
+    never emitted there, and Metro failed to resolve it. A real repo
+    (Hotel-Booking-Landing-Page) hit exactly this with its PageNotFound.
+    """
+    nav = (_out(emitted_js) / "src" / "navigation" / "AppNavigator.tsx").read_text()
+    assert "from '../components/NotFound'" in nav
+    assert "from '../screens/NotFound'" not in nav
+    # The file really is where the import points.
+    assert (_out(emitted_js) / "src" / "components" / "NotFound.tsx").is_file()
+    # Screens that DO live under pages/ still resolve to screens/.
+    assert "from '../screens/Home'" in nav
