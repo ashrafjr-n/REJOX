@@ -128,13 +128,17 @@ reintroducing it quietly.
   the re-signing table any change there re-reds all of section **C**, which is
   three verification passes for a rounding artifact.
 
-  The 2 GB default, so it can be recomputed rather than believed: gate B7
-  measured ~40 MB per run of ordinary use, so 2 GB is roughly 50 runs held at
-  once — far more than a real user has in flight, and small enough not to be a
-  disk. The ceiling exists because the other two limits do not compose: the rate
-  limit caps requests (10 uploads/minute) and the archive guard caps a single
-  upload (500 MB expanded), and 10 x 500 MB is 300 GB/hour held for a 24h
-  retention window. Change either input and this number should be recomputed.
+  The 2 GB default, so it can be recomputed rather than believed: a VALIDATED
+  run keeps the node_modules its `npm install` produced inside the run
+  workspace, measured at 391 MB for test-projects/sample-app (2026-09-03,
+  macOS) — so 2 GB is roughly 5 validated runs held at once, not 50. Gate B7's
+  ~40 MB/run is unvalidated gate traffic, which retains no install and is a
+  floor, not the typical case; raise this default before a day of real
+  uploads that exercise validation. The ceiling exists because the other two
+  limits do not compose: the rate limit caps requests (10 uploads/minute) and
+  the archive guard caps a single upload (500 MB expanded), and 10 x 500 MB is
+  300 GB/hour held for a 24h retention window. Change either input and this
+  number should be recomputed.
 - **Budgets**: fixed-window per-identity limits, separate per bucket, strictest
   on the stages that cost money (`migrate`) or CPU (`upload`, `pipeline`).
 - **Where the counters live** is one setting, `REJOX_RATE_STORE`. `memory`
