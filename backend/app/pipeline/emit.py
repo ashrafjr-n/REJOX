@@ -4,11 +4,12 @@ The Deterministic Transformer converts one file at a time; ``emit_project``
 assembles a runnable project out of them:
 
   1. scaffold the Expo (TS) skeleton (``scaffold.py``);
-  2. transform every source ``.ts``/``.tsx`` file through the codemod-worker and
-     write it into the RN tree (``components/``, ``screens/``, ``store/``,
-     ``api/``, ``hooks/``, ``lib/`` — ``pages/`` is remapped to ``screens/``) —
-     stores/api/hooks/types run through the *same* worker so nothing bypasses
-     the rules;
+  2. transform every source ``.ts``/``.tsx``/``.js``/``.jsx`` file through the
+     codemod-worker and write it into the RN tree (``components/``, ``screens/``,
+     ``store/``, ``api/``, ``hooks/``, ``lib/`` — ``pages/`` is remapped to
+     ``screens/``, and a ``.js``/``.jsx`` source's extension is rewritten to
+     ``.ts``/``.tsx``) — stores/api/hooks/types run through the *same* worker so
+     nothing bypasses the rules;
   3. generate the React Navigation navigator from the route table (deterministic,
      from the Planner/Analyzer) and an ``App.tsx`` wiring it;
   4. copy real assets, skipping web-only ones (favicon / index.html / global CSS)
@@ -54,8 +55,15 @@ _ANSWER_TO_WORKER = {
     "storage": "storage",
 }
 
-# Source files that are regenerated, never ported verbatim.
-_REGENERATED = {"src/main.tsx", "src/App.tsx"}
+# Source extensions the transformer accepts. The codemod-worker itself is
+# extension-agnostic (it always parses content as TSX — see convert.ts), so
+# this list is the only place "which files get converted" is decided.
+_SOURCE_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx")
+
+# Entry files that are regenerated, never ported verbatim — matched by STEM,
+# not a literal ".tsx" path, so a plain-JS project's real src/App.jsx and
+# src/main.jsx are recognized too (see _regenerated_source_paths).
+_REGENERATED_STEMS = {"src/App", "src/main"}
 
 # Web-only assets/files that have no place in an RN project.
 _WEB_ONLY_ASSET_NAMES = {"favicon.svg", "favicon.ico", "vite.svg"}
@@ -66,17 +74,43 @@ _TODO_RE = re.compile(r"REJOX-TODO\(([A-Z_]+)\)")
 # --- Path mapping ------------------------------------------------------------
 
 
+# Every emitted file lands in a TypeScript scaffold (tsconfig.json only
+# includes **/*.ts and **/*.tsx), so a .js/.jsx source is retargeted to
+# .ts/.tsx — otherwise tsc silently never sees it at all.
+_TARGET_EXTENSIONS = {".jsx": ".tsx", ".js": ".ts"}
+
+
 def _target_rel(src_rel: str) -> str:
     """Map a source ``src/`` path to its place in the RN tree.
 
     Layout is preserved 1:1 so every relative import stays valid; the only
-    remap is ``pages/`` → ``screens/`` (RN convention), and both live one level
-    under ``src/`` so ``../components/X`` imports are unaffected.
+    remaps are ``pages/`` → ``screens/`` (RN convention, both one level under
+    ``src/`` so ``../components/X`` imports are unaffected) and a .js/.jsx
+    source's extension → .ts/.tsx (the scaffold's own convention).
     """
     parts = Path(src_rel).parts
     if len(parts) >= 2 and parts[0] == "src" and parts[1] == "pages":
         parts = (parts[0], "screens", *parts[2:])
-    return str(Path(*parts))
+    target = Path(*parts)
+    new_ext = _TARGET_EXTENSIONS.get(target.suffix)
+    if new_ext:
+        target = target.with_suffix(new_ext)
+    return str(target)
+
+
+def _regenerated_source_paths(kg: KnowledgeGraph) -> dict[str, str]:
+    """The real source path for each regenerated entry, whatever extension
+    this project actually uses (``src/App.jsx`` as readily as ``src/App.tsx``).
+
+    Keyed by stem (``"src/App"``, ``"src/main"``) so callers can look up the
+    real App source for provenance without re-deriving it.
+    """
+    found: dict[str, str] = {}
+    for f in kg.files:
+        stem = str(Path(f.path).with_suffix(""))
+        if stem in _REGENERATED_STEMS:
+            found[stem] = f.path
+    return found
 
 
 def _provenance(result: TransformResult) -> ConfidenceSource:
@@ -177,6 +211,12 @@ def emit_project(
     nativewind = styling == "nativewind"
     app_name = kg.project.name.replace("-", " ").title()
 
+    regenerated = _regenerated_source_paths(kg)
+    regenerated_paths = set(regenerated.values())
+    # Falls back to the .tsx literal only if no App file was found at all —
+    # can't happen once report.routing required one, but keeps this total.
+    app_source_file = regenerated.get("src/App", "src/App.tsx")
+
     # 1. scaffold.
     scaffold = generate_scaffold(out_dir, answers, kg.project.dependencies, app_name)
     files: list[EmittedFile] = []
@@ -197,13 +237,13 @@ def emit_project(
 
     skipped: list[SkippedFile] = []
 
-    # 2. transform every source .ts/.tsx (except regenerated entry files).
+    # 2. transform every source .ts/.tsx/.js/.jsx (except regenerated entry files).
     source_ts = sorted(
         f.path
         for f in kg.files
         if f.path.startswith("src/")
-        and f.path.endswith((".ts", ".tsx"))
-        and f.path not in _REGENERATED
+        and f.path.endswith(_SOURCE_EXTENSIONS)
+        and f.path not in regenerated_paths
     )
     for src_rel in source_ts:
         abs_src = src_root / src_rel
@@ -286,7 +326,7 @@ def emit_project(
         files.append(
             EmittedFile(
                 path=nav_rel,
-                sourceFile="src/App.tsx",
+                sourceFile=app_source_file,
                 # Navigator wiring is a rule (generated from the route table);
                 # the SHAPE decision lives in the Planner question, not here.
                 provenance=ConfidenceSource.DETERMINISTIC_WARNING,
@@ -302,7 +342,7 @@ def emit_project(
     files.append(
         EmittedFile(
             path="App.tsx",
-            sourceFile="src/App.tsx",
+            sourceFile=app_source_file,
             provenance=ConfidenceSource.DETERMINISTIC_WARNING,
         )
     )
