@@ -516,6 +516,23 @@ $ grep -c 'rejox-canary' <emitted>/package.json
 0
 
 Exactly the four scaffold entries. The uploaded postinstall did not survive.
+
+Re-signed: 2026-09-04 — Ashraf (scaffold.py changed: dependency carry-over now
+takes the packages a lifted root provider imports). Fixture:
+test-projects/no-router-app with `postinstall`/`preinstall` canaries, migrated
+via `rejox migrate --no-validate` (same generate_scaffold path).
+
+$ jq '.scripts' <emitted>/package.json
+{
+  "start": "expo start",
+  "android": "expo start --android",
+  "ios": "expo start --ios",
+  "web": "expo start --web"
+}
+$ grep -i 'rejox-canary' <emitted>/package.json || echo clean
+clean
+
+Still exactly the four scaffold entries; neither canary survived.
 ```
 
 ---
@@ -557,6 +574,29 @@ $ ... | grep -cE '(https?://|git\+|file:|github:|npm:)'
 0
 
 `evil-pkg` was dropped entirely; every survivor is a plain semver range.
+
+Re-signed: 2026-09-04 — Ashraf (scaffold.py changed, as above). This re-run
+targets the NEW carry-over path directly: `react-redux` is the package the
+lifted root provider imports, pinned to a URL spec, plus an `evil-pkg` git spec.
+
+$ jq -r '.dependencies | to_entries[] | "\(.key)=\(.value)"' <emitted>/package.json
+expo=~52.0.0
+expo-asset=~11.0.5
+expo-status-bar=~2.0.0
+nativewind=^4.1.23
+react=18.3.1
+react-native=0.76.5
+react-native-reanimated=~3.16.2
+react-native-worklets=^0.10.0
+$ ... | grep -E '(https?://|git\+|file:|github:|npm:)' || echo clean
+clean
+
+The unsafe spec is filtered on the new path too: `react-redux` was dropped
+rather than carried. RED-adjacent finding fixed in the same pass — the lifted
+provider was still emitting `import { Provider } from "react-redux"` for a
+package that was deliberately not installed. It now drops the provider and
+leaves a REJOX-TODO(ENTRY_PROVIDER) instead of a dangling import
+(`test_provider_is_dropped_when_its_package_was_not_installed`).
 ```
 
 ---
