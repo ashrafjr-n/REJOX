@@ -37,7 +37,9 @@ _BASE_DEV_DEPS = {
     "@types/react": "~18.3.12",
     "typescript": "^5.3.3",
 }
-# Source deps that carry over unchanged when present.
+# Source deps that carry over unchanged when present. Callers add to this
+# per-project: a package a lifted root provider imports is not optional —
+# without it the provider is an unresolvable import, not a migration.
 _CARRY_OVER = ("zustand", "axios")
 
 # A carried-over version comes from an uploaded `package.json`, so it is
@@ -77,7 +79,8 @@ def _render(template_name: str, subs: dict[str, str]) -> str:
 
 
 def _build_dependencies(
-    styling: str, navigation: str | None, source_deps: dict[str, str]
+    styling: str, navigation: str | None, source_deps: dict[str, str],
+    extra_packages: tuple[str, ...] = (),
 ) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     deps = dict(_BASE_DEPS)
     dev = dict(_BASE_DEV_DEPS)
@@ -123,7 +126,7 @@ def _build_dependencies(
         deps["expo-linking"] = "~7.0.0"
         deps["expo-constants"] = "~17.0.0"
 
-    for lib in _CARRY_OVER:
+    for lib in (*_CARRY_OVER, *extra_packages):
         spec = source_deps.get(lib)
         if spec is None:
             continue
@@ -142,6 +145,7 @@ def generate_scaffold(
     answers: dict[str, str],
     source_dependencies: dict[str, str] | None = None,
     app_name: str = "Rejox App",
+    extra_packages: tuple[str, ...] = (),
 ) -> ScaffoldResult:
     """Render an Expo TS scaffold into ``out_dir`` from the answered questions.
 
@@ -150,6 +154,9 @@ def generate_scaffold(
         answers: questionId → optionId (e.g. ``{"styling-engine": "nativewind"}``).
         source_dependencies: the source project's deps, for carry-over versions.
         app_name: Human-facing app name.
+        extra_packages: source packages this project's emitted code needs on
+            top of the standard carry-over set (e.g. the package a lifted
+            root provider is imported from).
     """
     source_deps = source_dependencies or {}
     styling = answers.get("styling-engine", "stylesheet")
@@ -160,7 +167,9 @@ def generate_scaffold(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    deps, dev, overrides = _build_dependencies(styling, navigation, source_deps)
+    deps, dev, overrides = _build_dependencies(
+        styling, navigation, source_deps, extra_packages
+    )
     written: list[str] = []
 
     def write(rel: str, content: str) -> None:
