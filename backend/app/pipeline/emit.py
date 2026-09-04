@@ -305,6 +305,19 @@ def _entry_imports(
     return imports, declarations, providers, todos
 
 
+def _provider_packages(entry: Optional[EntryPoint]) -> tuple[str, ...]:
+    """External packages the lifted provider chain imports from."""
+    if entry is None:
+        return ()
+    lifted = {ref for p in entry.providers for ref in p.references}
+    return tuple(sorted({
+        b.module
+        for b in entry.bindings
+        if b.local in lifted and b.module and b.resolvedFile is None
+        and not b.module.startswith(".")
+    }))
+
+
 def _wrap_in_providers(element: str, providers: list[RootProvider]) -> str:
     """Nest ``element`` inside the provider chain, outermost provider first."""
     if not providers:
@@ -430,7 +443,12 @@ def emit_project(
     app_source_file = regenerated.get("src/App", "src/App.tsx")
 
     # 1. scaffold.
-    scaffold = generate_scaffold(out_dir, answers, kg.project.dependencies, app_name)
+    # A provider lifted out of the entry file imports its package; carrying the
+    # provider without carrying that package emits an unresolvable import.
+    scaffold = generate_scaffold(
+        out_dir, answers, kg.project.dependencies, app_name,
+        extra_packages=_provider_packages(kg.entry),
+    )
     files: list[EmittedFile] = []
     for rel in scaffold.files:
         files.append(
