@@ -77,9 +77,43 @@ DYNAMIC_CLASSNAME_LIBS = frozenset(
 )
 
 
-def component_styling_issues(comp: Component) -> list[Issue]:
+def project_defined_classes(kg: KnowledgeGraph) -> frozenset[str]:
+    """Class names the project declares in its own (non-module) stylesheets.
+
+    Read from the project rather than inferred from the shape of a name: the
+    only thing that reliably separates `black_btn` from a Tailwind utility is
+    the stylesheet that declares it.
+    """
+    return frozenset(cls for sheet in kg.stylesheets for cls in sheet.classes)
+
+
+def component_styling_issues(
+    comp: Component, project_classes: frozenset[str] = frozenset()
+) -> list[Issue]:
     """Emit styling issues for a single component from its KG facts."""
     issues: list[Issue] = []
+
+    # A className naming a class the project defines in CSS is not a Tailwind
+    # utility. NativeWind resolves Tailwind's utilities and nothing else, so
+    # this one is ignored at runtime — no error, no warning, an element that
+    # simply renders unstyled. Counting it as a mapped Tailwind class inflated
+    # Coverage AND hid that the app had lost its design.
+    custom = sorted(set(comp.tailwindClasses) & project_classes)
+    if custom:
+        issues.append(
+            Issue(
+                code=codes.CUSTOM_CSS_CLASS,
+                severity="warning",
+                message=(
+                    "className names a class this project defines in CSS, not a "
+                    "Tailwind utility; NativeWind ignores it and the element "
+                    "renders unstyled."
+                ),
+                evidence=Evidence(
+                    file=comp.file, detail=f"classes: {', '.join(custom)}"
+                ),
+            )
+        )
 
     # Bucket every class by category, keeping the offending classes as evidence.
     by_category: dict[str, list[str]] = {}
@@ -139,13 +173,19 @@ def analyze_styling(kg: KnowledgeGraph) -> StylingReport:
     unmappable: set[str] = set()
     css_modules: set[str] = set()
 
+    project_classes = project_defined_classes(kg)
+
     for comp in kg.components:
         for approach in comp.stylingApproach:
             if approach != "none":
                 approaches.add(approach)
         for cls in comp.tailwindClasses:
             all_classes.add(cls)
-            if classify_class(cls) & UNMAPPABLE_CATEGORIES:
+            # Two ways a class does not map: it is a Tailwind utility RN has no
+            # answer for (hover/grid/…), or it is not a Tailwind utility at all
+            # — one the project declared in its own CSS, which NativeWind will
+            # never resolve.
+            if cls in project_classes or classify_class(cls) & UNMAPPABLE_CATEGORIES:
                 unmappable.add(cls)
         for mod in comp.cssModuleImports:
             css_modules.add(mod)

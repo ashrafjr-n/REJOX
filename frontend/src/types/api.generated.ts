@@ -510,6 +510,47 @@ export interface components {
             file: string;
         };
         /**
+         * EntryBinding
+         * @description One value the lifted provider chain reads, and where it came from.
+         */
+        EntryBinding: {
+            /** Local */
+            local: string;
+            /** Module */
+            module?: string | null;
+            /** Imported */
+            imported?: string | null;
+            /** Resolvedfile */
+            resolvedFile?: string | null;
+            /** Declaration */
+            declaration?: string | null;
+        };
+        /**
+         * EntryPoint
+         * @description The web entry file (``src/main.*`` / ``src/index.*``).
+         *
+         *     Mounting a React tree into a DOM node has no React Native equivalent, so
+         *     this file is never emitted — but the providers it wrapped around the root
+         *     component are app configuration, not DOM plumbing, and are carried into the
+         *     generated ``App.tsx`` instead of being lost with the file.
+         */
+        EntryPoint: {
+            /** File */
+            file: string;
+            /** Rootcomponent */
+            rootComponent?: string | null;
+            /** Rootcomponentfile */
+            rootComponentFile?: string | null;
+            /** Providers */
+            providers?: components["schemas"]["RootProvider"][];
+            /** Bindings */
+            bindings?: components["schemas"]["EntryBinding"][];
+            /** Dropped */
+            dropped?: string[];
+            /** Warnings */
+            warnings?: string[];
+        };
+        /**
          * Evidence
          * @description The KG fact that triggered an issue.
          */
@@ -694,8 +735,11 @@ export interface components {
             apiLayer?: components["schemas"]["ApiLayer"];
             /** Assets */
             assets?: components["schemas"]["Asset"][];
+            /** Stylesheets */
+            stylesheets?: components["schemas"]["Stylesheet"][];
             /** Edges */
             edges?: components["schemas"]["Edge"][];
+            entry?: components["schemas"]["EntryPoint"] | null;
             /** Warnings */
             warnings?: string[];
         };
@@ -1073,6 +1117,18 @@ export interface components {
              */
             note: string;
         };
+        /**
+         * RootProvider
+         * @description One provider wrapping the root component in the entry file.
+         */
+        RootProvider: {
+            /** Tag */
+            tag: string;
+            /** Attributes */
+            attributes?: string[];
+            /** References */
+            references?: string[];
+        };
         /** Route */
         Route: {
             /** Path */
@@ -1295,6 +1351,22 @@ export interface components {
             stateKeys?: string[];
             /** Usedby */
             usedBy?: string[];
+        };
+        /**
+         * Stylesheet
+         * @description A stylesheet the project ships, and the classes it declares.
+         *
+         *     These are NOT Tailwind utilities. NativeWind resolves Tailwind's own
+         *     utilities and nothing else, so a ``className`` naming one of these is
+         *     silently ignored and the element renders unstyled. CSS Modules are excluded
+         *     — their classes are reached through the imported ``styles`` object, and the
+         *     CSS Module resolver already re-expresses them.
+         */
+        Stylesheet: {
+            /** File */
+            file: string;
+            /** Classes */
+            classes?: string[];
         };
         /** StylingReport */
         StylingReport: {

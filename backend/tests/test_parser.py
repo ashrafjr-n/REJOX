@@ -242,3 +242,36 @@ def test_parse_endpoint_rejects_bad_path() -> None:
 def test_build_knowledge_graph_raises_on_missing_path() -> None:
     with pytest.raises(IntelligenceError):
         build_knowledge_graph(Path("/definitely/not/here"))
+
+
+def test_project_stylesheets_record_the_classes_they_declare(tmp_path: Path) -> None:
+    """NativeWind resolves Tailwind utilities and nothing else, so the Analyzer
+    needs one fact only the project can supply: which classes it declares
+    itself. Selector POSITIONS are what is read — a url() or a decimal length
+    is not a class, and a CSS Module is reached through `styles.x`, never as a
+    bare className."""
+    (tmp_path / "package.json").write_text(
+        '{"name":"styled","dependencies":{"react":"18.2.0"}}'
+    )
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "App.jsx").write_text(
+        "export default function App(){return <div className='app'/>}"
+    )
+    (src / "App.css").write_text(
+        "@tailwind base;\n"
+        "/* .commented_out { color: red } */\n"
+        ".main { padding: 0.75rem; background: url('/src/assets/grid.svg'); }\n"
+        ".app { @apply relative z-10 flex; }\n"
+        "@media screen and (max-width: 640px) { .main { padding: 0; } }\n"
+    )
+    (src / "Card.module.css").write_text(".card { display: flex; }\n")
+
+    graph = build_knowledge_graph(tmp_path)
+
+    sheets = {s.file: s.classes for s in graph.stylesheets}
+    assert sheets == {"src/App.css": ["app", "main"]}, sheets
+    assert "commented_out" not in sheets["src/App.css"]   # comments declare nothing
+    assert "svg" not in sheets["src/App.css"]             # url(), not a selector
+    assert "75rem" not in sheets["src/App.css"]           # a length, not a selector
+    assert "src/Card.module.css" not in sheets            # module classes are not bare

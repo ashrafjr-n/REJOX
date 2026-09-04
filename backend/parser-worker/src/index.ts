@@ -23,6 +23,7 @@ import {
 } from './extractors/hooks';
 import { extractRoutes } from './extractors/routes';
 import { extractEntryPoint, findEntryFile } from './extractors/entry';
+import { extractStylesheets } from './extractors/stylesheets';
 import { extractState, storeId, type StoreDefinition } from './extractors/state';
 import {
   extractApiFile,
@@ -299,6 +300,11 @@ function main(): void {
     referencedBy: [...(referencedBy.get(rel) ?? [])].sort(),
   }));
 
+  // --- Stylesheets --------------------------------------------------------
+  // What the project declares itself, so the Analyzer can tell a Tailwind
+  // utility from a class NativeWind will silently ignore.
+  const stylesheets = extractStylesheets(root, discovered.style);
+
   // --- Edges --------------------------------------------------------------
   const edges: Edge[] = [];
   const seenEdges = new Set<string>();
@@ -410,6 +416,7 @@ function main(): void {
     stateManagement: { library: stateLibrary, stores },
     apiLayer: { clients, endpoints },
     assets,
+    stylesheets,
     edges,
     entry,
     warnings,

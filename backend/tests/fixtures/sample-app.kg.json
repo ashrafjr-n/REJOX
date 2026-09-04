@@ -1806,6 +1806,7 @@
       "referencedBy": []
     }
   ],
+  "stylesheets": [],
   "edges": [
     {
       "from_": "src/App.tsx",

@@ -21,6 +21,8 @@ GRADIENT = "GRADIENT"                       # bg-gradient/from-/to- — needs a 
 GROUP_SELECTOR = "GROUP_SELECTOR"           # group / group-hover: — no equivalent
 DYNAMIC_CLASSNAME = "DYNAMIC_CLASSNAME"     # className built at runtime
 CSS_MODULE = "CSS_MODULE"                   # *.module.css — manual conversion
+CUSTOM_CSS_CLASS = "CUSTOM_CSS_CLASS"       # a class the project defines in CSS,
+                                            # not a Tailwind utility
 
 # Layout / structure (conversion facts)
 MISSING_TEXT_WRAP = "MISSING_TEXT_WRAP"    # bare text not inside <Text> — RN crash

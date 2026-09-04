@@ -248,6 +248,20 @@ class Asset(KGBase):
     referencedBy: list[str] = Field(default_factory=list)
 
 
+class Stylesheet(KGBase):
+    """A stylesheet the project ships, and the classes it declares.
+
+    These are NOT Tailwind utilities. NativeWind resolves Tailwind's own
+    utilities and nothing else, so a ``className`` naming one of these is
+    silently ignored and the element renders unstyled. CSS Modules are excluded
+    — their classes are reached through the imported ``styles`` object, and the
+    CSS Module resolver already re-expresses them.
+    """
+
+    file: str
+    classes: list[str] = Field(default_factory=list)
+
+
 # --- Edges ------------------------------------------------------------------
 
 
@@ -271,6 +285,7 @@ class KnowledgeGraph(KGBase):
     stateManagement: StateManagement
     apiLayer: ApiLayer = Field(default_factory=ApiLayer)
     assets: list[Asset] = Field(default_factory=list)
+    stylesheets: list[Stylesheet] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
     entry: Optional[EntryPoint] = None
     warnings: list[str] = Field(default_factory=list)
