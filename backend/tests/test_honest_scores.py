@@ -123,3 +123,68 @@ def test_confidence_is_measured_as_soon_as_one_component_migrates() -> None:
 
 def test_no_findings_at_all_is_unmeasured() -> None:
     assert scoring.compute_confidence([]) is None
+
+
+# --- The "compiles + bundles" lens answers for the bundle too ----------------
+
+
+def _one_unit_project() -> EmittedProject:
+    from app.models.analysis import ConfidenceSource
+    from app.models.emission import EmittedFile
+
+    return EmittedProject(
+        outDir="/tmp/one",
+        files=[
+            EmittedFile(
+                path=f"src/components/C{i}.tsx",
+                sourceFile=f"src/components/C{i}.jsx",
+                provenance=ConfidenceSource.DETERMINISTIC,
+            )
+            for i in range(4)
+        ],
+        skipped=[],
+        todoCount=0,
+    )
+
+
+def _validation(*, bundle_ran: bool, bundle_passed: bool) -> ValidationResult:
+    return ValidationResult(
+        passed=bundle_passed,
+        installed=True,
+        typecheck=StageResult(ran=True, passed=True),
+        bundle=StageResult(ran=bundle_ran, passed=bundle_passed),
+        durationSeconds=0.0,
+    )
+
+
+def test_a_failed_bundle_means_nothing_bundles() -> None:
+    """The regression: Metro fails fast, so a failed bundle produces one
+    diagnostic for one file and never reaches the rest. Counting the rest as
+    "compiles + bundles" let a MORE broken migration score HIGHER — the
+    summarizer went 33% -> 43% while Metro went PASS -> FAIL."""
+    scores = validated_scores(
+        _one_unit_project(), _validation(bundle_ran=True, bundle_passed=False)
+    )
+    assert scores.totalUnitCount == 4
+    assert scores.workingCoverage == 0.0
+    assert scores.workingFileCount == 0
+    # The strict lens is unaffected — it measures residue, not the toolchain.
+    assert scores.coverage == 100.0
+
+
+def test_a_bundle_that_never_ran_is_not_measured() -> None:
+    """A lens labelled "compiles + bundles" cannot answer when nothing was
+    bundled. n/a, never a number carried over from the compiler alone."""
+    scores = validated_scores(
+        _one_unit_project(), _validation(bundle_ran=False, bundle_passed=False)
+    )
+    assert scores.workingCoverage is None
+    assert scores.coverage == 100.0
+
+
+def test_a_passing_bundle_still_measures_per_file() -> None:
+    scores = validated_scores(
+        _one_unit_project(), _validation(bundle_ran=True, bundle_passed=True)
+    )
+    assert scores.workingCoverage == 100.0
+    assert scores.workingFileCount == 4

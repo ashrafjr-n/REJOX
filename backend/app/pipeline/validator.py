@@ -636,7 +636,20 @@ def validated_scores(
             clean_warn += 1
 
     total = len(units)
-    working = sum(1 for f in units if f.path not in error_files)
+    # "Compiles + bundles" is a claim about the BUNDLE as much as the compiler,
+    # so it is only answerable when the bundle actually ran — and only true of
+    # anything when it passed. Metro fails fast on the first unresolved module:
+    # a failed bundle blames ONE file and never reaches the rest, so counting
+    # the rest as bundling is how a MORE broken migration scored HIGHER than a
+    # less broken one (the summarizer went 33% -> 43% while Metro went PASS ->
+    # FAIL). Nothing bundles when the bundle does not.
+    working: Optional[int]
+    if not result.bundle.ran:
+        working = None          # not measured — never a number that implies it was
+    elif not result.bundle.passed:
+        working = 0
+    else:
+        working = sum(1 for f in units if f.path not in error_files)
     # An empty population is NOT a perfect score. If nothing was emitted there
     # is nothing to be right about, so every ratio is None ("not measured")
     # rather than the 100% that a `x if total else 100.0` would invent — the
@@ -647,13 +660,15 @@ def validated_scores(
         else None
     )
     coverage = round(100.0 * migrated / total, 1) if total else None
-    working_coverage = round(100.0 * working / total, 1) if total else None
+    working_coverage = (
+        round(100.0 * working / total, 1) if total and working is not None else None
+    )
 
     return ValidatedScores(
         coverage=coverage,
         confidence=confidence,
         workingCoverage=working_coverage,
-        workingFileCount=working,
+        workingFileCount=working or 0,
         migratedFileCount=migrated,
         residueFileCount=residue,
         totalUnitCount=total,

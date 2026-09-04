@@ -19,6 +19,7 @@ from app.models.knowledge_graph import KnowledgeGraph
 from app.pipeline.analyzer import analyze_graph
 from app.pipeline.emit import emit_project
 from app.pipeline.planner import plan_migration
+from app.pipeline.transformer import TransformerError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "test-projects" / "sample-app"
@@ -203,3 +204,400 @@ def test_todo_count_matches_emitted_markers(emitted: EmittedProject) -> None:
     # todoCount is the ground-truth residue count from the emitted TODO markers.
     assert emitted.todoCount == sum(len(f.todoCodes) for f in emitted.files)
     assert emitted.todoCount > 0
+
+
+# --- Plain JavaScript / .jsx sources -----------------------------------------
+#
+# sample-app above is 100% TypeScript, so it can never exercise the .js/.jsx
+# path through emit_project — which is exactly how a real .jsx-only project
+# (most React apps in the wild) was silently emitting an empty RN project:
+# every source file fell outside the old `.endswith((".ts", ".tsx"))` filter
+# and simply vanished, with no entry in `skipped` to explain why.
+
+JS_SRC_ROOT = REPO_ROOT / "test-projects" / "plain-js-app"
+
+
+@pytest.fixture(scope="module")
+def emitted_js(tmp_path_factory: pytest.TempPathFactory) -> EmittedProject:
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    kg = build_knowledge_graph(JS_SRC_ROOT)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-js")
+    return emit_project(
+        plan, ANSWERS, kg, out, report=report, source_root=JS_SRC_ROOT
+    )
+
+
+def test_jsx_components_are_converted(emitted_js: EmittedProject) -> None:
+    """The real regression: Header/Home/About are .jsx, not .tsx — before the
+    fix these fell out of the file filter and were dropped without a trace."""
+    converted = {f.sourceFile for f in emitted_js.files if f.sourceFile}
+    assert "src/components/Header.jsx" in converted
+    assert "src/pages/Home.jsx" in converted
+    assert "src/pages/About.jsx" in converted
+
+
+def test_jsx_target_extension_is_rewritten_to_tsx(emitted_js: EmittedProject) -> None:
+    # tsconfig.json only includes **/*.ts and **/*.tsx (scaffold.py) — a .jsx
+    # source emitted with its original extension would silently never be
+    # type-checked at all.
+    by_source = {f.sourceFile: f.path for f in emitted_js.files if f.sourceFile}
+    assert by_source["src/components/Header.jsx"] == "src/components/Header.tsx"
+    assert by_source["src/pages/Home.jsx"] == "src/screens/Home.tsx"
+    assert by_source["src/pages/About.jsx"] == "src/screens/About.tsx"
+
+
+def test_js_entry_files_are_not_duplicated(emitted_js: EmittedProject) -> None:
+    """src/main.jsx and src/App.jsx are regenerated wholesale (navigator +
+    App.tsx) — they must not ALSO run through the generic per-file loop and
+    leak a second, stray copy into the output tree."""
+    paths = [f.path for f in emitted_js.files]
+    assert "src/main.jsx" not in paths
+    assert "src/main.tsx" not in paths
+    assert "src/App.jsx" not in paths
+    assert paths.count("App.tsx") == 1
+
+
+def test_navigator_imports_resolve_to_emitted_screens(emitted_js: EmittedProject) -> None:
+    # The failure mode this bug produced end-to-end: AppNavigator.tsx imports
+    # screens that were never written, so tsc/Metro fail on a dangling import.
+    nav = (_out(emitted_js) / "src" / "navigation" / "AppNavigator.tsx").read_text()
+    assert "../screens/Home" in nav
+    assert "../screens/About" in nav
+    assert (_out(emitted_js) / "src" / "screens" / "Home.tsx").is_file()
+    assert (_out(emitted_js) / "src" / "screens" / "About.tsx").is_file()
+
+
+def test_app_provenance_matches_the_real_source_extension(emitted_js: EmittedProject) -> None:
+    # Previously hardcoded to the literal "src/App.tsx" regardless of the
+    # project's real extension — wrong provenance for any .jsx project.
+    app = next(f for f in emitted_js.files if f.path == "App.tsx")
+    nav = next(f for f in emitted_js.files if f.path == "src/navigation/AppNavigator.tsx")
+    assert app.sourceFile == "src/App.jsx"
+    assert nav.sourceFile == "src/App.jsx"
+
+
+def test_one_failing_transform_does_not_abort_the_whole_migration(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real .jsx repo hit a codemod-worker edge case (a JSX attribute string
+    spanning a literal newline) that the worker correctly refused to emit —
+    and that refusal, uncaught, took the ENTIRE migration down: every other
+    file that transforms cleanly was lost too, with no partial output.
+
+    One file the codemod-worker cannot safely handle must be isolated: skipped
+    with a reason, not allowed to abort every other file's conversion.
+    """
+    from app.pipeline.intelligence import build_knowledge_graph
+    import app.pipeline.emit as emit_module
+
+    kg = build_knowledge_graph(JS_SRC_ROOT)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+
+    real_transform = emit_module.transform_component
+
+    def flaky_transform(file: Path, options: object = None) -> object:
+        if str(file).endswith("Header.jsx"):
+            raise TransformerError("simulated codemod-worker refusal for this test")
+        return real_transform(file, options)
+
+    monkeypatch.setattr(emit_module, "transform_component", flaky_transform)
+
+    out = tmp_path_factory.mktemp("emit-js-flaky")
+    emitted = emit_project(plan, ANSWERS, kg, out, report=report, source_root=JS_SRC_ROOT)
+
+    failed = [s for s in emitted.skipped if s.path == "src/components/Header.jsx"]
+    assert len(failed) == 1
+    assert "transform failed" in failed[0].reason
+
+    # The other files converted normally — the failure did not cascade.
+    converted = {f.sourceFile for f in emitted.files if f.sourceFile}
+    assert "src/pages/Home.jsx" in converted
+    assert "src/pages/About.jsx" in converted
+    assert "src/components/Header.jsx" not in converted
+
+
+def test_routed_screen_outside_pages_is_imported_from_where_it_landed(
+    emitted_js: EmittedProject,
+) -> None:
+    """A routed screen does not have to live under pages/.
+
+    `NotFound` is routed but sits in src/components/. The navigator used to
+    import every screen from '../screens/<name>' on the assumption that routed
+    components live under pages/ — which wrote an import to a file that was
+    never emitted there, and Metro failed to resolve it. A real repo
+    (Hotel-Booking-Landing-Page) hit exactly this with its PageNotFound.
+    """
+    nav = (_out(emitted_js) / "src" / "navigation" / "AppNavigator.tsx").read_text()
+    assert "from '../components/NotFound'" in nav
+    assert "from '../screens/NotFound'" not in nav
+    # The file really is where the import points.
+    assert (_out(emitted_js) / "src" / "components" / "NotFound.tsx").is_file()
+    # Screens that DO live under pages/ still resolve to screens/.
+    assert "from '../screens/Home'" in nav
+
+
+def test_web_only_and_build_only_files_never_reach_the_rn_project(
+    emitted_js: EmittedProject,
+) -> None:
+    """One list, three classes that must never be migrated.
+
+    `vite-env.d.ts` reached a real migrated project because the exclusion rules
+    were scattered per-loop instead of stated once: it references `vite/client`
+    types the RN project does not have. Test files are the same category — the
+    runtime app does not include them, and @testing-library/react has no RN
+    equivalent, so copying them guarantees a broken type-check.
+    """
+    reasons = {s.path: s.reason for s in emitted_js.skipped}
+    emitted_paths = {f.path for f in emitted_js.files}
+
+    assert "src/vite-env.d.ts" in reasons
+    assert "bundler types" in reasons["src/vite-env.d.ts"]
+    assert "src/App.test.jsx" in reasons
+    assert "test file" in reasons["src/App.test.jsx"]
+    assert "index.html" in reasons
+
+    # And none of them landed in the tree under any name.
+    assert not any("vite-env" in p or ".test." in p for p in emitted_paths)
+
+
+# --- Router-less projects: the root component and its providers --------------
+
+NO_ROUTER_SRC_ROOT = REPO_ROOT / "test-projects" / "no-router-app"
+
+
+@pytest.fixture(scope="module")
+def emitted_no_router(tmp_path_factory: pytest.TempPathFactory) -> EmittedProject:
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    kg = build_knowledge_graph(NO_ROUTER_SRC_ROOT)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-no-router")
+    return emit_project(
+        plan, ANSWERS, kg, out, report=report, source_root=NO_ROUTER_SRC_ROOT
+    )
+
+
+def test_router_less_root_component_is_converted_not_replaced(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """The regression: with no router to subsume it, ``src/App.jsx`` was
+    regenerated as a placeholder — so the project's entire UI (and every
+    component it rendered) was emitted but never reachable, while the report
+    still claimed App.tsx came from src/App.jsx."""
+    out = _out(emitted_no_router)
+    converted = {f.sourceFile for f in emitted_no_router.files if f.sourceFile}
+    assert "src/App.jsx" in converted
+
+    root = (out / "src" / "App.tsx").read_text()
+    # It is the real component, converted — not a stub.
+    assert "Header" in root and "Counter" in root
+    assert "<View" in root  # <main>/<div> converted by rule
+
+
+def test_router_less_app_shell_renders_the_converted_root(
+    emitted_no_router: EmittedProject,
+) -> None:
+    app = (_out(emitted_no_router) / "App.tsx").read_text()
+    assert './src/App' in app
+    assert "<AppRoot />" in app
+    assert "scaffold ready" not in app
+
+
+def test_entry_providers_are_lifted_into_the_app_root(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """main.jsx is never emitted, so the <Provider store={store}> it wrapped the
+    app in has to be rebuilt above the RN root — otherwise every hook that reads
+    the store throws at runtime."""
+    app = (_out(emitted_no_router) / "App.tsx").read_text()
+    assert "<Provider store={store}>" in app
+    assert 'from "react-redux"' in app
+    # Imported from where the store actually landed, not a guessed path.
+    assert 'from "./src/services/store"' in app
+    assert (_out(emitted_no_router) / "src" / "services" / "store.ts").is_file()
+
+
+def test_stateless_and_router_wrappers_are_not_lifted(
+    emitted_no_router: EmittedProject,
+) -> None:
+    app = (_out(emitted_no_router) / "App.tsx").read_text()
+    assert "StrictMode" not in app
+
+
+def test_entry_file_is_accounted_for_as_skipped(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """A source file must never simply vanish from the migration's accounting:
+    src/main.jsx is deliberately not emitted, so it has to appear as skipped
+    with the reason — and say what was lifted out of it."""
+    skipped = {s.path: s.reason for s in emitted_no_router.skipped}
+    assert "src/main.jsx" in skipped
+    assert "lifted into App.tsx" in skipped["src/main.jsx"]
+
+
+def test_routed_project_still_wires_the_navigator(emitted_js: EmittedProject) -> None:
+    """The router-less path must not change the routed one: there, src/App is
+    router wiring and the generated navigator does subsume it."""
+    app = (_out(emitted_js) / "App.tsx").read_text()
+    assert "<AppNavigator />" in app
+    converted = {f.sourceFile for f in emitted_js.files if f.sourceFile}
+    assert "src/App.jsx" not in [f.path for f in emitted_js.files]
+    assert "src/main.jsx" in {s.path for s in emitted_js.skipped}
+    del converted
+
+
+def test_provider_is_dropped_when_its_package_was_not_installed(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """The scaffold drops a dependency whose version spec is not a plain
+    registry range (the A9 carry-over filter). Lifting a provider whose package
+    was dropped that way would emit an import of something deliberately never
+    installed — so the provider is dropped too, and says so."""
+    import json as _json
+    import shutil
+
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    src = tmp_path_factory.mktemp("hostile") / "app"
+    shutil.copytree(NO_ROUTER_SRC_ROOT, src)
+    pkg = src / "package.json"
+    data = _json.loads(pkg.read_text())
+    data["dependencies"]["react-redux"] = "https://evil.example.com/pkg.tgz"
+    pkg.write_text(_json.dumps(data))
+
+    kg = build_knowledge_graph(src)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-hostile")
+    emit_project(plan, ANSWERS, kg, out, report=report, source_root=src)
+
+    app = (out / "App.tsx").read_text()
+    assert "react-redux" not in app                  # no dangling import
+    assert "<Provider store={store}>" not in app     # not in the rendered tree
+    assert "REJOX-TODO(ENTRY_PROVIDER)" in app       # and never silently
+
+
+def test_provider_configured_from_import_meta_is_dropped_not_smuggled_in(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """The provider chain is the one part of the output that is carried over as
+    the entry file's own source text, never through the codemod-worker. A lifted
+    attribute reading `import.meta.env` would therefore land in App.tsx exactly
+    as written — and Metro refuses to bundle a file containing `import.meta` at
+    all, so that one attribute costs the entire app, not one value."""
+    import shutil
+
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    src = tmp_path_factory.mktemp("vite-env") / "app"
+    shutil.copytree(NO_ROUTER_SRC_ROOT, src)
+    main = src / "src" / "main.jsx"
+    main.write_text(
+        main.read_text().replace(
+            "<Provider store={store}>",
+            "<Provider store={store} basename={import.meta.env.VITE_BASE}>",
+        )
+    )
+
+    kg = build_knowledge_graph(src)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-vite-env")
+    emit_project(plan, ANSWERS, kg, out, report=report, source_root=src)
+
+    app = (out / "App.tsx").read_text()
+    statements = "\n".join(
+        l for l in app.splitlines() if not l.lstrip().startswith("//")
+    )
+    assert "import.meta" not in statements
+    assert "<Provider" not in statements       # dropped rather than smuggled in
+    assert "REJOX-TODO(BUILD_ENV)" in app      # and never silently
+
+
+def test_declaration_built_from_import_meta_is_not_lifted_either(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Same seam, other half: a provider's value can be a top-level declaration
+    of the entry file, and those are spliced into App.tsx as source text too."""
+    import shutil
+
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    src = tmp_path_factory.mktemp("vite-env-decl") / "app"
+    shutil.copytree(NO_ROUTER_SRC_ROOT, src)
+    main = src / "src" / "main.jsx"
+    main.write_text(
+        main.read_text()
+        .replace(
+            "ReactDOM.createRoot(",
+            "const cfg = { base: import.meta.env.VITE_BASE }\n\nReactDOM.createRoot(",
+        )
+        .replace("<Provider store={store}>", "<Provider store={store} cfg={cfg}>")
+    )
+
+    kg = build_knowledge_graph(src)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-vite-env-decl")
+    emit_project(plan, ANSWERS, kg, out, report=report, source_root=src)
+
+    app = (out / "App.tsx").read_text()
+    statements = "\n".join(
+        l for l in app.splitlines() if not l.lstrip().startswith("//")
+    )
+    assert "import.meta" not in statements
+    assert "cfg" not in statements
+    assert "REJOX-TODO(BUILD_ENV)" in app
+
+
+# --- Dependency carry-over: driven by what the output imports -----------------
+
+
+def _emitted_deps(emitted: EmittedProject) -> dict[str, str]:
+    import json as _json
+
+    return _json.loads((_out(emitted) / "package.json").read_text())["dependencies"]
+
+
+def test_a_package_the_emitted_code_imports_is_installed(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """The regression this exists for: carry-over used to lift only the package
+    a root provider imported, so `react-redux` shipped and `@reduxjs/toolkit`
+    — imported by src/services/store, the very first module the app loads —
+    did not. Metro fails on the first unresolvable module, so the whole app was
+    dead on a dependency list that looked fine."""
+    deps = _emitted_deps(emitted_no_router)
+    store = (_out(emitted_no_router) / "src" / "services" / "store.ts").read_text()
+
+    assert "@reduxjs/toolkit" in store       # the output really does import it
+    assert "@reduxjs/toolkit" in deps        # …so it must be installed
+    assert deps["@reduxjs/toolkit"] == "^1.9.3"   # at the source's own version
+    assert "react-redux" in deps             # the provider's package, still
+
+
+def test_a_replaced_web_package_is_never_installed(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """react-dom is in the source dependencies and is REPLACED in RN, not
+    carried. Installing it because some import survived would hide the
+    transform bug that let it survive."""
+    deps = _emitted_deps(emitted_no_router)
+    assert "react-dom" not in deps
+    assert "vite" not in deps
+
+
+def test_the_scaffold_pin_beats_the_sources_range(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """`react` is imported by nearly every emitted file, so carry-over now sees
+    it. It must not overwrite the version the scaffold pinned for this Expo
+    SDK — the source says ^18.2.0, which is not what RN 0.76 requires."""
+    deps = _emitted_deps(emitted_no_router)
+    assert deps["react"] == "18.3.1"
+    assert deps["react-native"] == "0.76.5"

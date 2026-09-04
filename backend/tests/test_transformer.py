@@ -236,6 +236,97 @@ def test_rating_glyph_is_text_wrapped(options: dict) -> None:
     assert before.rfind("<Text") > before.rfind("<View")
 
 
+# --- Build-time env (import.meta) -----------------------------------------------
+
+
+def _transform_source(source: str, options: dict) -> TransformResult:
+    """Transform an inline source file — for patterns sample-app does not have."""
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "EnvProbe.tsx"
+        f.write_text(source)
+        return transform_component(f, options)
+
+
+def _statements(code: str) -> str:
+    """The code without its `//` lines — the TODOs quote the original text."""
+    return "\n".join(l for l in code.splitlines() if not l.lstrip().startswith("//"))
+
+
+def test_vite_env_var_becomes_an_expo_public_read(options: dict) -> None:
+    """The only form Metro inlines is a full `process.env.EXPO_PUBLIC_X`.
+
+    So the replacement is written out in full, and the VITE_ prefix — Vite's
+    marker for "safe to send to the client" — becomes Expo's EXPO_PUBLIC_.
+    """
+    r = _transform_source(
+        "export const key = import.meta.env.VITE_RAPID_API_KEY;\n"
+        "export const alt = import.meta.env['VITE_OTHER'];\n",
+        options,
+    )
+    assert "import.meta" not in _statements(r.code)
+    assert "process.env.EXPO_PUBLIC_RAPID_API_KEY" in r.code
+    assert "process.env.EXPO_PUBLIC_OTHER" in r.code
+    assert {w.code for w in r.warnings} == {"ENV_VAR_MAPPED"}
+    # The value itself does not migrate — the warning has to say which key to set.
+    assert "EXPO_PUBLIC_RAPID_API_KEY" in " ".join(w.message for w in r.warnings)
+
+
+def test_vite_build_flags_become_rn_build_flags(options: dict) -> None:
+    r = _transform_source(
+        "export const a = import.meta.env.DEV;\n"
+        "export const b = import.meta.env.PROD;\n"
+        "export const c = import.meta.env.MODE;\n"
+        "export const d = import.meta.env.SSR;\n",
+        options,
+    )
+    assert "export const a = __DEV__;" in r.code
+    assert "export const b = (!__DEV__);" in r.code
+    assert "export const c = (__DEV__ ? 'development' : 'production');" in r.code
+    assert "export const d = false;" in r.code  # a native app is never SSR'd
+    assert r.unhandled == []
+
+
+def test_env_flag_replacement_keeps_the_surrounding_expression(options: dict) -> None:
+    # `!import.meta.env.PROD` must stay a negation of PROD, not of __DEV__.
+    r = _transform_source("export const web = !import.meta.env.PROD;\n", options)
+    assert "!(!__DEV__)" in r.code
+
+
+def test_non_static_env_read_is_residue_but_still_leaves_the_file(options: dict) -> None:
+    """Metro fails the whole bundle on one `import.meta`, so none may survive.
+
+    A dynamic or destructured read cannot be rewritten into the form Expo
+    inlines, so it becomes `process.env` — same shape, still compiles — plus
+    BUILD_ENV residue saying each read has to become a full expression.
+    """
+    r = _transform_source(
+        "const { VITE_A } = import.meta.env;\n"
+        "export const dyn = import.meta.env[keyName];\n"
+        "export const a = VITE_A;\n",
+        options,
+    )
+    assert "import.meta" not in _statements(r.code)
+    assert "const { VITE_A } = process.env;" in r.code
+    assert "process.env[keyName]" in r.code
+    assert _codes(r) == {"BUILD_ENV"}
+
+
+def test_other_import_meta_members_are_residue(options: dict) -> None:
+    r = _transform_source("export const here = import.meta.url;\n", options)
+    assert "import.meta" not in _statements(r.code)
+    assert "export const here = undefined;" in r.code
+    assert "import.meta.url" in _snippets(r, "BUILD_ENV")
+
+
+def test_new_target_is_not_mistaken_for_import_meta(options: dict) -> None:
+    # `new.target` is a MetaProperty too — it has nothing to do with the bundler.
+    r = _transform_source(
+        "export function F() { return new.target === undefined; }\n", options
+    )
+    assert "new.target" in r.code
+    assert r.unhandled == []
+
+
 # --- The non-negotiable: every output is valid TS -------------------------------
 
 

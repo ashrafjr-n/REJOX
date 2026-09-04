@@ -31,7 +31,7 @@ pip install -e ".[dev]"
 # frontend
 cd ../frontend
 npm install
-cp .env.example .env             # sets VITE_API_URL=http://localhost:8000
+cp .env.example .env             # leaves VITE_API_URL empty — same origin
 ```
 
 **Run both services** (one command, from the repo root)
@@ -56,17 +56,28 @@ controlled by `REJOX_CORS_ORIGINS` (default `http://localhost:5173,http://127.0.
 > lists both the guarantees and the known gaps.
 
 `dev.sh` runs anonymous on purpose — it is the fast path, and it never exercises
-sign-in. To work on the real session flow locally instead, skip `dev.sh` and set
-a credential by hand:
+sign-in. To work on the real session flow locally, use **`./dev-local.sh`**
+instead: same two services, one command, plus the three variables a session
+needs.
 
 ```bash
-export REJOX_INVITE_CODES=dev-code
-export REJOX_SESSION_SECRET="$(openssl rand -hex 32)"
-export REJOX_ALLOW_ANONYMOUS=1 REJOX_COOKIE_INSECURE=1   # both, see below
-export REJOX_ALLOW_UNSANDBOXED=1 REJOX_ALLOW_LOCAL_PATH=1
-(cd backend && uvicorn app.main:app --reload) &
-(cd frontend && npm run dev)
+chmod +x dev-local.sh
+./dev-local.sh          # then sign in at :5173 with  my-code-2026
 ```
+
+It sets `REJOX_INVITE_CODES` (unset, the server has no valid code and rejects
+every one), `REJOX_SESSION_SECRET` (unset, `/api/session` answers 503 — there is
+deliberately no baked-in default) and `REJOX_COOKIE_INSECURE=1`, on top of the
+three flags `dev.sh` already exports. The signing secret is generated once into
+`backend/.env.dev-local` (gitignored) so a restart does not sign you out, and
+the invite code is overridable: `INVITE_CODE=something ./dev-local.sh`.
+
+It also forces `VITE_API_URL` empty, belt to `.env.example`'s braces. Pointing
+it at `http://localhost:8000` makes it a **different origin** from the app on
+`:5173`, and the `SameSite=Lax` session cookie is never sent cross-origin — so
+sign-in appears to succeed and then silently never sticks. Same-origin through
+the Vite proxy is the only shape in which the cookie works, and `sign-in.spec.ts`
+fails loudly if that ever changes.
 
 The session cookie is `Secure`, so a browser will not send it back over plain
 `http` — `REJOX_COOKIE_INSECURE=1` drops that for local work. It is refused
@@ -84,8 +95,14 @@ npx playwright install chromium   # once
 npm run test:e2e                  # boots both servers, drives a full run
 ```
 
-The test uploads `test-projects/sample-app`, runs the analysis, and asserts the
-Coverage / Confidence / Risk shown on screen equal the live `/api/analyze`
+The stack it boots is **not anonymous**: invite codes are configured, so the
+browser authenticates with a session cookie exactly as it does in production.
+`sign-in.spec.ts` drives that gate by hand — gated when signed out, a wrong code
+refused, a valid one signing in and surviving a page reload — and the rest of the
+suite starts from a session established once by the `setup` project.
+
+The main test uploads `test-projects/sample-app`, runs the analysis, and asserts
+the Coverage / Confidence / Risk shown on screen equal the live `/api/analyze`
 response (and that the score contributions sum to Coverage). Screenshots of all
 three screens are written to `docs/screenshots/`.
 
@@ -173,6 +190,23 @@ echo 'REJOX_DATA_DIR=/srv/rejox-data' >> .env
 # The worker needs the group that owns the Docker socket, or it cannot start a
 # sandbox container. On Docker Desktop the socket is root:root, so this is 0.
 echo "REJOX_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 0)" >> .env
+```
+
+**On Docker Desktop (macOS), the two lines above are different.** Both defaults
+are Linux ones and both fail there — see the 2026-09-05 entry in
+[`docs/PRE-LAUNCH-CHECKLIST.md`](docs/PRE-LAUNCH-CHECKLIST.md) for the evidence:
+
+```bash
+# /srv is not a shared path, and the chown is what breaks it: under VirtioFS the
+# host-side access check runs as the macOS user, so a root owned by 10001 is
+# unwritable by every uid in the container — root included. Leave it yours.
+sudo mkdir -p /Users/Shared/rejox-data
+sudo chown -R "$(id -u):$(id -g)" /Users/Shared/rejox-data
+echo 'REJOX_DATA_DIR=/Users/Shared/rejox-data' >> .env
+
+# `stat -f %g` (the macOS spelling) reads the SYMLINK, not the socket, and
+# answers 1. What counts is what the container sees: root:root 0660.
+echo 'REJOX_DOCKER_GID=0' >> .env
 
 docker compose up --build
 ```
@@ -260,6 +294,9 @@ compose file publishes a single fixed host port.
 REJOX_DATA_DIR=/srv/rejox-data \
 REJOX_DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)" \
   ./verify-deployment.sh
+
+# Docker Desktop / macOS — see the note under Deploying:
+#   REJOX_DATA_DIR=/Users/Shared/rejox-data REJOX_DOCKER_GID=0 ./verify-deployment.sh
 ```
 
 Stands the whole stack up and asserts what only a real run can: that the worker

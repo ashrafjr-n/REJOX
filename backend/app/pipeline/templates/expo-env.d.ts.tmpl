@@ -1,0 +1,36 @@
+/// <reference types="expo/types" />
+
+// Static asset imports. Expo's own types cover CSS but not images, and the web
+// shim that used to declare these (vite-env.d.ts / react-app-env.d.ts) is not
+// migrated — it references bundler types React Native does not have.
+//
+// The type is `number` because that is what a React Native asset import really
+// is: Metro registers the file and hands back an asset id, which is what
+// <Image source={...}> takes. Web bundlers hand back a URL string instead, so
+// code carried over from the web that does `source={{ uri: img }}` will fail to
+// type-check here. That is a real difference between the two platforms, not a
+// declaration to paper over.
+declare module '*.png' {
+  const asset: number;
+  export default asset;
+}
+declare module '*.jpg' {
+  const asset: number;
+  export default asset;
+}
+declare module '*.jpeg' {
+  const asset: number;
+  export default asset;
+}
+declare module '*.gif' {
+  const asset: number;
+  export default asset;
+}
+declare module '*.webp' {
+  const asset: number;
+  export default asset;
+}
+declare module '*.svg' {
+  const asset: number;
+  export default asset;
+}

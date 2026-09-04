@@ -22,6 +22,8 @@ import {
   type HookDefinition,
 } from './extractors/hooks';
 import { extractRoutes } from './extractors/routes';
+import { extractEntryPoint, findEntryFile } from './extractors/entry';
+import { extractStylesheets } from './extractors/stylesheets';
 import { extractState, storeId, type StoreDefinition } from './extractors/state';
 import {
   extractApiFile,
@@ -41,6 +43,7 @@ import type {
   KnowledgeGraph,
   Route,
   Store,
+  EntryPoint,
 } from './types';
 
 const ROUTER_MODULES = new Set(['react-router-dom', 'react-router']);
@@ -297,6 +300,11 @@ function main(): void {
     referencedBy: [...(referencedBy.get(rel) ?? [])].sort(),
   }));
 
+  // --- Stylesheets --------------------------------------------------------
+  // What the project declares itself, so the Analyzer can tell a Tailwind
+  // utility from a class NativeWind will silently ignore.
+  const stylesheets = extractStylesheets(root, discovered.style);
+
   // --- Edges --------------------------------------------------------------
   const edges: Edge[] = [];
   const seenEdges = new Set<string>();
@@ -374,6 +382,24 @@ function main(): void {
     discovered.source.some((f) => /(^|\/)vite\.config\.(ts|js)$/.test(f)) ||
     'vite' in ((pkg.devDependencies as Record<string, string>) ?? {});
 
+  // --- Entry point --------------------------------------------------------
+  // The entry file is never emitted (mounting into a DOM node has no RN
+  // equivalent), so what it configured above the root component is read out
+  // here instead of being lost with it.
+  let entry: EntryPoint | null = null;
+  const entryRel = findEntryFile(allFilesRel);
+  if (entryRel) {
+    const entrySf = sfByRel.get(entryRel);
+    const entryImports = importsByFile.get(entryRel);
+    if (entrySf && entryImports) {
+      try {
+        entry = extractEntryPoint(entrySf, entryRel, entryImports);
+      } catch (err) {
+        warnings.push(`Failed to read entry point ${entryRel}: ${(err as Error).message}`);
+      }
+    }
+  }
+
   const graph: KnowledgeGraph = {
     project: {
       name: (pkg.name as string) ?? path.basename(root),
@@ -390,7 +416,9 @@ function main(): void {
     stateManagement: { library: stateLibrary, stores },
     apiLayer: { clients, endpoints },
     assets,
+    stylesheets,
     edges,
+    entry,
     warnings,
   };
 

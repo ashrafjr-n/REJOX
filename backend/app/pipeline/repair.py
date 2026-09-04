@@ -31,6 +31,12 @@ from app.pipeline.validator import map_diagnostics, validate_project
 MAX_REPAIR_ROUNDS = 2
 _REPAIR_MAX_TOKENS = 400
 _FENCE_RE = re.compile(r"^```[a-zA-Z0-9]*\n?|\n?```$", re.MULTILINE)
+# A prose preamble the prompt already asks the model NOT to write ("Here is the
+# corrected line:"). Recognised as a line ending in a colon that carries none of
+# the punctuation real code would. A false positive is harmless: that line is
+# skipped, the next candidate is tried, and no candidate at all means "no
+# change", which leaves the file exactly as it was.
+_PREAMBLE_RE = re.compile(r"^[^;{}<>()=\[\]]*[A-Za-z][^;{}<>()=\[\]]*:\s*$")
 
 # Residue codes the repair loop is allowed to touch. An *unexplained* diagnostic
 # (no residue) is a codemod bug — we do NOT paper over it with the LLM.
@@ -50,6 +56,8 @@ class RepairAttempt:
     sent: str                # the exact line handed to the LLM
     received: str            # the LLM's replacement line
     fixed: bool = False      # did re-validation clear this file's errors?
+    applied: bool = False    # was the line actually written to the file?
+    rejectedReason: str = ""  # why it was not written (failed the syntax gate)
 
 
 @dataclass
@@ -86,11 +94,56 @@ def _build_prompt(m: MappedDiagnostic, line_text: str) -> tuple[str, str]:
     return system, user
 
 
-def _apply_line(path: Path, line_no: int, new_line: str) -> None:
-    lines = path.read_text().splitlines()
-    if 1 <= line_no <= len(lines):
-        lines[line_no - 1] = new_line
-        path.write_text("\n".join(lines) + "\n")
+def _clean_response(text: str) -> str:
+    """Reduce the model's reply to the single line of code it was asked for.
+
+    The prompt asks for a bare line — no fences, no prose — but a prompt is a
+    request, not a guarantee, so the obvious wrappers come off here before the
+    syntax gate sees the result.
+    """
+    body = _FENCE_RE.sub("", text).strip()
+    for line in body.splitlines():
+        if not line.strip() or _PREAMBLE_RE.match(line):
+            continue
+        return line
+    return ""
+
+
+def _apply_line(path: Path, line_no: int, new_line: str) -> tuple[bool, str]:
+    """Patch one line — but only if it does not make the file parse worse.
+
+    Every other path that writes a code artifact in this pipeline is gated: the
+    codemod-worker refuses to emit code it cannot prove parses, and the
+    resolvers hand their output to ``check_syntax`` before it lands. Model
+    output is the least trustworthy source in the system, so it goes through
+    the same gate rather than a weaker one.
+
+    The test is *relative* — new syntax errors, not zero errors — because the
+    file being repaired may already be broken (that is usually why it is here),
+    and a repair that leaves it no worse is still allowed to land.
+
+    Returns ``(applied, rejected_reason)``.
+    """
+    from app.pipeline.transformer import TransformerError, check_syntax
+
+    original = path.read_text()
+    lines = original.splitlines()
+    if not (1 <= line_no <= len(lines)):
+        return False, f"line {line_no} is outside the file"
+    lines[line_no - 1] = new_line
+    candidate = "\n".join(lines) + "\n"
+    try:
+        before, after = check_syntax(original), check_syntax(candidate)
+    except TransformerError as exc:
+        # Cannot prove it is safe → do not write it.
+        return False, f"syntax check unavailable ({exc})"
+    if after > before:
+        return False, (
+            f"rejected: the replacement introduced {after - before} syntax "
+            f"error(s); the file was left as it was"
+        )
+    path.write_text(candidate)
+    return True, ""
 
 
 def repair_project(
@@ -143,8 +196,7 @@ def repair_project(
             line_text = lines[m.diagnostic.line - 1] if m.diagnostic.line <= len(lines) else ""  # type: ignore[operator]
             system, user = _build_prompt(m, line_text)
             resp = provider.complete(system, user, max_tokens=_REPAIR_MAX_TOKENS)
-            new_line = _FENCE_RE.sub("", resp.text).strip().splitlines()
-            new_line_text = new_line[0] if new_line else line_text
+            new_line_text = _clean_response(resp.text) or line_text
             attempt = RepairAttempt(
                 round=rnd, file=m.diagnostic.file,  # type: ignore[arg-type]
                 line=m.diagnostic.line,  # type: ignore[arg-type]
@@ -154,9 +206,12 @@ def repair_project(
             )
             result.attempts.append(attempt)
             if new_line_text and new_line_text != line_text:
-                _apply_line(fp, m.diagnostic.line, new_line_text)  # type: ignore[arg-type]
-                repaired_files.add(m.diagnostic.file)  # type: ignore[arg-type]
-                touched = True
+                applied, reason = _apply_line(fp, m.diagnostic.line, new_line_text)  # type: ignore[arg-type]
+                attempt.applied = applied
+                attempt.rejectedReason = reason
+                if applied:
+                    repaired_files.add(m.diagnostic.file)  # type: ignore[arg-type]
+                    touched = True
 
         result.rounds = rnd
         current = validate_project(out_dir, install=False, run_bundle=run_bundle)
@@ -176,7 +231,13 @@ def repair_project(
             result.stoppedReason = "validation passed after repair"
             break
         if not touched:
-            result.stoppedReason = "LLM returned no change — nothing more to try"
+            rejected = sum(1 for a in result.attempts if a.round == rnd and a.rejectedReason)
+            result.stoppedReason = (
+                f"every replacement this round was rejected by the syntax gate "
+                f"({rejected}) — nothing safe to apply"
+                if rejected
+                else "LLM returned no change — nothing more to try"
+            )
             break
     else:
         result.stoppedReason = f"reached max {max_rounds} repair round(s)"
