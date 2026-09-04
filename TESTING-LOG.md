@@ -15,24 +15,29 @@ holds the rules. Two uneventful projects in a row get one line, not two entries.
 
 Vite + plain JS + Redux Toolkit / RTK Query, **no router**.
 
-- **Found:** any router-less project lost its whole UI — `src/App.jsx` was never
-  converted, just replaced by a placeholder, so every converted component was
-  emitted but unreachable, and `main.jsx`'s `<Provider>` vanished with the file.
-  Metro still reported **PASS**, because the stub made everything unreachable.
-- **Fixed:** the root component is now converted when no navigator subsumes it,
-  and the entry file's provider chain is lifted into `App.tsx`.
+- **Found:** a router-less project lost its whole UI — `src/App.jsx` was replaced
+  by a placeholder and `main.jsx`'s `<Provider>` vanished with the file, while
+  Metro still reported PASS because nothing was reachable to fail.
+- **Fixed:** the root component is converted when no navigator subsumes it, and
+  the provider chain is lifted; a re-test the same day then caught three more
+  numbers lying about the same run (carry-over, the compiles + bundles lens,
+  "0 unmappable"), all fixed, plus `import.meta.env`.
 - **For future projects:** a green Metro means nothing until the entry actually
-  reaches the converted files — check reachability before trusting the score.
-  Still open here: emitted code's deps get dropped (Redux is wrongly labelled
-  unsupported), the global-CSS `@apply` layer is lost, and the storage question
-  is asked but never applied.
+  reaches the converted files — check reachability before trusting a score.
 
-### Re-test, same day — after the fixes
+---
 
-Root component and providers held. With the UI finally reachable, three numbers
-turned out to be lying: carry-over shipped `react-redux` but not
-`@reduxjs/toolkit` (Metro dead on the first module), "compiles + bundles" rose
-33%→43% while Metro went PASS→FAIL, and "0 unmappable" was counting 13 of the
-project's own CSS classes as Tailwind. All four fixed. `import.meta.env` is now
-the only Metro blocker left — and that was three bugs in a row from a fixed list
-rather than from what the project actually shows.
+## Known gaps
+
+Open across projects. Here so no entry has to repeat them, and so a run that
+hits one recognises it instead of rediscovering it.
+
+- **Global CSS is not carried over.** A stylesheet's own classes (usually
+  `@apply`) are counted unmappable and named in the report; the design is lost.
+- **`CUSTOM_CSS_CLASS` deducts from the components area, not styling** — the
+  "Styling surface" row can still read "maps 1:1" while classes go unmapped.
+- **The storage question is asked but never applied** (`localStorage` →
+  AsyncStorage is decided and then not acted on).
+- **The Analyzer does not predict `import.meta.env`.** The transformer rewrites
+  it, but the Report/Ask stage never mentions the project has build-time env at
+  all, so the migrated app's missing `EXPO_PUBLIC_*` keys are a surprise.
