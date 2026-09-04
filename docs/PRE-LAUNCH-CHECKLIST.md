@@ -94,6 +94,24 @@ above is signed from their output: `./verify-deployment.sh` (0 FAIL — A0, A1,
 A8, A9, B0, B1, B2, B3, B5, C2, C3), the manual deployment gates (B4, B6, B7),
 and the HTTP and operability gates by hand (C0, C1, C4, C5, E0, E1).
 
+2026-09-04: `pipeline/scaffold.py` and `pipeline/validator.py` both changed
+(dependency carry-over now follows the emitted code's imports; the
+"compiles + bundles" lens now answers for the bundle result rather than for
+typecheck diagnostics alone). By the table above that re-reds **A8, A9** and
+**A1, A4, B3**.
+
+- **A8 and A9 are re-signed** below, against the new carry-over path, with the
+  output pasted.
+- **A1, A4 and B3 stay `⟲ re-red`.** `pytest -m sandbox_live` is green against
+  a live daemon (9 passed, Docker Desktop 29.6.2), but that runs as a process ON
+  the host, where the sibling-container path mismatch A1 exists to catch cannot
+  occur — so it is not evidence for A1, and it covers neither B3 nor the compose
+  geometry. Re-earn them with `./verify-deployment.sh`, which needs
+  `sudo mkdir -p /srv/rejox-data && sudo chown -R 10001:10001 /srv/rejox-data`
+  on this host. The validator change is confined to `validated_scores()`, a pure
+  function over an already-produced ValidationResult — but reading that is not
+  evidence either, which is the whole point of this file.
+
 **E0 and E1 are signed green for the first time.** E0 had been red twice — a
 silence, then a `Job OK` line for a job that had failed — and both cases are now
 explained from the retained logs alone. E1 had no bound at all; it now has one,
@@ -533,6 +551,23 @@ $ grep -i 'rejox-canary' <emitted>/package.json || echo clean
 clean
 
 Still exactly the four scaffold entries; neither canary survived.
+
+Re-signed: 2026-09-04 (2) — Ashraf (scaffold.py changed again: carry-over is now
+driven by scanning the module specifiers of the files actually emitted, not by a
+list). Same fixture, `rejox migrate --no-validate` (the generate_scaffold path).
+
+$ jq '.scripts' <emitted>/package.json
+{
+  "start": "expo start",
+  "android": "expo start --android",
+  "ios": "expo start --ios",
+  "web": "expo start --web"
+}
+$ grep -i 'rejox-canary' <emitted>/package.json || echo clean
+clean
+
+The wider carry-over reaches more of the uploaded package.json than before, and
+still reaches none of its scripts.
 ```
 
 ---
@@ -597,6 +632,30 @@ provider was still emitting `import { Provider } from "react-redux"` for a
 package that was deliberately not installed. It now drops the provider and
 leaves a REJOX-TODO(ENTRY_PROVIDER) instead of a dangling import
 (`test_provider_is_dropped_when_its_package_was_not_installed`).
+
+Re-signed: 2026-09-04 (2) — Ashraf (scaffold.py changed again, as above). This is
+the gate that matters most for that change: carry-over now follows the emitted
+code's imports, so an unsafe spec has a wider path to npm than it used to. The
+fixture pins `@reduxjs/toolkit` — a package `src/services/store.js` really does
+import, so it travels the NEW path — to a tarball URL, plus an `evil-pkg` git
+spec nothing imports.
+
+$ jq -r '.dependencies | to_entries[] | "\(.key)=\(.value)"' <emitted>/package.json
+expo=~52.0.0
+expo-asset=~11.0.5
+expo-status-bar=~2.0.0
+nativewind=^4.1.23
+react=18.3.1
+react-native=0.76.5
+react-native-reanimated=~3.16.2
+react-native-worklets=^0.10.0
+react-redux=^8.0.5
+$ ... | grep -E '(https?://|git\+|file:|github:|npm:)' || echo clean
+clean
+
+`@reduxjs/toolkit` was dropped despite being imported — the emitted code asking
+for a package does not lift the version filter — and `evil-pkg` never appeared.
+Every survivor is a plain semver range.
 ```
 
 ---
