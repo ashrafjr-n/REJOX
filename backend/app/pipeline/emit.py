@@ -416,8 +416,15 @@ def emit_project(
     nativewind = styling == "nativewind"
     app_name = kg.project.name.replace("-", " ").title()
 
+    # A router-less project's src/App is its real UI, not router wiring: only a
+    # generated navigator can subsume it. The entry file (src/main) is never
+    # emitted either way — mounting into a DOM node has no RN equivalent — but
+    # what it configured above the root component is lifted into App.tsx.
+    has_navigator = bool(report.routing.library and report.routing.routes)
     regenerated = _regenerated_source_paths(kg)
-    regenerated_paths = set(regenerated.values())
+    entry_source_file = regenerated.get("src/main")
+    regenerated_paths = {p for stem, p in regenerated.items()
+                         if stem == "src/main" or has_navigator}
     # Falls back to the .tsx literal only if no App file was found at all —
     # can't happen once report.routing required one, but keeps this total.
     app_source_file = regenerated.get("src/App", "src/App.tsx")
@@ -534,7 +541,6 @@ def emit_project(
         )
 
     # 3. navigator + App.tsx.
-    has_navigator = bool(report.routing.library and report.routing.routes)
     if has_navigator:
         nav_shape = answers.get("navigator-shape", "stack")
         # Import each screen from where it was actually written, not from the
@@ -560,17 +566,50 @@ def emit_project(
             )
         )
 
-    app_src = _app_source(has_navigator, nativewind, app_name)
+    emitted_paths = {f.path for f in files}
+    # Without a navigator the root App is a converted file like any other; point
+    # the generated shell at where it actually landed rather than assume it.
+    root_target = _target_rel(app_source_file) if app_source_file else None
+    root_module = (
+        _module_specifier("App.tsx", root_target)
+        if not has_navigator and root_target in emitted_paths
+        else None
+    )
+    app_src = _app_source(
+        nativewind=nativewind,
+        app_name=app_name,
+        navigator=has_navigator,
+        root_module=root_module,
+        entry=kg.entry,
+        emitted_paths=emitted_paths,
+    )
     (out_dir / "App.tsx").write_text(app_src)
     # App.tsx is in the scaffold list already; refresh its provenance/source.
+    # It is sourced from whatever it actually carries: the entry file when that
+    # file's providers were lifted into it, else the App it wires.
+    lifted_from_entry = bool(kg.entry and kg.entry.providers and "REJOX-TODO" not in app_src)
     files = [f for f in files if f.path != "App.tsx"]
     files.append(
         EmittedFile(
             path="App.tsx",
-            sourceFile=app_source_file,
+            sourceFile=(entry_source_file if lifted_from_entry else app_source_file),
             provenance=ConfidenceSource.DETERMINISTIC_WARNING,
+            todoCodes=_todo_codes(app_src),
         )
     )
+
+    # The entry file is deliberately never emitted — record it, so no source
+    # file simply vanishes from the migration's accounting.
+    if entry_source_file:
+        lifted = len(kg.entry.providers) if kg.entry else 0
+        skipped.append(SkippedFile(
+            path=entry_source_file,
+            reason=(
+                "web entry point (mounting into a DOM node has no RN equivalent); "
+                + (f"its {lifted} root provider(s) were lifted into App.tsx"
+                   if lifted else "it wrapped no app-level providers")
+            ),
+        ))
 
     # 4. assets — copy real assets, skip web-only ones with a note.
     for asset in kg.assets:
