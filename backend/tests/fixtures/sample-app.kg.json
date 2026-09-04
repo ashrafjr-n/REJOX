@@ -2198,5 +2198,17 @@
       "kind": "calls-api"
     }
   ],
+  "entry": {
+    "file": "src/main.tsx",
+    "rootComponent": "App",
+    "rootComponentFile": "src/App.tsx",
+    "providers": [],
+    "bindings": [],
+    "dropped": [
+      "StrictMode: a stateless wrapper carries no app configuration",
+      "BrowserRouter: router provider, subsumed by the generated navigator"
+    ],
+    "warnings": []
+  },
   "warnings": []
 }
