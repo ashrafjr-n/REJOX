@@ -66,6 +66,14 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
   const analyzeResponse = page.waitForResponse(
     (r) => r.url().includes('/api/analyze') && r.request().method() === 'POST',
   )
+  // Armed HERE, not at the Plan step below. The plan is prefetched the moment
+  // /api/analyze lands, behind the reveal (see AnalyzingScreen), so by the time
+  // "Plan the migration" is clicked the store already holds it and no second
+  // POST is ever made. Waiting from the click waits for a request that will
+  // never come, while the DAG renders perfectly on screen.
+  const planResponse = page.waitForResponse(
+    (r) => r.url().includes('/api/plan') && r.request().method() === 'POST',
+  )
   await page.getByRole('button', { name: /Analyze project/i }).click()
 
   // The Analyzing screen renders synchronously on click; capture it while the
@@ -102,9 +110,8 @@ test('Upload → Analyze → Report against the real backend', async ({ page }) 
   )
 
   // --- 4 · Plan screen — the real DAG from /api/plan -----------------------
-  const planResponse = page.waitForResponse(
-    (r) => r.url().includes('/api/plan') && r.request().method() === 'POST',
-  )
+  // The prefetched response (armed above) is the canonical one: it is the plan
+  // this screen renders, whether it arrived early or the screen re-requested it.
   await page.getByRole('button', { name: /Plan the migration/i }).click()
   const planJson = (await (await planResponse).json()) as {
     plan: { steps: PlanStepLite[]; questions: { id: string }[] }
