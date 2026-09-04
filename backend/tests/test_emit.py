@@ -449,3 +449,34 @@ def test_routed_project_still_wires_the_navigator(emitted_js: EmittedProject) ->
     assert "src/App.jsx" not in [f.path for f in emitted_js.files]
     assert "src/main.jsx" in {s.path for s in emitted_js.skipped}
     del converted
+
+
+def test_provider_is_dropped_when_its_package_was_not_installed(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """The scaffold drops a dependency whose version spec is not a plain
+    registry range (the A9 carry-over filter). Lifting a provider whose package
+    was dropped that way would emit an import of something deliberately never
+    installed — so the provider is dropped too, and says so."""
+    import json as _json
+    import shutil
+
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    src = tmp_path_factory.mktemp("hostile") / "app"
+    shutil.copytree(NO_ROUTER_SRC_ROOT, src)
+    pkg = src / "package.json"
+    data = _json.loads(pkg.read_text())
+    data["dependencies"]["react-redux"] = "https://evil.example.com/pkg.tgz"
+    pkg.write_text(_json.dumps(data))
+
+    kg = build_knowledge_graph(src)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-hostile")
+    emit_project(plan, ANSWERS, kg, out, report=report, source_root=src)
+
+    app = (out / "App.tsx").read_text()
+    assert "react-redux" not in app                  # no dangling import
+    assert "<Provider store={store}>" not in app     # not in the rendered tree
+    assert "REJOX-TODO(ENTRY_PROVIDER)" in app       # and never silently

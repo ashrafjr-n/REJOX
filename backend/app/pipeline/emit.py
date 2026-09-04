@@ -222,16 +222,27 @@ def _module_specifier(from_root: str, target_rel: str) -> str:
     return f"./{without_ext}"
 
 
+def _package_root(specifier: str) -> str:
+    """The installable package name of a module specifier.
+
+    ``@reduxjs/toolkit/query/react`` is supplied by ``@reduxjs/toolkit``; a
+    deep import is not its own dependency.
+    """
+    parts = specifier.split("/")
+    return "/".join(parts[:2]) if specifier.startswith("@") else parts[0]
+
+
 def _entry_imports(
     entry: Optional[EntryPoint],
     emitted_paths: set[str],
+    available_packages: set[str],
 ) -> tuple[list[str], list[str], list[RootProvider], list[str]]:
     """Render the entry file's provider chain into import/declaration source.
 
     Returns ``(imports, declarations, providers, todos)``. A provider whose
-    values cannot be carried over — the file that supplied one was skipped, or
-    the entry extractor could not resolve it — is NOT emitted with a dangling
-    import: it is dropped with a ``REJOX-TODO(ENTRY_PROVIDER)`` naming it, so a
+    values cannot be carried over — the file that supplied one was skipped, its
+    package did not reach package.json, or the entry extractor could not
+    resolve it — is NOT emitted with a dangling import: it is dropped with a ``REJOX-TODO(ENTRY_PROVIDER)`` naming it, so a
     lost provider is always visible rather than silently absent.
     """
     if entry is None or not entry.providers:
@@ -246,6 +257,13 @@ def _entry_imports(
         if b.module is None:
             continue
         if b.resolvedFile is None:
+            # A package only reaches the import if it reached package.json. The
+            # scaffold drops a dependency whose version spec is not a plain
+            # registry range (see scaffold._safe_version), and importing what
+            # was deliberately not installed is a dangling import, not a lift.
+            if _package_root(b.module) not in available_packages:
+                unresolved.add(b.local)
+                continue
             binding_specifier[b.local] = b.module  # a package: import as written
             continue
         landed = _target_rel(b.resolvedFile)
@@ -343,6 +361,7 @@ def _app_source(
     root_module: Optional[str],
     entry: Optional[EntryPoint],
     emitted_paths: set[str],
+    available_packages: set[str],
 ) -> str:
     """Generate the root ``App.tsx``.
 
@@ -352,7 +371,9 @@ def _app_source(
     router AND no readable root component) falls back to the placeholder, and
     that fallback is a genuinely empty project, not a lost one.
     """
-    imports, declarations, providers, todos = _entry_imports(entry, emitted_paths)
+    imports, declarations, providers, todos = _entry_imports(
+        entry, emitted_paths, available_packages
+    )
 
     head: list[str] = []
     if nativewind:
@@ -600,6 +621,7 @@ def emit_project(
         root_module=root_module,
         entry=kg.entry,
         emitted_paths=emitted_paths,
+        available_packages=set(scaffold.dependencies),
     )
     (out_dir / "App.tsx").write_text(app_src)
     # App.tsx is in the scaffold list already; refresh its provenance/source.
