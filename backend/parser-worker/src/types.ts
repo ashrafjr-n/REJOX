@@ -241,6 +241,20 @@ export interface EntryPoint {
   warnings: string[];
 }
 
+/** A stylesheet the project itself ships, and the classes it declares. */
+export interface Stylesheet {
+  /** Project-relative path. */
+  file: string;
+  /**
+   * Class names it declares (`.black_btn` -> "black_btn"), sorted.
+   *
+   * These are NOT Tailwind utilities: NativeWind ignores them, so a className
+   * naming one renders unstyled. CSS Modules are excluded — their classes are
+   * reached through the imported `styles` object.
+   */
+  classes: string[];
+}
+
 export interface KnowledgeGraph {
   project: Project;
   files: FileNode[];
@@ -250,6 +264,7 @@ export interface KnowledgeGraph {
   stateManagement: StateManagement;
   apiLayer: ApiLayer;
   assets: Asset[];
+  stylesheets: Stylesheet[];
   edges: Edge[];
   entry: EntryPoint | null;
   warnings: string[];

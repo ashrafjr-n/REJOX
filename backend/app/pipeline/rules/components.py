@@ -12,7 +12,7 @@ from app.models.knowledge_graph import Component, KnowledgeGraph
 
 from . import codes
 from .scoring import score_component
-from .styling import component_styling_issues
+from .styling import component_styling_issues, project_defined_classes
 
 # Host elements that map 1:1 with a trivial rename (div→View, span/p→Text, ...).
 # Present here = silent, fully supported, no issue emitted.
@@ -228,12 +228,19 @@ def _inline_style_issues(comp: Component) -> list[Issue]:
     return issues
 
 
-def analyze_component(comp: Component) -> ComponentFinding:
-    """Analyze a single component into a ComponentFinding."""
+def analyze_component(
+    comp: Component, project_classes: frozenset[str] = frozenset()
+) -> ComponentFinding:
+    """Analyze a single component into a ComponentFinding.
+
+    ``project_classes`` are the class names the project declares in its own
+    stylesheets — a project-level fact a single component cannot see, and the
+    only way to tell a Tailwind utility from a class NativeWind will ignore.
+    """
     issues: list[Issue] = []
     issues += _element_issues(comp)
     issues += _event_issues(comp)
-    issues += component_styling_issues(comp)
+    issues += component_styling_issues(comp, project_classes)
     issues += _web_api_issues(comp)
     issues += _text_wrap_issues(comp)
     issues += _flex_row_issues(comp)
@@ -252,4 +259,5 @@ def analyze_component(comp: Component) -> ComponentFinding:
 
 
 def analyze_components(kg: KnowledgeGraph) -> list[ComponentFinding]:
-    return [analyze_component(c) for c in kg.components]
+    project_classes = project_defined_classes(kg)
+    return [analyze_component(c, project_classes) for c in kg.components]

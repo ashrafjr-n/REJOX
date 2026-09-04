@@ -150,6 +150,7 @@ _CODE_LABELS = {
     codes.HOVER_STATE: "Hover styling",
     codes.INTERACTION_STATE: "Focus/active styling",
     codes.CSS_GRID: "CSS grid layout",
+    codes.CUSTOM_CSS_CLASS: "Project CSS classes (not Tailwind)",
     codes.RESPONSIVE_BREAKPOINT: "Responsive breakpoints",
     codes.GRADIENT: "Gradient backgrounds",
     codes.GROUP_SELECTOR: "Group selectors",
