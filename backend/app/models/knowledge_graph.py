@@ -203,10 +203,63 @@ class ApiLayer(KGBase):
 # --- Assets -----------------------------------------------------------------
 
 
+# --- Entry point ------------------------------------------------------------
+
+
+class EntryBinding(KGBase):
+    """One value the lifted provider chain reads, and where it came from."""
+
+    local: str
+    module: Optional[str] = None
+    imported: Optional[str] = None
+    resolvedFile: Optional[str] = None
+    declaration: Optional[str] = None
+
+
+class RootProvider(KGBase):
+    """One provider wrapping the root component in the entry file."""
+
+    tag: str
+    attributes: list[str] = Field(default_factory=list)
+    references: list[str] = Field(default_factory=list)
+
+
+class EntryPoint(KGBase):
+    """The web entry file (``src/main.*`` / ``src/index.*``).
+
+    Mounting a React tree into a DOM node has no React Native equivalent, so
+    this file is never emitted — but the providers it wrapped around the root
+    component are app configuration, not DOM plumbing, and are carried into the
+    generated ``App.tsx`` instead of being lost with the file.
+    """
+
+    file: str
+    rootComponent: Optional[str] = None
+    rootComponentFile: Optional[str] = None
+    providers: list[RootProvider] = Field(default_factory=list)
+    bindings: list[EntryBinding] = Field(default_factory=list)
+    dropped: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class Asset(KGBase):
     path: str
     type: str
     referencedBy: list[str] = Field(default_factory=list)
+
+
+class Stylesheet(KGBase):
+    """A stylesheet the project ships, and the classes it declares.
+
+    These are NOT Tailwind utilities. NativeWind resolves Tailwind's own
+    utilities and nothing else, so a ``className`` naming one of these is
+    silently ignored and the element renders unstyled. CSS Modules are excluded
+    — their classes are reached through the imported ``styles`` object, and the
+    CSS Module resolver already re-expresses them.
+    """
+
+    file: str
+    classes: list[str] = Field(default_factory=list)
 
 
 # --- Edges ------------------------------------------------------------------
@@ -232,5 +285,7 @@ class KnowledgeGraph(KGBase):
     stateManagement: StateManagement
     apiLayer: ApiLayer = Field(default_factory=ApiLayer)
     assets: list[Asset] = Field(default_factory=list)
+    stylesheets: list[Stylesheet] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
+    entry: Optional[EntryPoint] = None
     warnings: list[str] = Field(default_factory=list)

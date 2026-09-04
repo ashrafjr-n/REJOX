@@ -23,6 +23,7 @@ import { Node, SyntaxKind, type SourceFile } from 'ts-morph';
 import type { Ctx, RouteOption } from '../types';
 import {
   applyUntilStable,
+  commentSafe,
   enclosingComponentBody,
   recordUnhandled,
   requestNamedImport,
@@ -208,12 +209,13 @@ function transformOneLink(sf: SourceFile, ctx: Ctx): boolean {
         `<Pressable${attrs} onPress={() => ${navigateCall(match.screen, match.params)}}>` +
         `${inner}</Pressable>`;
     } else {
-      const todo = `{/* REJOX-TODO(NAV_LINK): wire navigation.navigate(${toText || '…'}) */}`;
+      const safeToText = commentSafe(toText);
+      const todo = `{/* REJOX-TODO(NAV_LINK): wire navigation.navigate(${safeToText || '…'}) */}`;
       replacement = `<Pressable${attrs} onPress={() => {}}>${todo}${inner}</Pressable>`;
       recordUnhandled(
         ctx,
         'NAV_LINK',
-        `<${tag}> at line ${line}: 'to' has no static route-table match; wire navigation.navigate(${toText || '…'}).`,
+        `<${tag}> at line ${line}: 'to' has no static route-table match; wire navigation.navigate(${safeToText || '…'}).`,
         replacement,
       );
     }

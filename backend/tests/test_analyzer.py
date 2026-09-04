@@ -379,3 +379,45 @@ def test_analyze_endpoint_reports_the_analyzer_failure(monkeypatch) -> None:
     resp = client.post("/api/analyze", json={"path": str(SAMPLE_APP)})
     assert resp.status_code == 500
     assert "component rules" in resp.json()["detail"]
+
+
+# --- A class the project defines is not a Tailwind class ----------------------
+
+
+def _kg_with_custom_css() -> KnowledgeGraph:
+    """sample-app, plus a stylesheet declaring one of the classes it uses."""
+    raw = json.loads((FIXTURES / "sample-app.kg.json").read_text())
+    used = next(
+        c["tailwindClasses"][0] for c in raw["components"] if c["tailwindClasses"]
+    )
+    raw["stylesheets"] = [{"file": "src/App.css", "classes": [used, "black_btn"]}]
+    return KnowledgeGraph.model_validate(raw), used
+
+
+def test_a_class_the_project_declares_counts_as_unmappable() -> None:
+    """The regression: every className was counted as a mappable Tailwind
+    utility, so the summarizer reported "60 Tailwind classes (0 unmappable)"
+    while 12 of them were its own CSS classes — which NativeWind ignores in
+    silence. The score went up as the app lost its design."""
+    kg, used = _kg_with_custom_css()
+    report = analyze_graph(kg)
+
+    assert used in report.styling.unmappableClasses
+    # And it is named, not just counted, so the report says which ones.
+    finding = next(
+        f for f in report.components
+        if any(i.code == "CUSTOM_CSS_CLASS" for i in f.issues)
+    )
+    issue = next(i for i in finding.issues if i.code == "CUSTOM_CSS_CLASS")
+    assert used in issue.evidence.detail
+
+
+def test_a_project_with_no_stylesheets_is_unchanged() -> None:
+    """The benchmark declares no classes of its own (its only global CSS is
+    `@import "tailwindcss"`), so this rule must cost it nothing."""
+    kg = _load("sample-app.kg.json")
+    assert kg.stylesheets == []
+    report = analyze_graph(kg)
+    assert not any(
+        i.code == "CUSTOM_CSS_CLASS" for f in report.components for i in f.issues
+    )

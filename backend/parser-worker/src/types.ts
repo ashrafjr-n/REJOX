@@ -191,6 +191,70 @@ export interface Edge {
   kind: EdgeKind;
 }
 
+/**
+ * One value the lifted provider chain reads and the entry file supplied —
+ * either an import, or a top-level declaration written in the entry file.
+ */
+export interface EntryBinding {
+  /** Local name bound (e.g. `store`, `queryClient`). */
+  local: string;
+  /** Import: the module specifier as written (`react-redux`, `./services/store`). */
+  module: string | null;
+  /** Import: the exported name (`default`, `*`, or a named export). */
+  imported: string | null;
+  /** Import of a same-project file: the project-relative path it resolves to. */
+  resolvedFile: string | null;
+  /** Declaration: its full source text, verbatim (`const q = new QueryClient()`). */
+  declaration: string | null;
+}
+
+/** One provider wrapping the root component, as written in the entry file. */
+export interface RootProvider {
+  /** Tag as written, e.g. `Provider` or `Theme.Provider`. */
+  tag: string;
+  /** Attributes as source text, in order, e.g. [`store={store}`]. */
+  attributes: string[];
+  /** Local names the tag and its attributes reference. */
+  references: string[];
+}
+
+/**
+ * The web entry file (`src/main.*` / `src/index.*`) — the one file whose whole
+ * job (mount into a DOM node) has no React Native equivalent, and which is
+ * therefore never emitted. What it configured ABOVE the root component still
+ * belongs to the app, so it is extracted here rather than lost with the file.
+ */
+export interface EntryPoint {
+  /** Project-relative path of the entry file. */
+  file: string;
+  /** Local name the root component was bound to (`App`), when resolvable. */
+  rootComponent: string | null;
+  /** The file that root component came from, project-relative. */
+  rootComponentFile: string | null;
+  /** Providers wrapping the root component, outermost first. */
+  providers: RootProvider[];
+  /** Values the providers reference, in the order they must be emitted. */
+  bindings: EntryBinding[];
+  /** Wrappers deliberately not lifted, as `<tag>: <reason>`. */
+  dropped: string[];
+  /** Anything the extraction could not resolve — never silently ignored. */
+  warnings: string[];
+}
+
+/** A stylesheet the project itself ships, and the classes it declares. */
+export interface Stylesheet {
+  /** Project-relative path. */
+  file: string;
+  /**
+   * Class names it declares (`.black_btn` -> "black_btn"), sorted.
+   *
+   * These are NOT Tailwind utilities: NativeWind ignores them, so a className
+   * naming one renders unstyled. CSS Modules are excluded — their classes are
+   * reached through the imported `styles` object.
+   */
+  classes: string[];
+}
+
 export interface KnowledgeGraph {
   project: Project;
   files: FileNode[];
@@ -200,6 +264,8 @@ export interface KnowledgeGraph {
   stateManagement: StateManagement;
   apiLayer: ApiLayer;
   assets: Asset[];
+  stylesheets: Stylesheet[];
   edges: Edge[];
+  entry: EntryPoint | null;
   warnings: string[];
 }

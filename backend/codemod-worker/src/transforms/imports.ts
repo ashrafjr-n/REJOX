@@ -6,6 +6,8 @@
  *     NAV_CONTAINER residue — navigator structure is a judgment call, and
  *     nothing is ever silently dropped.
  *   - flag CSS-Module imports (kept verbatim; restyling needs judgment)
+ *   - drop plain stylesheet imports (+ GLOBAL_CSS residue): RN has no
+ *     stylesheet imports, and the file is never emitted
  *   - flag web-only React DOM types that survived the props-type transform
  *   - inject `import { … } from 'react-native'` for every RN component used
  *   - inject the named imports other transforms requested
@@ -18,6 +20,7 @@ import { RN_COMPONENTS, ROUTER_HOOKS } from '../maps';
 import { recordUnhandled, recordWarning } from '../util';
 
 const CSS_MODULE_RE = /\.module\.(css|scss|sass|less)$/;
+const STYLESHEET_RE = /\.(css|scss|sass|less)$/;
 const DOM_TYPE_RE = /HTMLAttributes|HTML[A-Za-z]*Element|SVGProps|MouseEvent|ChangeEvent|FormEvent|KeyboardEvent/;
 
 /** react-router components that define navigator STRUCTURE — a design call. */
@@ -106,6 +109,21 @@ export function transformImports(sf: SourceFile, ctx: Ctx): void {
         imp.getText(),
       );
       continue; // keep the import (className preserved verbatim)
+    }
+
+    if (STYLESHEET_RE.test(mod)) {
+      // A plain stylesheet import is side-effect-only and has no React Native
+      // equivalent — the file itself is never emitted. Dropping it silently is
+      // how a project's whole design layer disappears without a trace, so the
+      // residue names the stylesheet at the call site that lost it.
+      recordUnhandled(
+        ctx,
+        'GLOBAL_CSS',
+        `Global stylesheet '${mod}' has no React Native equivalent; its rules must be re-expressed as NativeWind classes or a StyleSheet.`,
+        imp.getText(),
+      );
+      imp.remove();
+      continue;
     }
 
     if (mod === 'react') {

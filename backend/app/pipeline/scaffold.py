@@ -37,7 +37,11 @@ _BASE_DEV_DEPS = {
     "@types/react": "~18.3.12",
     "typescript": "^5.3.3",
 }
-# Source deps that carry over unchanged when present.
+# Source deps that carry over unchanged when present, whether or not the
+# emitted code happens to import them in a way we scanned. The real carry-over
+# is `extra_packages`, which the emitter derives from the module specifiers of
+# the files it actually wrote — a package is installed because the output uses
+# it, not because it was on a list.
 _CARRY_OVER = ("zustand", "axios")
 
 # A carried-over version comes from an uploaded `package.json`, so it is
@@ -77,7 +81,8 @@ def _render(template_name: str, subs: dict[str, str]) -> str:
 
 
 def _build_dependencies(
-    styling: str, navigation: str | None, source_deps: dict[str, str]
+    styling: str, navigation: str | None, source_deps: dict[str, str],
+    extra_packages: tuple[str, ...] = (),
 ) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     deps = dict(_BASE_DEPS)
     dev = dict(_BASE_DEV_DEPS)
@@ -123,9 +128,19 @@ def _build_dependencies(
         deps["expo-linking"] = "~7.0.0"
         deps["expo-constants"] = "~17.0.0"
 
-    for lib in _CARRY_OVER:
+    for lib in (*_CARRY_OVER, *extra_packages):
+        if lib in deps or lib in dev:
+            # The scaffold already pins this one to a version it knows works
+            # with the target SDK (react, react-native, tailwindcss…). A range
+            # from the uploaded package.json must never override that pin —
+            # `react: ^18.2.0` from a web project would quietly float off the
+            # version React Native 0.76 requires.
+            continue
         spec = source_deps.get(lib)
         if spec is None:
+            # Nothing to install it from. The project imports a package its own
+            # package.json never declared, so there is no version to carry; the
+            # unresolvable module says so at bundle time.
             continue
         safe = _safe_version(spec)
         # An unsafe spec (tarball / git / file) is never carried over. The
@@ -142,6 +157,7 @@ def generate_scaffold(
     answers: dict[str, str],
     source_dependencies: dict[str, str] | None = None,
     app_name: str = "Rejox App",
+    extra_packages: tuple[str, ...] = (),
 ) -> ScaffoldResult:
     """Render an Expo TS scaffold into ``out_dir`` from the answered questions.
 
@@ -150,6 +166,9 @@ def generate_scaffold(
         answers: questionId → optionId (e.g. ``{"styling-engine": "nativewind"}``).
         source_dependencies: the source project's deps, for carry-over versions.
         app_name: Human-facing app name.
+        extra_packages: source packages this project's emitted code needs on
+            top of the standard carry-over set (e.g. the package a lifted
+            root provider is imported from).
     """
     source_deps = source_dependencies or {}
     styling = answers.get("styling-engine", "stylesheet")
@@ -160,7 +179,9 @@ def generate_scaffold(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    deps, dev, overrides = _build_dependencies(styling, navigation, source_deps)
+    deps, dev, overrides = _build_dependencies(
+        styling, navigation, source_deps, extra_packages
+    )
     written: list[str] = []
 
     def write(rel: str, content: str) -> None:
@@ -189,7 +210,7 @@ def generate_scaffold(
     }))
 
     # tsconfig.json
-    includes = ["**/*.ts", "**/*.tsx"]
+    includes = ["**/*.ts", "**/*.tsx", "expo-env.d.ts"]
     if nativewind:
         includes.append("nativewind-env.d.ts")
     write("tsconfig.json", _render("tsconfig.json.tmpl", {
@@ -219,6 +240,10 @@ def generate_scaffold(
         "METRO_IMPORTS": metro_imports,
         "METRO_EXPORT": metro_export,
     }))
+
+    # Ambient types for static assets. Always written: the web shim that
+    # declared these (vite-env.d.ts) is deliberately never migrated.
+    write("expo-env.d.ts", _render("expo-env.d.ts.tmpl", {}))
 
     # NativeWind extras
     if nativewind:

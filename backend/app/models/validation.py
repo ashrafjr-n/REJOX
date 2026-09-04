@@ -119,8 +119,13 @@ class ValidatedScores(ValidationBase):
     # working, so this is the number directly comparable to the Analyzer's
     # area-weighted Coverage prediction. Always reported ALONGSIDE the strict
     # figure, never instead of it.
+    #
+    # It answers for the bundle as well as the compiler, so: None when the
+    # bundle did not run (not measured), 0 when it ran and FAILED — Metro stops
+    # at the first unresolved module, so the files it never reached have not
+    # been shown to bundle and must not be counted as if they had.
     workingCoverage: Optional[float] = Field(default=None, ge=0, le=100)
-    workingFileCount: int = 0       # units with no tsc/bundle error
+    workingFileCount: int = 0       # units that compiled AND bundled
     migratedFileCount: int          # units that migrated cleanly (no residue)
     residueFileCount: int           # units excluded from Confidence (residue)
     totalUnitCount: int

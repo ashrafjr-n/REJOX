@@ -127,3 +127,52 @@ def test_repair_ignores_unexplained_errors(tmp_path, monkeypatch) -> None:
     result = repair_project(tmp_path, emitted, _validation(False, [diag]), provider=provider)
     assert provider.sent == []  # never touched — unexplained errors aren't repaired
     assert "resolvable residue" in result.stoppedReason
+
+
+def test_malformed_llm_output_is_rejected_not_written(tmp_path, monkeypatch) -> None:
+    """The gate that was missing: a reply that does not parse must never land.
+
+    A real run against a public repo wrote the offline provider's placeholder
+    (`FAKE_RESPONSE[816f...]`) straight into two source files, because this was
+    the one path in the pipeline that wrote a code artifact without the syntax
+    check every other path performs. The provider is irrelevant — a real model
+    returning prose or a truncated line does exactly the same damage.
+    """
+    emitted = _emitted(tmp_path)
+    before = (tmp_path / "Broken.tsx").read_text()
+    diag = Diagnostic(source="typecheck", file="Broken.tsx", line=3, code="TS2304",
+                      message="Cannot find name 'BROKEN'.")
+    monkeypatch.setattr(repair_mod, "validate_project", lambda *a, **k: _validation(False))
+    provider = ScriptedProvider(["FAKE_RESPONSE[816f532cf5ff]"])
+
+    result = repair_project(
+        tmp_path, emitted, _validation(False, [diag]),
+        provider=provider, run_bundle=False,
+    )
+
+    assert (tmp_path / "Broken.tsx").read_text() == before  # file untouched
+    a: RepairAttempt = result.attempts[0]
+    assert a.applied is False
+    assert "syntax error" in a.rejectedReason
+    assert "syntax gate" in result.stoppedReason
+
+
+def test_markdown_fences_and_prose_are_stripped_before_the_gate(tmp_path, monkeypatch) -> None:
+    """The prompt asks for a bare line; belt-and-braces strips the wrappers."""
+    emitted = _emitted(tmp_path)
+    diag = Diagnostic(source="typecheck", file="Broken.tsx", line=3, code="TS2304",
+                      message="Cannot find name 'BROKEN'.")
+    monkeypatch.setattr(repair_mod, "validate_project", lambda *a, **k: _validation(True))
+    provider = ScriptedProvider(
+        ["Here is the corrected line:\n```tsx\n  <Pressable onPress={() => {}}>x</Pressable>\n```"]
+    )
+
+    result = repair_project(
+        tmp_path, emitted, _validation(False, [diag]),
+        provider=provider, run_bundle=False,
+    )
+
+    a: RepairAttempt = result.attempts[0]
+    assert a.received == "  <Pressable onPress={() => {}}>x</Pressable>"
+    assert a.applied is True
+    assert "BROKEN" not in (tmp_path / "Broken.tsx").read_text()
