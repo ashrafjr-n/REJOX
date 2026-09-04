@@ -31,7 +31,7 @@ pip install -e ".[dev]"
 # frontend
 cd ../frontend
 npm install
-cp .env.example .env             # sets VITE_API_URL=http://localhost:8000
+cp .env.example .env             # leaves VITE_API_URL empty — same origin
 ```
 
 **Run both services** (one command, from the repo root)
@@ -72,11 +72,12 @@ three flags `dev.sh` already exports. The signing secret is generated once into
 `backend/.env.dev-local` (gitignored) so a restart does not sign you out, and
 the invite code is overridable: `INVITE_CODE=something ./dev-local.sh`.
 
-It also forces `VITE_API_URL` empty. That matters: `frontend/.env.example` sets
-it to `http://localhost:8000`, which is a **different origin** from the app on
-`:5173` — and the `SameSite=Lax` session cookie is never sent cross-origin, so
+It also forces `VITE_API_URL` empty, belt to `.env.example`'s braces. Pointing
+it at `http://localhost:8000` makes it a **different origin** from the app on
+`:5173`, and the `SameSite=Lax` session cookie is never sent cross-origin — so
 sign-in appears to succeed and then silently never sticks. Same-origin through
-the Vite proxy is the only shape in which the cookie works.
+the Vite proxy is the only shape in which the cookie works, and `sign-in.spec.ts`
+fails loudly if that ever changes.
 
 The session cookie is `Secure`, so a browser will not send it back over plain
 `http` — `REJOX_COOKIE_INSECURE=1` drops that for local work. It is refused
@@ -94,8 +95,14 @@ npx playwright install chromium   # once
 npm run test:e2e                  # boots both servers, drives a full run
 ```
 
-The test uploads `test-projects/sample-app`, runs the analysis, and asserts the
-Coverage / Confidence / Risk shown on screen equal the live `/api/analyze`
+The stack it boots is **not anonymous**: invite codes are configured, so the
+browser authenticates with a session cookie exactly as it does in production.
+`sign-in.spec.ts` drives that gate by hand — gated when signed out, a wrong code
+refused, a valid one signing in and surviving a page reload — and the rest of the
+suite starts from a session established once by the `setup` project.
+
+The main test uploads `test-projects/sample-app`, runs the analysis, and asserts
+the Coverage / Confidence / Risk shown on screen equal the live `/api/analyze`
 response (and that the score contributions sum to Coverage). Screenshots of all
 three screens are written to `docs/screenshots/`.
 
