@@ -190,6 +190,23 @@ echo 'REJOX_DATA_DIR=/srv/rejox-data' >> .env
 # The worker needs the group that owns the Docker socket, or it cannot start a
 # sandbox container. On Docker Desktop the socket is root:root, so this is 0.
 echo "REJOX_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 0)" >> .env
+```
+
+**On Docker Desktop (macOS), the two lines above are different.** Both defaults
+are Linux ones and both fail there — see the 2026-09-05 entry in
+[`docs/PRE-LAUNCH-CHECKLIST.md`](docs/PRE-LAUNCH-CHECKLIST.md) for the evidence:
+
+```bash
+# /srv is not a shared path, and the chown is what breaks it: under VirtioFS the
+# host-side access check runs as the macOS user, so a root owned by 10001 is
+# unwritable by every uid in the container — root included. Leave it yours.
+sudo mkdir -p /Users/Shared/rejox-data
+sudo chown -R "$(id -u):$(id -g)" /Users/Shared/rejox-data
+echo 'REJOX_DATA_DIR=/Users/Shared/rejox-data' >> .env
+
+# `stat -f %g` (the macOS spelling) reads the SYMLINK, not the socket, and
+# answers 1. What counts is what the container sees: root:root 0660.
+echo 'REJOX_DOCKER_GID=0' >> .env
 
 docker compose up --build
 ```
@@ -277,6 +294,9 @@ compose file publishes a single fixed host port.
 REJOX_DATA_DIR=/srv/rejox-data \
 REJOX_DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)" \
   ./verify-deployment.sh
+
+# Docker Desktop / macOS — see the note under Deploying:
+#   REJOX_DATA_DIR=/Users/Shared/rejox-data REJOX_DOCKER_GID=0 ./verify-deployment.sh
 ```
 
 Stands the whole stack up and asserts what only a real run can: that the worker
