@@ -104,8 +104,23 @@ def _never_migrate(rel_path: str) -> Optional[str]:
         return "web build shim (references bundler types React Native does not have)"
     if _TEST_FILE_RE.search(name):
         return "test file (not the runtime app; its web testing libraries have no RN equivalent)"
+    if name.endswith(".module.css"):
+        return (
+            "web-only (a CSS Module is read at transform time and re-expressed "
+            "in the component that imports it)"
+        )
     if name.endswith(".css"):
-        return "web-only (global CSS is handled by the scaffold)"
+        # NOT "handled by the scaffold". The scaffold writes a global.css holding
+        # Tailwind's directives and nothing else, so every class this file
+        # defined — `.app`, `.black_btn`, whatever `@apply` composed — resolves
+        # to nothing under NativeWind. Saying the scaffold handles it is how a
+        # project's entire visual design goes missing behind a reassuring line.
+        return (
+            "web-only stylesheet — its rules are NOT carried over. The scaffold's "
+            "global.css holds Tailwind directives only, so any class this file "
+            "defined resolves to nothing in NativeWind and must be re-expressed "
+            "by hand"
+        )
     return None
 
 _TODO_RE = re.compile(r"REJOX-TODO\(([A-Z_]+)\)")
