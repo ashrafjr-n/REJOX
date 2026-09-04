@@ -26,3 +26,13 @@ Vite + plain JS + Redux Toolkit / RTK Query, **no router**.
   Still open here: emitted code's deps get dropped (Redux is wrongly labelled
   unsupported), the global-CSS `@apply` layer is lost, and the storage question
   is asked but never applied.
+
+### Re-test, same day — after the fixes
+
+Root component and providers held. With the UI finally reachable, three numbers
+turned out to be lying: carry-over shipped `react-redux` but not
+`@reduxjs/toolkit` (Metro dead on the first module), "compiles + bundles" rose
+33%→43% while Metro went PASS→FAIL, and "0 unmappable" was counting 13 of the
+project's own CSS classes as Tailwind. All four fixed. `import.meta.env` is now
+the only Metro blocker left — and that was three bugs in a row from a fixed list
+rather than from what the project actually shows.
