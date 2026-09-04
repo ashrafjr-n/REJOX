@@ -37,7 +37,7 @@ from app.ai.cache import ResolutionCache
 from app.ai.provider import LLMProvider
 from app.models.analysis import AnalysisReport, ConfidenceSource, RouteMapping
 from app.models.emission import EmittedFile, EmittedProject, SkippedFile
-from app.models.knowledge_graph import KnowledgeGraph
+from app.models.knowledge_graph import EntryPoint, KnowledgeGraph, RootProvider
 from app.models.plan import MigrationPlan
 from app.models.transformation import TransformResult
 from app.ai.navigation import build_navigator_spec, generate_navigator, unhoistable_screens
@@ -209,24 +209,169 @@ def _navigator_source(
     return generate_navigator(spec, routes, import_paths), todos
 
 
-def _app_source(has_navigator: bool, nativewind: bool, app_name: str) -> str:
-    css = 'import "./global.css";\n' if nativewind else ""
-    if has_navigator:
-        return (
-            css
-            + "import { AppNavigator } from './src/navigation/AppNavigator';\n\n"
-            + "export default function App() {\n"
-            + "  return <AppNavigator />;\n}\n"
+def _module_specifier(from_root: str, target_rel: str) -> str:
+    """Import specifier for ``target_rel`` as seen from the project root.
+
+    The root ``App.tsx`` sits one level above the emitted tree, so a file that
+    landed at ``src/services/store.ts`` is ``./src/services/store`` from there —
+    derived from where the file ACTUALLY landed, never from a directory
+    convention (the same rule ``_screen_import_paths`` follows).
+    """
+    del from_root
+    without_ext = str(Path(target_rel).with_suffix(""))
+    return f"./{without_ext}"
+
+
+def _entry_imports(
+    entry: Optional[EntryPoint],
+    emitted_paths: set[str],
+) -> tuple[list[str], list[str], list[RootProvider], list[str]]:
+    """Render the entry file's provider chain into import/declaration source.
+
+    Returns ``(imports, declarations, providers, todos)``. A provider whose
+    values cannot be carried over — the file that supplied one was skipped, or
+    the entry extractor could not resolve it — is NOT emitted with a dangling
+    import: it is dropped with a ``REJOX-TODO(ENTRY_PROVIDER)`` naming it, so a
+    lost provider is always visible rather than silently absent.
+    """
+    if entry is None or not entry.providers:
+        return [], [], [], []
+
+    unresolved: set[str] = {
+        b.local for b in entry.bindings if b.module is None and b.declaration is None
+    }
+    # A same-project value is only importable if its file reached the output.
+    binding_specifier: dict[str, str] = {}
+    for b in entry.bindings:
+        if b.module is None:
+            continue
+        if b.resolvedFile is None:
+            binding_specifier[b.local] = b.module  # a package: import as written
+            continue
+        landed = _target_rel(b.resolvedFile)
+        if landed not in emitted_paths:
+            unresolved.add(b.local)
+            continue
+        binding_specifier[b.local] = _module_specifier("App.tsx", landed)
+
+    providers: list[RootProvider] = []
+    todos: list[str] = []
+    kept_locals: set[str] = set()
+    for provider in entry.providers:
+        missing = sorted(set(provider.references) & unresolved)
+        if missing:
+            todos.append(
+                f"// REJOX-TODO(ENTRY_PROVIDER): <{provider.tag}> wrapped the app in "
+                f"{entry.file} but {', '.join(missing)} could not be carried over; "
+                f"re-add it here."
+            )
+            continue
+        providers.append(provider)
+        kept_locals.update(provider.references)
+
+    # Group the kept bindings back into one import per module, preserving the
+    # order the entry file declared them in.
+    by_module: dict[str, dict[str, list[str]]] = {}
+    order: list[str] = []
+    declarations: list[str] = []
+    for b in entry.bindings:
+        if b.local not in kept_locals:
+            continue
+        if b.declaration is not None:
+            declarations.append(b.declaration)
+            continue
+        specifier = binding_specifier.get(b.local)
+        if specifier is None:
+            continue
+        if specifier not in by_module:
+            by_module[specifier] = {"default": [], "named": []}
+            order.append(specifier)
+        slot = "default" if b.imported == "default" else "named"
+        name = b.local if slot == "default" else (
+            b.local if b.imported == b.local else f"{b.imported} as {b.local}"
         )
-    return (
-        css
-        + "import { Text, View } from 'react-native';\n\n"
-        + "export default function App() {\n"
-        + "  return (\n"
-        + '    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>\n'
-        + f"      <Text>{app_name}</Text>\n"
-        + "    </View>\n  );\n}\n"
-    )
+        by_module[specifier][slot].append(name)
+
+    imports: list[str] = []
+    for specifier in order:
+        parts = by_module[specifier]
+        clauses: list[str] = []
+        if parts["default"]:
+            clauses.append(parts["default"][0])
+        if parts["named"]:
+            clauses.append("{ " + ", ".join(sorted(set(parts["named"]))) + " }")
+        imports.append(f'import {", ".join(clauses)} from "{specifier}";')
+
+    return imports, declarations, providers, todos
+
+
+def _wrap_in_providers(element: str, providers: list[RootProvider]) -> str:
+    """Nest ``element`` inside the provider chain, outermost provider first."""
+    if not providers:
+        return f"    {element}\n"
+    lines: list[str] = []
+    indent = "    "
+    for provider in providers:
+        attrs = ("".join(f" {a}" for a in provider.attributes))
+        lines.append(f"{indent}<{provider.tag}{attrs}>")
+        indent += "  "
+    lines.append(f"{indent}{element}")
+    for provider in reversed(providers):
+        indent = indent[:-2]
+        lines.append(f"{indent}</{provider.tag}>")
+    return "\n".join(lines) + "\n"
+
+
+def _app_source(
+    *,
+    nativewind: bool,
+    app_name: str,
+    navigator: bool,
+    root_module: Optional[str],
+    entry: Optional[EntryPoint],
+    emitted_paths: set[str],
+) -> str:
+    """Generate the root ``App.tsx``.
+
+    It renders exactly one thing — the generated navigator, or the project's own
+    converted root component (``root_module``) — wrapped in whatever providers
+    the web entry file configured above it. Only a project that has neither (no
+    router AND no readable root component) falls back to the placeholder, and
+    that fallback is a genuinely empty project, not a lost one.
+    """
+    imports, declarations, providers, todos = _entry_imports(entry, emitted_paths)
+
+    head: list[str] = []
+    if nativewind:
+        head.append('import "./global.css";')
+
+    if navigator:
+        head.append("import { AppNavigator } from './src/navigation/AppNavigator';")
+        element = "<AppNavigator />"
+    elif root_module is not None:
+        head.append(f'import AppRoot from "{root_module}";')
+        element = "<AppRoot />"
+    else:
+        head.append("import { Text, View } from 'react-native';")
+        element = None
+
+    head.extend(imports)
+    body = "\n".join(head) + "\n"
+    if todos:
+        body += "\n" + "\n".join(todos) + "\n"
+    if declarations:
+        body += "\n" + "\n".join(declarations) + "\n"
+
+    if element is None:
+        inner = (
+            '    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>\n'
+            f"      <Text>{app_name}</Text>\n"
+            "    </View>\n"
+        )
+    else:
+        inner = _wrap_in_providers(element, providers)
+
+    return body + "\nexport default function App() {\n  return (\n" + inner + "  );\n}\n"
 
 
 # --- Emission ----------------------------------------------------------------
