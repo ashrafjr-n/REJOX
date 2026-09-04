@@ -56,17 +56,27 @@ controlled by `REJOX_CORS_ORIGINS` (default `http://localhost:5173,http://127.0.
 > lists both the guarantees and the known gaps.
 
 `dev.sh` runs anonymous on purpose — it is the fast path, and it never exercises
-sign-in. To work on the real session flow locally instead, skip `dev.sh` and set
-a credential by hand:
+sign-in. To work on the real session flow locally, use **`./dev-local.sh`**
+instead: same two services, one command, plus the three variables a session
+needs.
 
 ```bash
-export REJOX_INVITE_CODES=dev-code
-export REJOX_SESSION_SECRET="$(openssl rand -hex 32)"
-export REJOX_ALLOW_ANONYMOUS=1 REJOX_COOKIE_INSECURE=1   # both, see below
-export REJOX_ALLOW_UNSANDBOXED=1 REJOX_ALLOW_LOCAL_PATH=1
-(cd backend && uvicorn app.main:app --reload) &
-(cd frontend && npm run dev)
+chmod +x dev-local.sh
+./dev-local.sh          # then sign in at :5173 with  my-code-2026
 ```
+
+It sets `REJOX_INVITE_CODES` (unset, the server has no valid code and rejects
+every one), `REJOX_SESSION_SECRET` (unset, `/api/session` answers 503 — there is
+deliberately no baked-in default) and `REJOX_COOKIE_INSECURE=1`, on top of the
+three flags `dev.sh` already exports. The signing secret is generated once into
+`backend/.env.dev-local` (gitignored) so a restart does not sign you out, and
+the invite code is overridable: `INVITE_CODE=something ./dev-local.sh`.
+
+It also forces `VITE_API_URL` empty. That matters: `frontend/.env.example` sets
+it to `http://localhost:8000`, which is a **different origin** from the app on
+`:5173` — and the `SameSite=Lax` session cookie is never sent cross-origin, so
+sign-in appears to succeed and then silently never sticks. Same-origin through
+the Vite proxy is the only shape in which the cookie works.
 
 The session cookie is `Secure`, so a browser will not send it back over plain
 `http` — `REJOX_COOKIE_INSECURE=1` drops that for local work. It is refused
