@@ -31,7 +31,7 @@ import re
 import shutil
 from collections import Counter
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from app.ai.cache import ResolutionCache
 from app.ai.provider import LLMProvider
@@ -43,6 +43,7 @@ from app.models.transformation import TransformResult
 from app.ai.navigation import build_navigator_spec, generate_navigator, unhoistable_screens
 from app.pipeline.analyzer import analyze_graph
 from app.pipeline.resolve_apply import apply_resolutions
+from app.pipeline.rules.libraries import KNOWN_LIBRARIES
 from app.pipeline.scaffold import generate_scaffold
 from app.pipeline.transformer import (
     TransformerError,
@@ -220,6 +221,49 @@ def _module_specifier(from_root: str, target_rel: str) -> str:
     del from_root
     without_ext = str(Path(target_rel).with_suffix(""))
     return f"./{without_ext}"
+
+
+# Every way emitted TS/TSX names another module: `from "x"`, a side-effect
+# `import "x"`, `require("x")` and dynamic `import("x")`. Scanning the code that
+# was WRITTEN is the point — a dependency list derived from the source would
+# carry over what the transforms deliberately dropped, and miss nothing they
+# added.
+_MODULE_SPEC_RE = re.compile(
+    r"""(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bimport\s+)"""
+    r"""['"]([^'"\n]+)['"]"""
+)
+
+
+def _imported_packages(code: str) -> set[str]:
+    """The installable packages ``code`` imports.
+
+    Relative and absolute specifiers name files, not packages, and are ignored.
+    A deep import resolves to its package root, so
+    ``@reduxjs/toolkit/query/react`` asks for ``@reduxjs/toolkit``.
+    """
+    return {
+        _package_root(spec)
+        for spec in _MODULE_SPEC_RE.findall(code)
+        if not spec.startswith((".", "/"))
+    }
+
+
+def _carry_over_packages(codes: Iterable[str]) -> tuple[str, ...]:
+    """Packages the emitted code imports that the RN project must install.
+
+    A library the detector calls ``needs-conversion`` is REPLACED in React
+    Native (``react-dom`` by the RN renderer, ``react-router-dom`` by the
+    navigator, ``vite`` by Metro), so it is never installed. If such an import
+    somehow survived into the output, the unresolvable module is the honest
+    signal of a transform bug — installing the web package would hide it.
+    """
+    found: set[str] = set()
+    for code in codes:
+        found |= _imported_packages(code)
+    return tuple(sorted(
+        pkg for pkg in found
+        if KNOWN_LIBRARIES.get(pkg, {}).get("status") != "needs-conversion"
+    ))
 
 
 def _package_root(specifier: str) -> str:
@@ -463,22 +507,10 @@ def emit_project(
     # can't happen once report.routing required one, but keeps this total.
     app_source_file = regenerated.get("src/App", "src/App.tsx")
 
-    # 1. scaffold.
-    # A provider lifted out of the entry file imports its package; carrying the
-    # provider without carrying that package emits an unresolvable import.
-    scaffold = generate_scaffold(
-        out_dir, answers, kg.project.dependencies, app_name,
-        extra_packages=_provider_packages(kg.entry),
-    )
     files: list[EmittedFile] = []
-    for rel in scaffold.files:
-        files.append(
-            EmittedFile(
-                path=rel,
-                sourceFile=None,
-                provenance=ConfidenceSource.DETERMINISTIC_WARNING,  # generated shell
-            )
-        )
+    # The text of every file actually written, so the scaffold below can be
+    # built from what the output imports rather than from a guess.
+    emitted_code: list[str] = []
 
     # Worker options: answers (worker keys) + graph-derived routes/componentEvents.
     worker_answers = {
@@ -568,6 +600,8 @@ def emit_project(
                 # the transformer's own deterministic output.
                 provenance = ConfidenceSource.DETERMINISTIC
 
+        final_code = target.read_text()
+        emitted_code.append(final_code)
         files.append(
             EmittedFile(
                 path=target_rel,
@@ -575,7 +609,28 @@ def emit_project(
                 provenance=provenance,
                 warnings=result.warnings,
                 unhandled=remaining_unhandled,
-                todoCodes=_todo_codes(target.read_text()),
+                todoCodes=_todo_codes(final_code),
+            )
+        )
+
+    # 2b. scaffold — generated AFTER the transforms, on purpose. What the RN
+    # project must install is not knowable until the code that imports it
+    # exists: the emitted files are scanned for their own module specifiers, so
+    # a dependency is carried because the output USES it, never because it was
+    # on a list. A lifted provider's package is added alongside, since App.tsx
+    # is written further down and its imports are not on disk yet.
+    scaffold = generate_scaffold(
+        out_dir, answers, kg.project.dependencies, app_name,
+        extra_packages=tuple(sorted(
+            set(_carry_over_packages(emitted_code)) | set(_provider_packages(kg.entry))
+        )),
+    )
+    for rel in scaffold.files:
+        files.append(
+            EmittedFile(
+                path=rel,
+                sourceFile=None,
+                provenance=ConfidenceSource.DETERMINISTIC_WARNING,  # generated shell
             )
         )
 

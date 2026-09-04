@@ -37,9 +37,11 @@ _BASE_DEV_DEPS = {
     "@types/react": "~18.3.12",
     "typescript": "^5.3.3",
 }
-# Source deps that carry over unchanged when present. Callers add to this
-# per-project: a package a lifted root provider imports is not optional —
-# without it the provider is an unresolvable import, not a migration.
+# Source deps that carry over unchanged when present, whether or not the
+# emitted code happens to import them in a way we scanned. The real carry-over
+# is `extra_packages`, which the emitter derives from the module specifiers of
+# the files it actually wrote — a package is installed because the output uses
+# it, not because it was on a list.
 _CARRY_OVER = ("zustand", "axios")
 
 # A carried-over version comes from an uploaded `package.json`, so it is
@@ -127,8 +129,18 @@ def _build_dependencies(
         deps["expo-constants"] = "~17.0.0"
 
     for lib in (*_CARRY_OVER, *extra_packages):
+        if lib in deps or lib in dev:
+            # The scaffold already pins this one to a version it knows works
+            # with the target SDK (react, react-native, tailwindcss…). A range
+            # from the uploaded package.json must never override that pin —
+            # `react: ^18.2.0` from a web project would quietly float off the
+            # version React Native 0.76 requires.
+            continue
         spec = source_deps.get(lib)
         if spec is None:
+            # Nothing to install it from. The project imports a package its own
+            # package.json never declared, so there is no version to carry; the
+            # unresolvable module says so at bundle time.
             continue
         safe = _safe_version(spec)
         # An unsafe spec (tarball / git / file) is never carried over. The

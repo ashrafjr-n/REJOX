@@ -480,3 +480,51 @@ def test_provider_is_dropped_when_its_package_was_not_installed(
     assert "react-redux" not in app                  # no dangling import
     assert "<Provider store={store}>" not in app     # not in the rendered tree
     assert "REJOX-TODO(ENTRY_PROVIDER)" in app       # and never silently
+
+
+# --- Dependency carry-over: driven by what the output imports -----------------
+
+
+def _emitted_deps(emitted: EmittedProject) -> dict[str, str]:
+    import json as _json
+
+    return _json.loads((_out(emitted) / "package.json").read_text())["dependencies"]
+
+
+def test_a_package_the_emitted_code_imports_is_installed(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """The regression this exists for: carry-over used to lift only the package
+    a root provider imported, so `react-redux` shipped and `@reduxjs/toolkit`
+    — imported by src/services/store, the very first module the app loads —
+    did not. Metro fails on the first unresolvable module, so the whole app was
+    dead on a dependency list that looked fine."""
+    deps = _emitted_deps(emitted_no_router)
+    store = (_out(emitted_no_router) / "src" / "services" / "store.ts").read_text()
+
+    assert "@reduxjs/toolkit" in store       # the output really does import it
+    assert "@reduxjs/toolkit" in deps        # …so it must be installed
+    assert deps["@reduxjs/toolkit"] == "^1.9.3"   # at the source's own version
+    assert "react-redux" in deps             # the provider's package, still
+
+
+def test_a_replaced_web_package_is_never_installed(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """react-dom is in the source dependencies and is REPLACED in RN, not
+    carried. Installing it because some import survived would hide the
+    transform bug that let it survive."""
+    deps = _emitted_deps(emitted_no_router)
+    assert "react-dom" not in deps
+    assert "vite" not in deps
+
+
+def test_the_scaffold_pin_beats_the_sources_range(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """`react` is imported by nearly every emitted file, so carry-over now sees
+    it. It must not overwrite the version the scaffold pinned for this Expo
+    SDK — the source says ^18.2.0, which is not what RN 0.76 requires."""
+    deps = _emitted_deps(emitted_no_router)
+    assert deps["react"] == "18.3.1"
+    assert deps["react-native"] == "0.76.5"
