@@ -72,6 +72,9 @@ self-checks that its output is syntactically valid TS before emitting.
 | `flex` with no direction → append `flex-row`    | web defaults to row, RN to column — direction made explicit | ✅ High / automated |
 | Inject `import { … } from 'react-native'` / `'@react-navigation/native'` | for everything actually used | ✅ High / automated |
 | Drop `react-dom` imports                        | import removal                                       | ✅ High / automated |
+| Root component (`src/App.*`) in a project with **no router** → converted like any other component into `src/App.tsx`; the root `App.tsx` is a generated shell that renders it | root-component conversion (a router-less App is the app's real UI, not router wiring) | ✅ High / automated |
+| `createRoot(…).render(<P a={a}><App/></P>)` / `ReactDOM.render(…)` → the provider chain is lifted into the generated root `App.tsx`, with the values it reads (imports + top-level declarations of the entry file) carried across | entry-point provider lift; `createRoot`/`document.getElementById`/`react-dom` have no RN equivalent and are dropped, the app-level configuration they wrapped is not | ✅ High / automated |
+| `<StrictMode>` / `<React.Fragment>` / `<BrowserRouter>`… wrapping the root | dropped from the lifted chain — a stateless wrapper carries no app configuration, and a router provider is subsumed by the generated navigator | ✅ High / automated |
 
 **The honest residue (`unhandled` → AI Resolution Engine)** — only what
 genuinely requires judgment; every item also leaves a `// REJOX-TODO(<CODE>)`
