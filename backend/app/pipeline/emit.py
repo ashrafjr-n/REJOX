@@ -125,6 +125,15 @@ def _never_migrate(rel_path: str) -> Optional[str]:
 
 _TODO_RE = re.compile(r"REJOX-TODO\(([A-Z_]+)\)")
 
+# The provider chain and the declarations it reads are carried over as the entry
+# file's own SOURCE TEXT — the one thing in the output that never passes through
+# the codemod-worker. `import.meta` is the one construct where that matters: it
+# is a Vite build-time feature Metro refuses to bundle at all, so one lifted
+# attribute carrying it costs the whole app. The codemod rewrites it everywhere
+# it can reach (see the BUILD_ENV rows in docs/CONVERSION-RULES.md); here, where
+# it cannot, the value is dropped with a TODO naming it rather than smuggled in.
+_IMPORT_META_RE = re.compile(r"\bimport\s*\.\s*meta\b")
+
 
 # --- Path mapping ------------------------------------------------------------
 
@@ -310,6 +319,14 @@ def _entry_imports(
     unresolved: set[str] = {
         b.local for b in entry.bindings if b.module is None and b.declaration is None
     }
+    # A declaration is spliced into App.tsx verbatim; one holding `import.meta`
+    # would be the only unbundleable line in the project.
+    build_time: set[str] = {
+        b.local
+        for b in entry.bindings
+        if b.declaration is not None and _IMPORT_META_RE.search(b.declaration)
+    }
+    unresolved |= build_time
     # A same-project value is only importable if its file reached the output.
     binding_specifier: dict[str, str] = {}
     for b in entry.bindings:
@@ -335,8 +352,23 @@ def _entry_imports(
     todos: list[str] = []
     kept_locals: set[str] = set()
     for provider in entry.providers:
+        if any(_IMPORT_META_RE.search(a) for a in provider.attributes):
+            todos.append(
+                f"// REJOX-TODO(BUILD_ENV): <{provider.tag}> wrapped the app in "
+                f"{entry.file} but is configured from import.meta.env, which Metro "
+                f"cannot bundle; re-add it here reading process.env.EXPO_PUBLIC_*."
+            )
+            continue
         missing = sorted(set(provider.references) & unresolved)
         if missing:
+            if set(missing) & build_time:
+                todos.append(
+                    f"// REJOX-TODO(BUILD_ENV): <{provider.tag}> wrapped the app in "
+                    f"{entry.file} but {', '.join(missing)} is built from "
+                    f"import.meta.env, which Metro cannot bundle; re-add it here "
+                    f"reading process.env.EXPO_PUBLIC_*."
+                )
+                continue
             todos.append(
                 f"// REJOX-TODO(ENTRY_PROVIDER): <{provider.tag}> wrapped the app in "
                 f"{entry.file} but {', '.join(missing)} could not be carried over; "
