@@ -6,7 +6,7 @@
  * Resolution Engine residue). The transform order matters:
  *
  *   navigation → events → attributes → elements → images → text → styles
- *   → propsTypes → imports → TODO header
+ *   → propsTypes → env → imports → TODO header
  *
  *   - navigation runs first, while <Link>/<NavLink>/useParams are intact;
  *   - events run while host tags are still lowercase, so only graph-proven
@@ -15,6 +15,8 @@
  *     attribute has to go while its tag still says which ones those are;
  *   - images run after elements (img is already <Image>);
  *   - text-wrapping runs after element renames so parent tags are already RN;
+ *   - env touches no JSX at all; it runs beside imports because both are about
+ *     what the module reaches for outside itself.
  *   - imports run last, over the fully-transformed file.
  */
 
@@ -29,6 +31,7 @@ import { transformImages } from './transforms/images';
 import { transformText } from './transforms/text';
 import { transformStyles } from './transforms/styles';
 import { transformPropsTypes } from './transforms/propsTypes';
+import { transformEnv } from './transforms/env';
 import { transformImports } from './transforms/imports';
 
 function newProject(): Project {
@@ -91,6 +94,7 @@ export function convert(
   transformText(sf, ctx);
   transformStyles(sf, ctx);
   transformPropsTypes(sf, ctx);
+  transformEnv(sf, ctx);
   transformImports(sf, ctx);
   withTodoHeader(sf, ctx);
 
