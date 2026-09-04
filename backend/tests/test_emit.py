@@ -362,3 +362,90 @@ def test_web_only_and_build_only_files_never_reach_the_rn_project(
 
     # And none of them landed in the tree under any name.
     assert not any("vite-env" in p or ".test." in p for p in emitted_paths)
+
+
+# --- Router-less projects: the root component and its providers --------------
+
+NO_ROUTER_SRC_ROOT = REPO_ROOT / "test-projects" / "no-router-app"
+
+
+@pytest.fixture(scope="module")
+def emitted_no_router(tmp_path_factory: pytest.TempPathFactory) -> EmittedProject:
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    kg = build_knowledge_graph(NO_ROUTER_SRC_ROOT)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-no-router")
+    return emit_project(
+        plan, ANSWERS, kg, out, report=report, source_root=NO_ROUTER_SRC_ROOT
+    )
+
+
+def test_router_less_root_component_is_converted_not_replaced(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """The regression: with no router to subsume it, ``src/App.jsx`` was
+    regenerated as a placeholder — so the project's entire UI (and every
+    component it rendered) was emitted but never reachable, while the report
+    still claimed App.tsx came from src/App.jsx."""
+    out = _out(emitted_no_router)
+    converted = {f.sourceFile for f in emitted_no_router.files if f.sourceFile}
+    assert "src/App.jsx" in converted
+
+    root = (out / "src" / "App.tsx").read_text()
+    # It is the real component, converted — not a stub.
+    assert "Header" in root and "Counter" in root
+    assert "<View" in root  # <main>/<div> converted by rule
+
+
+def test_router_less_app_shell_renders_the_converted_root(
+    emitted_no_router: EmittedProject,
+) -> None:
+    app = (_out(emitted_no_router) / "App.tsx").read_text()
+    assert './src/App' in app
+    assert "<AppRoot />" in app
+    assert "scaffold ready" not in app
+
+
+def test_entry_providers_are_lifted_into_the_app_root(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """main.jsx is never emitted, so the <Provider store={store}> it wrapped the
+    app in has to be rebuilt above the RN root — otherwise every hook that reads
+    the store throws at runtime."""
+    app = (_out(emitted_no_router) / "App.tsx").read_text()
+    assert "<Provider store={store}>" in app
+    assert 'from "react-redux"' in app
+    # Imported from where the store actually landed, not a guessed path.
+    assert 'from "./src/services/store"' in app
+    assert (_out(emitted_no_router) / "src" / "services" / "store.ts").is_file()
+
+
+def test_stateless_and_router_wrappers_are_not_lifted(
+    emitted_no_router: EmittedProject,
+) -> None:
+    app = (_out(emitted_no_router) / "App.tsx").read_text()
+    assert "StrictMode" not in app
+
+
+def test_entry_file_is_accounted_for_as_skipped(
+    emitted_no_router: EmittedProject,
+) -> None:
+    """A source file must never simply vanish from the migration's accounting:
+    src/main.jsx is deliberately not emitted, so it has to appear as skipped
+    with the reason — and say what was lifted out of it."""
+    skipped = {s.path: s.reason for s in emitted_no_router.skipped}
+    assert "src/main.jsx" in skipped
+    assert "lifted into App.tsx" in skipped["src/main.jsx"]
+
+
+def test_routed_project_still_wires_the_navigator(emitted_js: EmittedProject) -> None:
+    """The router-less path must not change the routed one: there, src/App is
+    router wiring and the generated navigator does subsume it."""
+    app = (_out(emitted_js) / "App.tsx").read_text()
+    assert "<AppNavigator />" in app
+    converted = {f.sourceFile for f in emitted_js.files if f.sourceFile}
+    assert "src/App.jsx" not in [f.path for f in emitted_js.files]
+    assert "src/main.jsx" in {s.path for s in emitted_js.skipped}
+    del converted
