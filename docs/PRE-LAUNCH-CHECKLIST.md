@@ -106,23 +106,56 @@ typecheck diagnostics alone). By the table above that re-reds **A8, A9** and
   a live daemon (9 passed, Docker Desktop 29.6.2), but that runs as a process ON
   the host, where the sibling-container path mismatch A1 exists to catch cannot
   occur — so it is not evidence for A1, and it covers neither B3 nor the compose
-  geometry. Re-earn them with `./verify-deployment.sh`, which needs
-  `sudo mkdir -p /srv/rejox-data && sudo chown -R 10001:10001 /srv/rejox-data`
-  on this host. The validator change is confined to `validated_scores()`, a pure
+  geometry. Re-earn them with `./verify-deployment.sh`, which needs a
+  workspace root the containers can write: `sudo mkdir -p /srv/rejox-data &&
+  sudo chown -R 10001:10001 /srv/rejox-data` on Linux, but **owned by the macOS
+  user** on Docker Desktop — see the 2026-09-05 entry below, where that chown is
+  what broke it. The validator change is confined to `validated_scores()`, a pure
   function over an already-produced ValidationResult — but reading that is not
   evidence either, which is the whole point of this file.
+
+Re-run 2026-09-05 against the same host, commit `6daedb5`, by
+`./verify-deployment.sh`: **every gate that script covers passed in one pass —
+Preflight, B0, A0, A1, B1, Fixture, B2, B3, A8, A9, C3, B5, C2** ("All
+deployment gates passed", exit 0). That re-earns **A1 and B3**, red since the
+2026-09-04 validator.py change. **A4 stays `⟲ re-red`**: it is not one of the
+gates this script covers, and nothing else has run it since.
+
+That run took two attempts, and both failures were operator traps specific to
+**Docker Desktop on macOS** — worth recording because this repo's own
+instructions point straight at them:
+
+- **`REJOX_DOCKER_GID` must be `0`.** The hint here and in the README is
+  `stat -c '%g'` (GNU). The macOS reflex, `stat -f %g /var/run/docker.sock`,
+  returns `1` — it reads the *symlink* (root:daemon), not the socket, and the
+  socket's host-side group (`staff`, 20) would be wrong too. Only what the
+  container sees counts: root:root 0660 → gid **0**. Proof is under A0. Note
+  that a shell `export` overrides `.env` in compose interpolation, so a derived
+  value can silently replace the correct configured one.
+- **Do NOT `chown 10001:10001` the workspace root on Docker Desktop.** That
+  instruction (top of `docker-compose.yml`, the README, and the A1/A4/B3 note
+  above) is Linux-only. Under VirtioFS the bind mount is *displayed* inside the
+  container as owned by the container's uid — always, whatever is on disk — so
+  `stat` inside the container reassures you while the real check happens on the
+  macOS side as the Docker Desktop user (uid 501). A root owned by 10001 mode
+  755 is unwritable by uid 10001, by 501, **and by root** in the container; a
+  root owned by 501 works, and files land as 10001. It surfaces as
+  `PermissionError: [Errno 13] Permission denied: '<data dir>/workspaces'` in
+  the api container. On macOS, leave the workspace root owned by the macOS user.
 
 **E0 and E1 are signed green for the first time.** E0 had been red twice — a
 silence, then a `Job OK` line for a job that had failed — and both cases are now
 explained from the retained logs alone. E1 had no bound at all; it now has one,
-and a documented answer to what a full disk does. Sections **A, B, C and D are signed in full, and E is signed except E2**, which
-needs real LLM spend and is a budget decision rather than an engineering one.
+and a documented answer to what a full disk does. Sections **B, C and D are signed in full; A is signed except A4** (re-red by the
+2026-09-04 validator.py change and not covered by `./verify-deployment.sh`), **and
+E is signed except E2**, which needs real LLM spend and is a budget decision
+rather than an engineering one.
 
 D0 and D1 were signed last, on 2026-09-03, when required status checks were
 turned on for `master`. That was deferred deliberately rather than forgotten:
 requiring the checks also stops direct pushes, so it changes how the repository
 is worked in day to day, and it was left until the engineering it guards was
-finished. **28 of 29 gates are signed.**
+finished. **27 of 29 gates are signed** — A4 and E2 are the two that are not.
 
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
@@ -130,28 +163,28 @@ signature below carries the output it came from.
 
 | Gate | Proves | Status |
 | --- | --- | --- |
-| A0 | the worker can reach a Docker daemon at all | ☑ signed — RED first (socket permission), fixed |
-| A1 | a sandboxed command runs, in the right directory | ☑ signed — canary read back, negative control refused |
+| A0 | the worker can reach a Docker daemon at all | ☑ signed — RED first (socket permission), fixed; re-signed 2026-09-05 (verify-deployment pass) |
+| A1 | a sandboxed command runs, in the right directory | ☑ signed — canary read back, negative control refused; re-signed 2026-09-05 (verify-deployment pass) |
 | A2 | the container is non-root and holds no capabilities | ☑ signed |
 | A3 | only the run directory is writable | ☑ signed |
-| A4 | network is off for stages that did not ask for it | ☑ signed |
+| A4 | network is off for stages that did not ask for it | ⟲ re-red 2026-09-04 (validator.py) — not covered by `./verify-deployment.sh`, so the 2026-09-05 pass does not re-earn it |
 | A5 | the pid ceiling stops a fork storm | ☑ signed |
 | A6 | the memory ceiling is real, and the host survives it | ☑ signed — see the timeout note |
 | A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
-| A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped |
-| A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped |
-| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
-| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
-| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
-| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
+| A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped; re-signed 2026-09-05 (verify-deployment pass) |
+| A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped; re-signed 2026-09-05 (verify-deployment pass) |
+| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
+| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
+| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
+| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
 | B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker; re-signed 2026-09-03 (session pass) |
-| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass) |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
 | B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2); re-signed 2026-09-03 (session pass) |
 | B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G; re-signed 2026-09-03 (session pass) |
 | C0 | a server with no keys refuses to serve | ☑ signed — re-signed 2026-09-03; refuses only when BOTH credentials are absent |
 | C1 | a wrong key is rejected | ☑ signed — re-signed 2026-09-03; bad key, forged cookie and bad invite code all 401 |
-| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass) |
-| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3) |
+| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
+| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3); re-signed 2026-09-05 (verify-deployment pass) |
 | C4 | CORS is never a wildcard | ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin |
 | C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03 |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ☑ signed — green in CI ×3, and required on master 2026-09-03 |
@@ -229,6 +262,41 @@ the compose deployment as written could never start a sandbox container — on
 any host, not just this one. Fixed by giving the worker the socket's group
 (`group_add: ["${REJOX_DOCKER_GID}"]`, commit fced909) rather than running it
 as root. Re-run above is green.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+A0 — the worker can reach a Docker daemon
+  PASS  daemon reachable from the worker — 29.6.2
+
+OPERATOR TRAP, found the hard way on this host before the run above. The gate
+went red a second time, and not from a code change:
+
+    permission denied while trying to connect to the docker API at
+    unix:///var/run/docker.sock
+
+The command hint in this file and in the README is `stat -c '%g'`, which is GNU.
+On macOS the reflex is `stat -f %g /var/run/docker.sock` — and that returns 1,
+because /var/run/docker.sock is a SYMLINK (root:daemon) to
+~/.docker/run/docker.sock, so it reads the link, not the socket. Even the real
+socket is the wrong answer: it is `staff` (20) on the host side. What decides
+access is what the CONTAINER sees, and that is root:root 0660:
+
+$ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock alpine \
+    stat -c "uid=%u gid=%g mode=%a" /var/run/docker.sock
+uid=0 gid=0 mode=660
+
+$ docker run --rm --user 10001 --group-add 1  ... docker version
+permission denied while trying to connect to the docker API at unix:///var/run/docker.sock
+$ docker run --rm --user 10001 --group-add 0  ... docker version
+29.6.2
+
+So on Docker Desktop REJOX_DOCKER_GID is **0**, as .env.example and the
+docker-compose.yml comment already say. Note also that a shell `export`
+OVERRIDES .env in compose interpolation, so exporting a derived value can
+replace a correct configured one — which is exactly what happened here.
 ```
 
 ---
@@ -282,6 +350,14 @@ not (/tmp/worker-only-dir), to prove the green above means something:
 
 Without the check that call would have mounted a new empty directory and every
 stage would have validated nothing while reporting success.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+A1 — the sandbox is handed the real run directory
+  PASS  canary read back through the mount — canary-a1
 ```
 
 ---
@@ -568,6 +644,18 @@ clean
 
 The wider carry-over reaches more of the uploaded package.json than before, and
 still reaches none of its scripts.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+Fixture — sample-app carrying a hostile postinstall and a URL dependency
+  PASS  built  44K
+
+A8 — the uploaded project's npm scripts never reach the output
+  PASS  hostile postinstall occurrences — 0
+  PASS  emitted scripts — android ios start web
 ```
 
 ---
@@ -656,6 +744,15 @@ clean
 `@reduxjs/toolkit` was dropped despite being imported — the emitted code asking
 for a package does not lift the version filter — and `evil-pkg` never appeared.
 Every survivor is a plain semver range.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+A9 — a non-registry dependency spec never reaches npm install
+  PASS  url-ish dependency specs — 0
+  PASS  evil-pkg carried over — 
 ```
 
 ---
@@ -726,6 +823,17 @@ worker    Up
 
 Still running, RESTARTS 0, after ~40 minutes of gate work including three full
 migrations, an API restart and a deliberate worker kill.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+B0 — all three services come up and stay up
+  PASS  health — {"status":"ok"}
+  PASS  redis is running — running
+  PASS  api is running — running
+  PASS  worker is running — running
 ```
 
 ---
@@ -768,6 +876,14 @@ rq:worker:4e77d2a87f544af59d24b8fa146e9c5a
 `rq:queue:rejox-migrations` did not exist at this point and that is correct —
 RQ creates the key on first enqueue. After B2 the queue and registry keys
 (rq:wip:…, rq:finished:…, rq:job:…) were all present.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+B1 — the worker is registered with Redis
+  PASS  1 worker(s) registered
 ```
 
 ---
@@ -859,6 +975,17 @@ answered from its own stale copy forever while the worker advanced job.json.
 Every client (the UI's SSE stream included) would have hung on "queued" through
 a migration that had already finished. Fixed in commit c5e318d: only the process
 executing a job keeps a memory copy. Re-read after the fix is the output above.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+B2 — a full migration completes through the queue
+  PASS  uploaded — runId 44b59c7ef6374e36843eafdc61babf8b
+  PASS  enqueued — jobId 90873de32bc742eb8859cddfbb922122
+  PASS  migration status — succeeded
+  PASS  a sibling sandbox container was observed on the host during the run
 ```
 
 ---
@@ -907,6 +1034,16 @@ $ unzip -p out.zip package.json | jq '{name, main, ndeps:(.dependencies|keys|len
 
 Also checked: the mount probe left nothing behind —
 `unzip -l out.zip | grep -c 'rejox-mount-probe'` → 0.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+B3 — the emitted project is downloadable and real
+  PASS  download — 200
+  PASS  42 files in the archive
+  PASS  no mount probe leaked into the artifact — 0
 ```
 
 ---
@@ -1092,6 +1229,17 @@ $ docker ps --format '{{.Image}}' | grep -c node
 
 Well under the 15s bound (DNS resolution fails immediately inside the compose
 network). Nothing started anyway: no silent fallback to an in-process thread.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+B5 — a dead queue is a clean 503, never an in-process fallback
+  PASS  status with Redis down — 503
+  PASS  answered in 0s (must not hang)
+  PASS  the body names Redis: {"detail":"Rate-limit store at redis://redis:6379/0 is unreachable: Error -2 connecting to redis:6379. Name or service n
+  PASS  the queue itself refuses, never a thread fallback — QUEUE-REFUSED
 ```
 
 ---
@@ -1529,6 +1677,16 @@ Standing coverage: backend/tests/test_rate_limit_shared.py runs the same
 scenario against a live Redis, with the memory store asserted as the negative
 control (two limiters, 2x the ceiling) so a silent fallback to per-process
 counting fails the suite. CI runs it with a Redis service.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+C2 — the rate limit is shared across API replicas
+  PASS  API replicas running — 2
+  PASS  requests allowed across 2 replicas (limit 10) — 10
+  PASS  both replicas served (5 via :8000, 5 via :8001)
 ```
 
 ---
@@ -1637,6 +1795,21 @@ A second identity downloaded another identity's source code and read its job.
 The only thing standing between a run and any authenticated caller is that
 runIds are uuid4 — and a runId travels in URLs, browser history, proxy access
 logs and support tickets. Unblocks with plan step 7.
+
+Re-signed: 2026-09-05 — Ashraf — commit 6daedb5 — one ./verify-deployment.sh
+pass (Docker Desktop 29.6.2, macOS; REJOX_DATA_DIR=/private/tmp/rejox-data,
+REJOX_DOCKER_GID=0). Re-earns what the 2026-09-04 validator.py change re-red.
+
+$ ./verify-deployment.sh
+C3 — a run belongs to one identity and no other
+  PASS  download as the owner — 200
+  PASS  download as a stranger — 404
+  PASS  job as a stranger — 404
+  PASS  event stream as a stranger — 404
+  PASS  plan as a stranger — 404
+  PASS  a run that does not exist — No such run: 00000000000000000000000000000000
+  PASS  the two messages have the same shape — No such run: 44b59c7ef6374e36843eafdc61babf8b
+  PASS  local-path mode is refused — 403
 ```
 
 ---
