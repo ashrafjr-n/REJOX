@@ -75,6 +75,8 @@ self-checks that its output is syntactically valid TS before emitting.
 | Root component (`src/App.*`) in a project with **no router** → converted like any other component into `src/App.tsx`; the root `App.tsx` is a generated shell that renders it | root-component conversion (a router-less App is the app's real UI, not router wiring) | ✅ High / automated |
 | `createRoot(…).render(<P a={a}><App/></P>)` / `ReactDOM.render(…)` → the provider chain is lifted into the generated root `App.tsx`, with the values it reads (imports + top-level declarations of the entry file) carried across | entry-point provider lift; `createRoot`/`document.getElementById`/`react-dom` have no RN equivalent and are dropped, the app-level configuration they wrapped is not | ✅ High / automated |
 | `<StrictMode>` / `<React.Fragment>` / `<BrowserRouter>`… wrapping the root | dropped from the lifted chain — a stateless wrapper carries no app configuration, and a router provider is subsumed by the generated navigator | ✅ High / automated |
+| `import './App.css'` (a plain, non-module stylesheet) → dropped (+ `GLOBAL_CSS` unhandled) | import removal — RN has no stylesheet imports at all, and the file is never emitted; the TODO names the stylesheet so the loss is visible at the call site rather than only in the skip list | ✅ High / automated |
+| A package a lifted root provider imports (`react-redux`, `@tanstack/react-query`, …) → carried into the scaffold's `package.json` | dependency carry-over (a provider whose package is absent is not carried over, it is an unresolvable import) | ✅ High / automated |
 
 **The honest residue (`unhandled` → AI Resolution Engine)** — only what
 genuinely requires judgment; every item also leaves a `// REJOX-TODO(<CODE>)`
