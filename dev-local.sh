@@ -77,10 +77,10 @@ if [ ! -d node_modules ]; then
 fi
 
 # Force the app to talk to the API on its OWN origin, through the Vite proxy.
-# The session cookie is SameSite=Lax, so a cross-origin VITE_API_URL (which is
-# exactly what .env.example sets) means the browser never sends it and sign-in
-# silently never sticks. A shell variable outrules frontend/.env, so this holds
-# whatever that file happens to say.
+# The session cookie is SameSite=Lax, so a cross-origin VITE_API_URL means the
+# browser never sends it and sign-in silently never sticks. frontend/.env.example
+# leaves it empty for exactly that reason; this export is the belt to that
+# braces, because a shell variable outrules frontend/.env whatever it says.
 export VITE_API_URL=
 
 echo ">> frontend → http://localhost:5173"
