@@ -482,6 +482,79 @@ def test_provider_is_dropped_when_its_package_was_not_installed(
     assert "REJOX-TODO(ENTRY_PROVIDER)" in app       # and never silently
 
 
+def test_provider_configured_from_import_meta_is_dropped_not_smuggled_in(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """The provider chain is the one part of the output that is carried over as
+    the entry file's own source text, never through the codemod-worker. A lifted
+    attribute reading `import.meta.env` would therefore land in App.tsx exactly
+    as written — and Metro refuses to bundle a file containing `import.meta` at
+    all, so that one attribute costs the entire app, not one value."""
+    import shutil
+
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    src = tmp_path_factory.mktemp("vite-env") / "app"
+    shutil.copytree(NO_ROUTER_SRC_ROOT, src)
+    main = src / "src" / "main.jsx"
+    main.write_text(
+        main.read_text().replace(
+            "<Provider store={store}>",
+            "<Provider store={store} basename={import.meta.env.VITE_BASE}>",
+        )
+    )
+
+    kg = build_knowledge_graph(src)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-vite-env")
+    emit_project(plan, ANSWERS, kg, out, report=report, source_root=src)
+
+    app = (out / "App.tsx").read_text()
+    statements = "\n".join(
+        l for l in app.splitlines() if not l.lstrip().startswith("//")
+    )
+    assert "import.meta" not in statements
+    assert "<Provider" not in statements       # dropped rather than smuggled in
+    assert "REJOX-TODO(BUILD_ENV)" in app      # and never silently
+
+
+def test_declaration_built_from_import_meta_is_not_lifted_either(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Same seam, other half: a provider's value can be a top-level declaration
+    of the entry file, and those are spliced into App.tsx as source text too."""
+    import shutil
+
+    from app.pipeline.intelligence import build_knowledge_graph
+
+    src = tmp_path_factory.mktemp("vite-env-decl") / "app"
+    shutil.copytree(NO_ROUTER_SRC_ROOT, src)
+    main = src / "src" / "main.jsx"
+    main.write_text(
+        main.read_text()
+        .replace(
+            "ReactDOM.createRoot(",
+            "const cfg = { base: import.meta.env.VITE_BASE }\n\nReactDOM.createRoot(",
+        )
+        .replace("<Provider store={store}>", "<Provider store={store} cfg={cfg}>")
+    )
+
+    kg = build_knowledge_graph(src)
+    report = analyze_graph(kg)
+    plan = plan_migration(report, kg)
+    out = tmp_path_factory.mktemp("emit-vite-env-decl")
+    emit_project(plan, ANSWERS, kg, out, report=report, source_root=src)
+
+    app = (out / "App.tsx").read_text()
+    statements = "\n".join(
+        l for l in app.splitlines() if not l.lstrip().startswith("//")
+    )
+    assert "import.meta" not in statements
+    assert "cfg" not in statements
+    assert "REJOX-TODO(BUILD_ENV)" in app
+
+
 # --- Dependency carry-over: driven by what the output imports -----------------
 
 
