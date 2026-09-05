@@ -44,6 +44,23 @@ _BASE_DEV_DEPS = {
 # it, not because it was on a list.
 _CARRY_OVER = ("zustand", "axios")
 
+# Packages REJOX ITSELF introduces — the transforms emit an import for one, so
+# the output depends on a package that appears in no uploaded package.json.
+# Carry-over cannot supply these: it reads the version off the source project,
+# and a web project has never heard of AsyncStorage. Without an explicit pin the
+# import resolves to nothing and Metro fails on it, so the pin lives here, next
+# to the SDK versions it has to agree with.
+_REJOX_INTRODUCED = {
+    # Expo SDK 52's own bundled version (expo/bundledNativeModules.json), not a
+    # guess — this is the one `expo install` would pick.
+    "@react-native-async-storage/async-storage": "1.23.1",
+    # MMKV is not an Expo module, so there is no bundled pin to inherit. The 2.x
+    # line is deliberate: 3.x requires react-native-nitro-modules as a peer, so
+    # answering "mmkv" would silently pull in a SECOND native package. 2.x runs
+    # on both architectures with one.
+    "react-native-mmkv": "^2.12.2",
+}
+
 # A carried-over version comes from an uploaded `package.json`, so it is
 # untrusted input, not a constant. npm accepts far more than semver in that
 # position — `https://…/x.tgz`, `git+ssh://…`, `file:../../` — each of which
@@ -135,6 +152,12 @@ def _build_dependencies(
             # from the uploaded package.json must never override that pin —
             # `react: ^18.2.0` from a web project would quietly float off the
             # version React Native 0.76 requires.
+            continue
+        pinned = _REJOX_INTRODUCED.get(lib)
+        if pinned is not None:
+            # Ours, not the uploader's: the source project never declared it,
+            # so there is nothing to carry over and nothing to distrust.
+            deps[lib] = pinned
             continue
         spec = source_deps.get(lib)
         if spec is None:
