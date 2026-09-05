@@ -22,7 +22,7 @@
  * site. Listing them here too would report every one of them twice.
  */
 
-import { SyntaxKind, type SourceFile } from 'ts-morph';
+import { Node, SyntaxKind, type SourceFile } from 'ts-morph';
 import type { Ctx } from '../types';
 import {
   GLOBAL_HOSTS,
@@ -87,12 +87,33 @@ const WEB_GLOBALS: Record<string, GlobalRule> = {
   },
 };
 
+/** Globals another rule reports better — never named twice for one fix. */
+const OWNED_ELSEWHERE = new Set(['localStorage', 'sessionStorage']);
+
+/**
+ * Is this a global host standing in front of another global we already report?
+ *
+ * `window.location.pathname` is ONE thing to fix, and naming both halves of it
+ * produced two TODOs for one edit. The inner, more specific global wins;
+ * `window` steps aside. It also steps aside for `window.localStorage`, which
+ * the storage rule describes far better than this list can.
+ */
+function shadowedByInnerGlobal(id: Node): boolean {
+  const parent = id.getParent();
+  if (!Node.isPropertyAccessExpression(parent) || parent.getExpression() !== id) {
+    return false;
+  }
+  const inner = parent.getName();
+  return inner in WEB_GLOBALS || OWNED_ELSEWHERE.has(inner);
+}
+
 export function transformGlobals(sf: SourceFile, ctx: Ctx): void {
   for (const id of sf.getDescendantsOfKind(SyntaxKind.Identifier)) {
     const name = id.getText();
     const rule = WEB_GLOBALS[name];
     if (!rule) continue;
     if (!isGlobalIdentifier(id)) continue;
+    if (GLOBAL_HOSTS.has(name) && shadowedByInnerGlobal(id)) continue;
 
     const host = propertyHost(id);
     // `router.location` is someone's field; `window.location` is the global.
