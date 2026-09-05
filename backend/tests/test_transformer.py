@@ -615,6 +615,26 @@ def test_alert_is_a_warning_because_react_native_polyfills_it(
     assert "polyfills" in " ".join(w.message for w in r.warnings)
 
 
+def test_one_expression_is_named_once_not_by_both_halves(options: dict) -> None:
+    """`window.location.pathname` is ONE fix; two TODOs for it is noise.
+
+    The inner, more specific global wins and `window` steps aside — including
+    for `window.localStorage`, which the storage rule describes far better.
+    """
+    r = _transform_source(
+        "export function P() {\n"
+        "  const a = window.location.pathname;\n"
+        "  const b = window.innerWidth;\n"
+        "  return <span>{a}{b}</span>;\n"
+        "}\n",
+        options,
+    )
+    todos = [l for l in r.code.splitlines() if "WEB_GLOBAL" in l]
+    assert len(todos) == 2
+    assert sum("location is not defined" in l for l in todos) == 1
+    assert sum("window exists in React Native" in l for l in todos) == 1
+
+
 def test_a_local_name_matching_a_global_is_not_flagged(options: dict) -> None:
     """A prop or field named `location` is not the browser's — zero noise is
     the guard's whole claim, so the shadowing cases are part of the contract."""
