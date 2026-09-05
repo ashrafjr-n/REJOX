@@ -179,6 +179,9 @@ const WEB_GLOBALS = new Set([
   'cancelAnimationFrame',
 ]);
 
+/** Objects that carry a browser global as a property (`window.localStorage`). */
+const GLOBAL_HOSTS = new Set(['window', 'globalThis', 'self', 'global']);
+
 /** Collect browser-global references used inside a component body. */
 function extractWebApis(fn: FunctionLike): string[] {
   const found = new Set<string>();
@@ -193,6 +196,14 @@ function extractWebApis(fn: FunctionLike): string[] {
       Node.isPropertyAccessExpression(parent) &&
       parent.getNameNode() === id
     ) {
+      // ...unless it hangs off a global host: `window.localStorage` IS the
+      // storage global, spelled out. Skipping it made the Planner's storage
+      // question disappear for a project that uses only that spelling, while
+      // the transformer still rewrote the code — an answer applied without
+      // ever being asked for.
+      if (GLOBAL_HOSTS.has(parent.getExpression().getText())) {
+        found.add(text);
+      }
       continue;
     }
     if (
