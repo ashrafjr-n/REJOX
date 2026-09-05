@@ -12,6 +12,8 @@
  *   - inject `import { … } from 'react-native'` for every RN component used
  *   - inject the named imports other transforms requested
  *     (e.g. useNavigation/useRoute from '@react-navigation/native')
+ *   - inject the default imports other transforms requested
+ *     (AsyncStorage from '@react-native-async-storage/async-storage')
  */
 
 import { SyntaxKind, type SourceFile } from 'ts-morph';
@@ -50,6 +52,22 @@ function referencedOutsideImports(sf: SourceFile, name: string): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Inject `import NAME from 'module'` unless the file already imports that
+ * module with a default binding (in which case the file's own name wins — the
+ * transforms asked for the module, not for a second binding to it).
+ */
+function ensureDefaultImport(sf: SourceFile, module: string, name: string): void {
+  const existing = sf
+    .getImportDeclarations()
+    .find((d) => d.getModuleSpecifierValue() === module);
+  if (!existing) {
+    sf.insertImportDeclaration(0, { moduleSpecifier: module, defaultImport: name });
+    return;
+  }
+  if (!existing.getDefaultImport()) existing.setDefaultImport(name);
 }
 
 function ensureNamedImports(sf: SourceFile, module: string, names: Iterable<string>): void {
@@ -148,5 +166,8 @@ export function transformImports(sf: SourceFile, ctx: Ctx): void {
   for (const [module, names] of ctx.namedImports) {
     if (module === 'react-native') continue;
     ensureNamedImports(sf, module, names);
+  }
+  for (const [module, name] of ctx.defaultImports) {
+    ensureDefaultImport(sf, module, name);
   }
 }
