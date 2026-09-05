@@ -54,14 +54,26 @@ hits one recognises it instead of rediscovering it.
   `@apply`) are counted unmappable and named in the report; the design is lost.
 - **`CUSTOM_CSS_CLASS` deducts from the components area, not styling** — the
   "Styling surface" row can still read "maps 1:1" while classes go unmapped.
+- **The Knowledge Graph only sees browser APIs inside components.**
+  `extractComponents` requires a PascalCase name AND JSX, so a hook, service or
+  util file (`hooks/useLocalStorage.js`) contributes no `webApis` at all — the
+  Report never mentions them and the Ask stage may not even raise the storage
+  question, while the transformer converts those files anyway. The emitted code
+  still carries the TODO; only the report is silent. Not urgent.
 - **The Validator is blind to browser APIs.** `expo/tsconfig.base` sets
   `lib: ["DOM", "ESNext"]`, so `localStorage`/`window`/`navigator`/`document`
   type-check, and Metro bundles them as valid JS — tsc + Metro can never fail
   on one. Measured on the 11-project benchmark: **31 real occurrences across 6
   projects**, all invisible to the gates. A green run says nothing about this
   class. Dropping the DOM lib is NOT the fix — it also errors on 66 globals RN
-  really does provide (`setTimeout` alone is 48). Anything in this family
-  (`document`, `window`, `navigator`) has the same root, not a new discovery.
+  really does provide (`setTimeout` alone is 48); measured and rejected, see
+  the guard section in `docs/CONVERSION-RULES.md`. **Half-closed:** the
+  transformer now flags the closed list (`document`/`window`/`navigator`/
+  `history`/`location`/`alert`, plus storage under its own rule) as
+  `WEB_GLOBAL`. The gates themselves are still blind — a `WEB_GLOBAL` TODO
+  lowers the score but nothing FAILS a run, so a project can still ship green
+  with one. Anything else in this family has the same root, not a new
+  discovery.
 - **The Analyzer does not predict `import.meta.env`.** The transformer rewrites
   it, but the Report/Ask stage never mentions the project has build-time env at
   all, so the migrated app's missing `EXPO_PUBLIC_*` keys are a surprise.
