@@ -416,8 +416,10 @@ def test_unplaceable_awaits_are_left_alone_with_a_named_reason(options: dict) ->
     assert _codes(r) == {"WEB_STORAGE"}
     assert len(r.unhandled) == 3
     # The call sites are untouched — a loud runtime failure, not a quiet wrong value.
-    assert _statements(r.code).count("localStorage.getItem") == 3
-    assert "AsyncStorage" not in r.code
+    statements = _statements(r.code)
+    assert statements.count("localStorage.getItem") == 3
+    # The TODO text names AsyncStorage; the CODE must not reach for it at all.
+    assert "AsyncStorage" not in statements
     # Each residue names ITS OWN reason, not a list of every possible one.
     reasons = " ".join(t for t in r.code.splitlines() if "WEB_STORAGE" in t)
     assert "module scope" in reasons
