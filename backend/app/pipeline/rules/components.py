@@ -123,20 +123,46 @@ def _event_issues(comp: Component) -> list[Issue]:
     return issues
 
 
+# Browser storage is the one web API the Deterministic Transformer now maps
+# (docs/CONVERSION-RULES.md → the storage rows). Reporting it as "no RN
+# equivalent" alongside `document` and `window` was true only while nothing
+# converted it; scored as residue it also deducted from a project for work the
+# pipeline actually does.
+STORAGE_WEB_APIS = frozenset({"localStorage", "sessionStorage"})
+
+
 def _web_api_issues(comp: Component) -> list[Issue]:
     if not comp.webApis:
         return []
-    return [
-        Issue(
-            code=codes.WEB_API_USAGE,
-            severity="warning",
-            message=(
-                f"Browser API(s) used ({', '.join(comp.webApis)}); "
-                "no RN equivalent (e.g. localStorage → AsyncStorage)."
-            ),
-            evidence=Evidence(file=comp.file, detail=f"web APIs: {', '.join(comp.webApis)}"),
+    storage = sorted(STORAGE_WEB_APIS.intersection(comp.webApis))
+    other = sorted(set(comp.webApis) - STORAGE_WEB_APIS)
+
+    issues: list[Issue] = []
+    if storage:
+        issues.append(
+            Issue(
+                code=codes.WEB_STORAGE_USAGE,
+                severity="warning",
+                message=(
+                    f"Browser storage used ({', '.join(storage)}); mapped to the "
+                    "store chosen in the storage question. Call sites change "
+                    "shape under AsyncStorage (they become awaited)."
+                ),
+                evidence=Evidence(file=comp.file, detail=f"web APIs: {', '.join(storage)}"),
+            )
         )
-    ]
+    if other:
+        issues.append(
+            Issue(
+                code=codes.WEB_API_USAGE,
+                severity="warning",
+                message=(
+                    f"Browser API(s) used ({', '.join(other)}); no RN equivalent."
+                ),
+                evidence=Evidence(file=comp.file, detail=f"web APIs: {', '.join(other)}"),
+            )
+        )
+    return issues
 
 
 # CSS properties with no clean React Native equivalent.

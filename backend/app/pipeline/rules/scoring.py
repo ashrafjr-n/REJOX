@@ -87,6 +87,7 @@ PROVENANCE_BY_CODE: dict[str, ConfidenceSource] = {
     codes.RESPONSIVE_BREAKPOINT: ConfidenceSource.DETERMINISTIC_WARNING,  # needs config
     codes.INTERACTION_STATE: ConfidenceSource.DETERMINISTIC_WARNING,      # partial in RN
     codes.ROUTER_NEEDS_CONVERSION: ConfidenceSource.DETERMINISTIC_WARNING,  # links/hooks rule-resolved; navigator wiring reviewed
+    codes.WEB_STORAGE_USAGE: ConfidenceSource.DETERMINISTIC_WARNING,  # mapped to the chosen store; call sites reshaped
     # Residue — not migrated; excluded from Confidence, penalizes Coverage.
     codes.HOVER_STATE: ConfidenceSource.UNHANDLED,
     codes.CSS_GRID: ConfidenceSource.UNHANDLED,
@@ -161,6 +162,7 @@ _CODE_LABELS = {
     codes.UNSIZED_IMAGE: "Unsized images",
     codes.RN_INCOMPATIBLE_CSS_PROP: "RN-incompatible inline CSS",
     codes.WEB_API_USAGE: "Browser API usage",
+    codes.WEB_STORAGE_USAGE: "Browser storage",
 }
 
 # Per-component styling-issue penalties (points off the styling area).
