@@ -70,7 +70,8 @@ hits one recognises it instead of rediscovering it.
   the guard section in `docs/CONVERSION-RULES.md`. **Half-closed:** the
   transformer now flags the closed list (`document`/`window`/`navigator`/
   `history`/`location`/`alert`, plus storage under its own rule) as
-  `WEB_GLOBAL`. The gates themselves are still blind — a `WEB_GLOBAL` TODO
+  `WEB_GLOBAL` — measured at 20 `WEB_GLOBAL` + 21 storage sites across 6 of the
+  11 projects, with zero false alarms. The gates themselves are still blind — a `WEB_GLOBAL` TODO
   lowers the score but nothing FAILS a run, so a project can still ship green
   with one. Anything else in this family has the same root, not a new
   discovery.
