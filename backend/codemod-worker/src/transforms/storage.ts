@@ -376,6 +376,33 @@ function transformAsyncStorage(sf: SourceFile, ctx: Ctx): void {
 
 // --- Residue -----------------------------------------------------------------
 
+/**
+ * Why THIS storage use was left alone. Each case gets its own sentence: a
+ * generic "could not be converted" makes the reader re-derive what the
+ * transform already knew, and the fix differs per case.
+ */
+function placementReason(id: Identifier): string {
+  const fn = enclosingFunction(id);
+  if (!fn) return 'it is read at module scope, where nothing can be awaited';
+  if (isEffectCallback(fn)) {
+    return (
+      'the useEffect around it returns a cleanup, which cannot move into the ' +
+      'async wrapper without unregistering it'
+    );
+  }
+  const decl = fn.getParent();
+  if (Node.isVariableDeclaration(decl) && decl.getInitializer() === fn) {
+    return (
+      `${decl.getNameNode().getText()}() cannot be made async: its return ` +
+      'value is read somewhere, and it would become a Promise'
+    );
+  }
+  return (
+    'it is read during render (a hook argument or the component body), which ' +
+    'cannot be async — move it into an effect that sets state'
+  );
+}
+
 /** Why this particular storage use was left alone — named, never generic. */
 function residueReason(id: Identifier, mmkv: boolean): string {
   const sc = asStorageCall(id);
@@ -387,17 +414,15 @@ function residueReason(id: Identifier, mmkv: boolean): string {
         : ' used as a value';
     return (
       `${id.getText()}${member} has no equivalent in the chosen React Native ` +
-      'store — neither AsyncStorage nor MMKV exposes the Storage interface ' +
-      '(length/key/property access) the way the browser does.'
+      'store — neither AsyncStorage nor MMKV exposes the browser Storage ' +
+      'interface (length/key/property access).'
     );
   }
   if (mmkv) return `${sc.object}.${sc.method}() could not be rewritten.`;
   return (
-    `${sc.object}.${sc.method}() is read where no \`await\` can be placed ` +
-    '(module scope, a useState initializer, an effect with a cleanup, or a ' +
-    'value consumed synchronously). AsyncStorage returns a Promise, so this ' +
-    'read must move into an async function or an effect before it can be ' +
-    'converted — rewriting it un-awaited would substitute a Promise for the value.'
+    `${sc.object}.${sc.method}() left as-is: ${placementReason(id)}. ` +
+    'AsyncStorage returns a Promise, and rewriting this un-awaited would ' +
+    'substitute the Promise for the value.'
   );
 }
 
