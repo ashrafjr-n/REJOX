@@ -7,6 +7,7 @@ import {
   type JsxElement,
   type JsxSelfClosingElement,
   type JsxOpeningElement,
+  type Identifier,
   type SourceFile,
 } from 'ts-morph';
 import type { Ctx } from './types';
@@ -74,6 +75,79 @@ export function requestNamedImport(ctx: Ctx, module: string, name: string): void
     ctx.namedImports.set(module, names);
   }
   names.add(name);
+}
+
+/** Objects that carry a browser global as a property (`window.localStorage`). */
+export const GLOBAL_HOSTS = new Set(['window', 'globalThis', 'self', 'global']);
+
+/**
+ * Does the file declare `name` itself? Then every bare use is that local
+ * binding, not the browser global, and treating it as one would be wrong in
+ * both directions — rewriting working code, or flagging it as a bug.
+ */
+export function declaresName(sf: SourceFile, name: string): boolean {
+  for (const decl of sf.getDescendantsOfKind(SyntaxKind.VariableDeclaration)) {
+    if (decl.getNameNode().getText() === name) return true;
+  }
+  for (const param of sf.getDescendantsOfKind(SyntaxKind.Parameter)) {
+    if (param.getNameNode().getText() === name) return true;
+  }
+  for (const spec of sf.getDescendantsOfKind(SyntaxKind.ImportSpecifier)) {
+    if (spec.getName() === name) return true;
+  }
+  // Destructuring binds names too — `({ location })` as a prop, or
+  // `const { history } = useRouter()`. Missing these was a false positive on
+  // every component with a prop sharing a browser global's name.
+  for (const el of sf.getDescendantsOfKind(SyntaxKind.BindingElement)) {
+    if (el.getNameNode().getText() === name) return true;
+  }
+  for (const fn of sf.getDescendantsOfKind(SyntaxKind.FunctionDeclaration)) {
+    if (fn.getName() === name) return true;
+  }
+  return false;
+}
+
+/**
+ * Is this identifier a real read of a browser global, rather than a name that
+ * merely looks like one? Excludes object keys, declaration names, imported
+ * bindings, and type members — `{ location: string }` describes a shape, and a
+ * type annotation is not a use of anything at runtime.
+ *
+ * A property access is deliberately NOT decided here: `window.location` is the
+ * global and `router.location` is not, and only the caller knows whether it
+ * cares about the host. `propertyHost` reports it instead.
+ */
+export function isGlobalIdentifier(id: Identifier): boolean {
+  const parent = id.getParent();
+  if (!parent) return false;
+  if (Node.isPropertyAssignment(parent) && parent.getNameNode() === id) return false;
+  if (Node.isPropertySignature(parent) && parent.getNameNode() === id) return false;
+  if (Node.isMethodSignature(parent) && parent.getNameNode() === id) return false;
+  if (Node.isVariableDeclaration(parent) && parent.getNameNode() === id) return false;
+  if (Node.isParameterDeclaration(parent) && parent.getNameNode() === id) return false;
+  if (Node.isBindingElement(parent) && parent.getNameNode() === id) return false;
+  if (id.getFirstAncestorByKind(SyntaxKind.ImportDeclaration)) return false;
+  if (
+    id.getFirstAncestorByKind(SyntaxKind.TypeLiteral) ||
+    id.getFirstAncestorByKind(SyntaxKind.InterfaceDeclaration) ||
+    id.getFirstAncestorByKind(SyntaxKind.TypeAliasDeclaration)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * When `id` is the property half of `X.id`, the text of `X`; otherwise
+ * undefined. Lets a caller tell `window.localStorage` (the global) from
+ * `db.localStorage` (somebody's field).
+ */
+export function propertyHost(id: Identifier): string | undefined {
+  const parent = id.getParent();
+  if (Node.isPropertyAccessExpression(parent) && parent.getNameNode() === id) {
+    return parent.getExpression().getText();
+  }
+  return undefined;
 }
 
 /** Request a default import (injected by the imports transform). */

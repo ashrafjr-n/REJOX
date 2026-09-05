@@ -6,7 +6,7 @@
  * Resolution Engine residue). The transform order matters:
  *
  *   navigation → events → attributes → elements → images → text → styles
- *   → propsTypes → env → storage → imports → TODO header
+ *   → propsTypes → env → storage → imports → globals → TODO header
  *
  *   - navigation runs first, while <Link>/<NavLink>/useParams are intact;
  *   - events run while host tags are still lowercase, so only graph-proven
@@ -19,7 +19,10 @@
  *     three are about what the module reaches for outside itself. Storage runs
  *     after env and before imports: it can restructure a function into an async
  *     one, and it asks for the store's import once that is settled.
- *   - imports run last, over the fully-transformed file.
+ *   - imports run last, over the fully-transformed file;
+ *   - globals runs after ALL of them, so it reports only what every rule
+ *     above has already declined to convert — never a call site one of
+ *     them was about to rewrite.
  */
 
 import { IndentationText, Project, QuoteKind } from 'ts-morph';
@@ -36,6 +39,7 @@ import { transformPropsTypes } from './transforms/propsTypes';
 import { transformEnv } from './transforms/env';
 import { transformStorage } from './transforms/storage';
 import { transformImports } from './transforms/imports';
+import { transformGlobals } from './transforms/globals';
 
 function newProject(): Project {
   return new Project({
@@ -101,6 +105,7 @@ export function convert(
   transformEnv(sf, ctx);
   transformStorage(sf, ctx);
   transformImports(sf, ctx);
+  transformGlobals(sf, ctx);
   withTodoHeader(sf, ctx);
 
   sf.formatText();
