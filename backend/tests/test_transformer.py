@@ -479,6 +479,41 @@ def test_a_local_binding_named_localstorage_is_not_the_browser_global(
     assert _codes(r) == set()  # not residue either — it was never the global
 
 
+def test_window_localstorage_is_the_same_global(options: dict) -> None:
+    """`window.localStorage` is not a property that looks like the global.
+
+    Some codebases write only the long form. Treating it as "a property, not
+    the global" left such a file wholly unconverted while the report claimed
+    storage was handled — and, upstream, made the Planner never ask which store
+    to use, so the default was applied without anyone choosing it.
+    """
+    r = _transform_source(
+        "export const save = async (v: string) => {\n"
+        "  window.localStorage.setItem('k', v);\n"
+        "  globalThis.sessionStorage.removeItem('k');\n"
+        "};\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    code = _statements(r.code)
+    assert "await AsyncStorage.setItem('k', v)" in code
+    assert "await AsyncStorage.removeItem('k')" in code
+    assert "localStorage" not in code and "sessionStorage" not in code
+    assert _codes(r) == set()
+
+
+def test_a_property_on_an_unrelated_object_is_not_the_global(options: dict) -> None:
+    """The other half of the same rule: `db.localStorage` is somebody's field."""
+    r = _transform_source(
+        "declare const db: { localStorage: { setItem(k: string, v: string): void } };\n"
+        "export const save = async () => {\n"
+        "  db.localStorage.setItem('k', '1');\n"
+        "};\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    assert "AsyncStorage" not in r.code
+    assert _codes(r) == set()
+
+
 def test_session_storage_says_the_data_now_persists(options: dict) -> None:
     """No RN store is session-scoped. That behaviour change is reported."""
     r = _transform_source(

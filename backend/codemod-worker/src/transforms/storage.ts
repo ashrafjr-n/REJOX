@@ -51,6 +51,14 @@ import {
 
 const STORAGE_GLOBALS = new Set(['localStorage', 'sessionStorage']);
 
+/**
+ * Objects that carry the storage global as a property. `window.localStorage`
+ * is the same object as `localStorage` — some codebases write only the long
+ * form, and skipping it as "a property, not the global" leaves the whole file
+ * unconverted while the report says storage was handled.
+ */
+const GLOBAL_HOSTS = new Set(['window', 'globalThis', 'self', 'global']);
+
 const ASYNC_STORAGE_MODULE = '@react-native-async-storage/async-storage';
 const MMKV_MODULE = 'react-native-mmkv';
 
@@ -73,10 +81,20 @@ type FunctionLike = FunctionDeclaration | FunctionExpression | ArrowFunction;
 /** Where `await` can go, or `null` when no placement is provable (case D). */
 type Placement = 'already-async' | 'mark-async' | null;
 
+/**
+ * A reference to the storage global: either the bare `localStorage` identifier
+ * or the `window.localStorage` property access that means the same thing.
+ */
+interface StorageRef {
+  /** The node standing for the storage object — what a rewrite replaces. */
+  node: Node;
+  /** `localStorage` or `sessionStorage`, whichever host it was written on. */
+  name: string;
+}
+
 /** A storage call the transform can rewrite. */
 interface StorageCall {
-  id: Identifier;
-  object: string;
+  ref: StorageRef;
   method: string;
   call: CallExpression;
 }
@@ -85,14 +103,28 @@ interface StorageCall {
 
 /**
  * Is this identifier the browser global, rather than a name that merely looks
- * like it? A property (`foo.localStorage`), an object key, or a declaration's
- * own name is a different thing wearing the same text.
+ * like it? An object key, or a declaration's own name, is a different thing
+ * wearing the same text. A property (`x.localStorage`) is handled separately:
+ * it IS the global when `x` is a global host, and is not otherwise.
  */
 function isGlobalRead(id: Identifier): boolean {
   const parent = id.getParent();
   if (!parent) return false;
-  if (Node.isPropertyAccessExpression(parent) && parent.getNameNode() === id) return false;
+  if (Node.isPropertyAccessExpression(parent) && parent.getNameNode() === id) {
+    return GLOBAL_HOSTS.has(parent.getExpression().getText());
+  }
   if (Node.isPropertyAssignment(parent) && parent.getNameNode() === id) return false;
+  // A member of a type/interface — `{ localStorage: … }` describes somebody
+  // else's shape, and a type annotation is not a use of the global at all.
+  if (Node.isPropertySignature(parent) && parent.getNameNode() === id) return false;
+  if (Node.isMethodSignature(parent) && parent.getNameNode() === id) return false;
+  if (
+    id.getFirstAncestorByKind(SyntaxKind.TypeLiteral) ||
+    id.getFirstAncestorByKind(SyntaxKind.InterfaceDeclaration) ||
+    id.getFirstAncestorByKind(SyntaxKind.TypeAliasDeclaration)
+  ) {
+    return false;
+  }
   if (Node.isVariableDeclaration(parent) && parent.getNameNode() === id) return false;
   if (Node.isParameterDeclaration(parent) && parent.getNameNode() === id) return false;
   if (Node.isBindingElement(parent) && parent.getNameNode() === id) return false;
@@ -101,8 +133,10 @@ function isGlobalRead(id: Identifier): boolean {
 }
 
 /**
- * Does the file declare `name` itself? Then every use is that local binding,
- * not the browser global, and rewriting them would break working code.
+ * Does the file declare `name` itself? Then every BARE use is that local
+ * binding, not the browser global, and rewriting them would break working
+ * code. `window.localStorage` is unaffected — a local `localStorage` does not
+ * shadow a property of `window`.
  */
 function isShadowed(sf: SourceFile, name: string): boolean {
   for (const decl of sf.getDescendantsOfKind(SyntaxKind.VariableDeclaration)) {
@@ -117,37 +151,44 @@ function isShadowed(sf: SourceFile, name: string): boolean {
   return false;
 }
 
-/** Every live browser-storage identifier still in the file. */
-function storageIdentifiers(sf: SourceFile): Identifier[] {
+/** Every live browser-storage reference still in the file, in both spellings. */
+function storageRefs(sf: SourceFile): StorageRef[] {
   const shadowed = new Set(
     [...STORAGE_GLOBALS].filter((name) => isShadowed(sf, name)),
   );
-  return sf
-    .getDescendantsOfKind(SyntaxKind.Identifier)
-    .filter(
-      (id) =>
-        STORAGE_GLOBALS.has(id.getText()) &&
-        !shadowed.has(id.getText()) &&
-        isGlobalRead(id),
-    );
+  const refs: StorageRef[] = [];
+  for (const id of sf.getDescendantsOfKind(SyntaxKind.Identifier)) {
+    const name = id.getText();
+    if (!STORAGE_GLOBALS.has(name)) continue;
+    if (!isGlobalRead(id)) continue;
+    const parent = id.getParent();
+    // `window.localStorage` — the ref is the whole access, not the name.
+    if (Node.isPropertyAccessExpression(parent) && parent.getNameNode() === id) {
+      refs.push({ node: parent, name });
+      continue;
+    }
+    if (shadowed.has(name)) continue;
+    refs.push({ node: id, name });
+  }
+  return refs;
 }
 
 /**
- * The supported `localStorage.method(...)` call this identifier heads, or
+ * The supported `<storage>.method(...)` call this reference heads, or
  * `undefined` for anything else — `.length`, `.key(i)`, a property read, or
  * the object passed around as a value. None of those have an equivalent in
  * either target store, so none are guessed at.
  */
-function asStorageCall(id: Identifier): StorageCall | undefined {
-  const access = id.getParent();
-  if (!Node.isPropertyAccessExpression(access) || access.getExpression() !== id) {
+function asStorageCall(ref: StorageRef): StorageCall | undefined {
+  const access = ref.node.getParent();
+  if (!Node.isPropertyAccessExpression(access) || access.getExpression() !== ref.node) {
     return undefined;
   }
   const method = access.getName();
   if (!SUPPORTED.has(method)) return undefined;
   const call = access.getParent();
   if (!Node.isCallExpression(call) || call.getExpression() !== access) return undefined;
-  return { id, object: id.getText(), method, call };
+  return { ref, method, call };
 }
 
 // --- await placement (AsyncStorage only) ------------------------------------
@@ -252,7 +293,7 @@ function recordMapped(ctx: Ctx, sc: StorageCall, replacement: string): void {
   recordWarning(
     ctx,
     'STORAGE_MAPPED',
-    `${sc.object}.${sc.method}() → ${replacement}.`,
+    `${sc.ref.node.getText()}.${sc.method}() → ${replacement}.`,
     sc.call.getStartLineNumber(),
   );
 }
@@ -263,7 +304,7 @@ function recordMapped(ctx: Ctx, sc: StorageCall, replacement: string): void {
  * the two keyspaces have become one. Real behaviour change, said out loud.
  */
 function recordSessionPersistence(ctx: Ctx, sc: StorageCall): void {
-  if (sc.object !== 'sessionStorage') return;
+  if (sc.ref.name !== 'sessionStorage') return;
   recordWarning(
     ctx,
     'STORAGE_PERSISTENCE',
@@ -281,8 +322,8 @@ function transformMmkv(sf: SourceFile, ctx: Ctx): void {
   let used = false;
 
   applyUntilStable(() => {
-    for (const id of storageIdentifiers(sf)) {
-      const sc = asStorageCall(id);
+    for (const ref of storageRefs(sf)) {
+      const sc = asStorageCall(ref);
       if (!sc) continue; // residue — recorded in the final pass
       const args = argsOf(sc.call);
       const replacement =
@@ -320,9 +361,9 @@ function transformMmkv(sf: SourceFile, ctx: Ctx): void {
  * cleanup inside the wrapper would unregister it.
  */
 function wrapOneEffect(sf: SourceFile, ctx: Ctx): boolean {
-  for (const id of storageIdentifiers(sf)) {
-    if (!asStorageCall(id)) continue;
-    const fn = enclosingFunction(id);
+  for (const ref of storageRefs(sf)) {
+    if (!asStorageCall(ref)) continue;
+    const fn = enclosingFunction(ref.node);
     if (!fn || fn.isAsync() || !isEffectCallback(fn)) continue;
     const body = fn.getBody();
     if (!body || !Node.isBlock(body)) continue;
@@ -352,10 +393,10 @@ function transformAsyncStorage(sf: SourceFile, ctx: Ctx): void {
   let used = false;
 
   applyUntilStable(() => {
-    for (const id of storageIdentifiers(sf)) {
-      const sc = asStorageCall(id);
+    for (const ref of storageRefs(sf)) {
+      const sc = asStorageCall(ref);
       if (!sc) continue;
-      const fn = enclosingFunction(id);
+      const fn = enclosingFunction(ref.node);
       const placement = placementFor(sf, fn);
       if (placement === null) continue; // case D — left untouched, residue below
       if (placement === 'mark-async' && fn) fn.setIsAsync(true);
@@ -381,8 +422,8 @@ function transformAsyncStorage(sf: SourceFile, ctx: Ctx): void {
  * generic "could not be converted" makes the reader re-derive what the
  * transform already knew, and the fix differs per case.
  */
-function placementReason(id: Identifier): string {
-  const fn = enclosingFunction(id);
+function placementReason(ref: StorageRef): string {
+  const fn = enclosingFunction(ref.node);
   if (!fn) return 'it is read at module scope, where nothing can be awaited';
   if (isEffectCallback(fn)) {
     return (
@@ -404,30 +445,30 @@ function placementReason(id: Identifier): string {
 }
 
 /** Why this particular storage use was left alone — named, never generic. */
-function residueReason(id: Identifier, mmkv: boolean): string {
-  const sc = asStorageCall(id);
+function residueReason(ref: StorageRef, mmkv: boolean): string {
+  const sc = asStorageCall(ref);
   if (!sc) {
-    const access = id.getParent();
+    const access = ref.node.getParent();
     const member =
-      Node.isPropertyAccessExpression(access) && access.getExpression() === id
+      Node.isPropertyAccessExpression(access) && access.getExpression() === ref.node
         ? `.${access.getName()}`
         : ' used as a value';
     return (
-      `${id.getText()}${member} has no equivalent in the chosen React Native ` +
+      `${ref.node.getText()}${member} has no equivalent in the chosen React Native ` +
       'store — neither AsyncStorage nor MMKV exposes the browser Storage ' +
       'interface (length/key/property access).'
     );
   }
-  if (mmkv) return `${sc.object}.${sc.method}() could not be rewritten.`;
+  if (mmkv) return `${sc.ref.node.getText()}.${sc.method}() could not be rewritten.`;
   return (
-    `${sc.object}.${sc.method}() left as-is: ${placementReason(id)}. ` +
+    `${sc.ref.node.getText()}.${sc.method}() left as-is: ${placementReason(ref)}. ` +
     'AsyncStorage returns a Promise, and rewriting this un-awaited would ' +
     'substitute the Promise for the value.'
   );
 }
 
 export function transformStorage(sf: SourceFile, ctx: Ctx): void {
-  if (storageIdentifiers(sf).length === 0) return;
+  if (storageRefs(sf).length === 0) return;
 
   const mmkv = ctx.options.storage === 'mmkv';
   if (mmkv) transformMmkv(sf, ctx);
@@ -436,7 +477,12 @@ export function transformStorage(sf: SourceFile, ctx: Ctx): void {
   // Whatever still says `localStorage` after the rewrite is what rules could
   // not resolve. It stays in the code, exactly where it was, with a TODO
   // naming it — a loud runtime failure at a known line beats a silent one.
-  for (const id of storageIdentifiers(sf)) {
-    recordUnhandled(ctx, 'WEB_STORAGE', residueReason(id, mmkv), id.getParent()?.getText() ?? id.getText());
+  for (const ref of storageRefs(sf)) {
+    recordUnhandled(
+      ctx,
+      'WEB_STORAGE',
+      residueReason(ref, mmkv),
+      ref.node.getParent()?.getText() ?? ref.node.getText(),
+    );
   }
 }
