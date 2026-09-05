@@ -6,7 +6,7 @@
  * Resolution Engine residue). The transform order matters:
  *
  *   navigation → events → attributes → elements → images → text → styles
- *   → propsTypes → env → imports → TODO header
+ *   → propsTypes → env → storage → imports → TODO header
  *
  *   - navigation runs first, while <Link>/<NavLink>/useParams are intact;
  *   - events run while host tags are still lowercase, so only graph-proven
@@ -15,8 +15,10 @@
  *     attribute has to go while its tag still says which ones those are;
  *   - images run after elements (img is already <Image>);
  *   - text-wrapping runs after element renames so parent tags are already RN;
- *   - env touches no JSX at all; it runs beside imports because both are about
- *     what the module reaches for outside itself.
+ *   - env and storage touch no JSX at all; they run beside imports because all
+ *     three are about what the module reaches for outside itself. Storage runs
+ *     after env and before imports: it can restructure a function into an async
+ *     one, and it asks for the store's import once that is settled.
  *   - imports run last, over the fully-transformed file.
  */
 
@@ -32,6 +34,7 @@ import { transformText } from './transforms/text';
 import { transformStyles } from './transforms/styles';
 import { transformPropsTypes } from './transforms/propsTypes';
 import { transformEnv } from './transforms/env';
+import { transformStorage } from './transforms/storage';
 import { transformImports } from './transforms/imports';
 
 function newProject(): Project {
@@ -84,6 +87,7 @@ export function convert(
     todos: [],
     rnUsed: new Set(),
     namedImports: new Map(),
+    defaultImports: new Map(),
   };
 
   transformNavigation(sf, ctx);
@@ -95,6 +99,7 @@ export function convert(
   transformStyles(sf, ctx);
   transformPropsTypes(sf, ctx);
   transformEnv(sf, ctx);
+  transformStorage(sf, ctx);
   transformImports(sf, ctx);
   withTodoHeader(sf, ctx);
 
