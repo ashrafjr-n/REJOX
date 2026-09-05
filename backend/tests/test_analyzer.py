@@ -257,9 +257,42 @@ def test_table_component_is_blocked(redux_report: AnalysisReport) -> None:
     )
 
 
-def test_web_api_usage_flagged(redux_report: AnalysisReport) -> None:
+def test_browser_storage_is_reported_as_handled_not_residue(
+    redux_report: AnalysisReport,
+) -> None:
+    """`localStorage` is mapped by the transformer, so it is not `WEB_API_USAGE`.
+
+    The two facts were one code while nothing converted storage. Once the
+    storage transform existed, keeping them merged meant every project using
+    localStorage was scored as carrying unmigrated residue for work the
+    pipeline actually does — and the report told the user there was "no RN
+    equivalent" for something it had just converted.
+    """
     dashboard = _component(redux_report, "Dashboard")
-    assert any(i.code == "WEB_API_USAGE" for i in dashboard.issues)
+    storage = [i for i in dashboard.issues if i.code == "WEB_STORAGE_USAGE"]
+    assert len(storage) == 1
+    assert "localStorage" in storage[0].evidence.detail
+    # ...and it is NOT reported as the unhandled browser-API code.
+    assert not any(i.code == "WEB_API_USAGE" for i in dashboard.issues)
+
+
+def test_non_storage_web_apis_stay_unhandled() -> None:
+    """`window`/`document` have no equivalent — that half must not soften."""
+    from app.models.knowledge_graph import Component
+    from app.pipeline.rules.components import _web_api_issues
+
+    comp = Component(
+        id="c1",
+        name="Probe",
+        file="src/Probe.tsx",
+        exportType="default",
+        webApis=["document", "localStorage", "window"],
+    )
+    issues = {i.code: i for i in _web_api_issues(comp)}
+    assert set(issues) == {"WEB_STORAGE_USAGE", "WEB_API_USAGE"}
+    assert "localStorage" in issues["WEB_STORAGE_USAGE"].evidence.detail
+    assert "localStorage" not in issues["WEB_API_USAGE"].evidence.detail
+    assert "document" in issues["WEB_API_USAGE"].evidence.detail
 
 
 def test_coverage_drops_for_unsupported_project(

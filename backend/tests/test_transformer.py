@@ -327,6 +327,189 @@ def test_new_target_is_not_mistaken_for_import_meta(options: dict) -> None:
     assert r.unhandled == []
 
 
+# --- Web storage: the Ask answer applied, and the async gap it opens -----------
+#
+# The storage question was asked and its answer dropped: `localStorage` shipped
+# untouched into the RN app, past `tsc` (Expo's tsconfig base includes the DOM
+# lib) and past Metro (it is valid JS), and crashed only on the device. These
+# tests pin both halves — the rewrite, and the four cases that decide where an
+# `await` may go.
+
+ASYNC_ANSWERS = {**ANSWERS, "storage": "async-storage"}
+MMKV_ANSWERS = {**ANSWERS, "storage": "mmkv"}
+
+
+def test_storage_call_in_an_async_function_is_simply_awaited(options: dict) -> None:
+    """Case A — the enclosing function is already async, so `await` just goes in."""
+    r = _transform_source(
+        "export const save = async (v: string) => {\n"
+        "  localStorage.setItem('k', v);\n"
+        "};\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    assert "await AsyncStorage.setItem('k', v)" in r.code
+    assert "localStorage" not in _statements(r.code)
+    assert "@react-native-async-storage/async-storage" in r.code
+    assert _codes(r) == set()
+
+
+def test_storage_read_in_an_effect_moves_into_an_async_wrapper(options: dict) -> None:
+    """Case B — `useEffect(async () => …)` is the WRONG fix.
+
+    React reads an effect callback's return value as the cleanup, so an async
+    callback hands it a Promise and unmount silently stops working. The body
+    moves into an inner async function instead, and the effect stays sync.
+    """
+    r = _transform_source(
+        "import { useEffect, useState } from 'react';\n"
+        "export function P() {\n"
+        "  const [v, setV] = useState(null);\n"
+        "  useEffect(() => {\n"
+        "    const raw = JSON.parse(localStorage.getItem('k'));\n"
+        "    setV(raw);\n"
+        "  }, []);\n"
+        "  return null;\n"
+        "}\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    code = _statements(r.code)
+    assert "useEffect(async" not in code  # never — it breaks cleanup
+    assert "const load = async () => {" in code
+    assert "await AsyncStorage.getItem('k')" in code
+    assert "load();" in code
+    assert "localStorage" not in code
+
+
+def test_handler_with_no_read_return_value_is_made_async(options: dict) -> None:
+    """Case C — a JSX handler's return value cannot be read, so async is safe."""
+    r = _transform_source(
+        "export function P() {\n"
+        "  const save = () => {\n"
+        "    localStorage.setItem('k', '1');\n"
+        "  };\n"
+        "  return <button onClick={save}>go</button>;\n"
+        "}\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    code = _statements(r.code)
+    assert "const save = async () => {" in code
+    assert "await AsyncStorage.setItem('k', '1')" in code
+
+
+def test_unplaceable_awaits_are_left_alone_with_a_named_reason(options: dict) -> None:
+    """Case D — the deliberate non-transform, one reason per site.
+
+    An un-awaited rewrite would put a `Promise` where a `string` was: a wrong
+    value that type-checks, bundles, and corrupts whatever reads it. An
+    untouched `localStorage` throws at the line the TODO names instead.
+    """
+    r = _transform_source(
+        "import { useState } from 'react';\n"
+        "const boot = localStorage.getItem('boot');\n"
+        "export function P() {\n"
+        "  const [v] = useState(localStorage.getItem('v'));\n"
+        "  const read = () => localStorage.getItem('r');\n"
+        "  return <span>{read()}{boot}{v}</span>;\n"
+        "}\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    assert _codes(r) == {"WEB_STORAGE"}
+    assert len(r.unhandled) == 3
+    # The call sites are untouched — a loud runtime failure, not a quiet wrong value.
+    assert _statements(r.code).count("localStorage.getItem") == 3
+    assert "AsyncStorage" not in r.code
+    # Each residue names ITS OWN reason, not a list of every possible one.
+    reasons = " ".join(t for t in r.code.splitlines() if "WEB_STORAGE" in t)
+    assert "module scope" in reasons
+    assert "during render" in reasons
+    assert "read()" in reasons
+
+
+def test_storage_members_with_no_equivalent_are_residue(options: dict) -> None:
+    """`.length` / `.key(i)` exist in neither target store — never guessed at."""
+    r = _transform_source(
+        "export function P() {\n"
+        "  return <span>{localStorage.length}{localStorage.key(0)}</span>;\n"
+        "}\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    assert _codes(r) == {"WEB_STORAGE"}
+    assert len(r.unhandled) == 2
+    assert "browser Storage" in r.code
+
+
+def test_mmkv_answer_is_a_pure_rename_with_no_async_residue(options: dict) -> None:
+    """The other answer is a different problem: MMKV is synchronous.
+
+    Nothing needs awaiting, so the case-D residue disappears entirely — the
+    same source that leaves three TODOs under AsyncStorage leaves none here.
+    """
+    r = _transform_source(
+        "import { useState } from 'react';\n"
+        "const boot = localStorage.getItem('boot');\n"
+        "export function P() {\n"
+        "  const [v] = useState(localStorage.getItem('v'));\n"
+        "  return <span>{boot}{v}</span>;\n"
+        "}\n",
+        {**options, **MMKV_ANSWERS},
+    )
+    code = _statements(r.code)
+    assert "import { MMKV } from 'react-native-mmkv'" in code
+    assert "const storage = new MMKV();" in code
+    # getString answers a missing key with `undefined`; getItem answered `null`.
+    # `?? null` keeps the value identical, not merely similar.
+    assert code.count("(storage.getString(") == 2
+    assert code.count("?? null)") == 2
+    assert _codes(r) == set()
+
+
+def test_a_local_binding_named_localstorage_is_not_the_browser_global(
+    options: dict,
+) -> None:
+    """Shadowing: rewriting a name the file declares itself would break code."""
+    r = _transform_source(
+        "export function P(localStorage: { getItem: (k: string) => string }) {\n"
+        "  return localStorage.getItem('k');\n"
+        "}\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    assert "AsyncStorage" not in r.code
+    assert _codes(r) == set()  # not residue either — it was never the global
+
+
+def test_session_storage_says_the_data_now_persists(options: dict) -> None:
+    """No RN store is session-scoped. That behaviour change is reported."""
+    r = _transform_source(
+        "export const save = async () => {\n"
+        "  sessionStorage.setItem('k', '1');\n"
+        "};\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    assert "await AsyncStorage.setItem('k', '1')" in r.code
+    assert "STORAGE_PERSISTENCE" in {w.code for w in r.warnings}
+
+
+def test_scaffold_pins_a_storage_package_the_source_never_declared() -> None:
+    """Carry-over cannot supply this one: no web project declares AsyncStorage.
+
+    Without an explicit pin the emitted import resolves to nothing and Metro
+    fails on it — the dependency has to come from Rejox's own table.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "app"
+        res = generate_scaffold(
+            out,
+            {"project-type": "expo", "styling-engine": "nativewind", "navigation-library": "react-navigation"},
+            {},  # the source project declares NOTHING
+            extra_packages=(
+                "@react-native-async-storage/async-storage",
+                "react-native-mmkv",
+            ),
+        )
+        assert res.dependencies["@react-native-async-storage/async-storage"] == "1.23.1"
+        assert "react-native-mmkv" in res.dependencies
+
+
 # --- The non-negotiable: every output is valid TS -------------------------------
 
 
