@@ -11,6 +11,24 @@ holds the rules. Two uneventful projects in a row get one line, not two entries.
 
 ---
 
+## 2026-09-05 — `adrianhajdin/project_ai_summarizer` (re-test, on device)
+
+Second pass on the same project — first one to actually reach an iOS Simulator.
+
+- **Found:** the app builds, bundles and launches, then dies on
+  `localStorage` — the storage question was asked, answered, and the answer
+  thrown away. The deeper find is WHY nothing caught it: the Validator cannot
+  see browser APIs at all (see Known gaps), so this was never one missing rule.
+- **Fixed:** the `storage` answer is applied — AsyncStorage (awaited, with the
+  await placement decided from the enclosing function, never assumed) or MMKV
+  (synchronous, a pure rename); packages Rejox introduces itself are now pinned,
+  since carry-over can only supply what the uploaded project declared.
+- **For future projects:** a device run is worth more than both gates on this
+  class of bug. If an app builds and bundles and still dies on launch, suspect
+  a web global before suspecting the transform.
+
+---
+
 ## 2026-09-04 — `adrianhajdin/project_ai_summarizer`
 
 Vite + plain JS + Redux Toolkit / RTK Query, **no router**.
@@ -36,8 +54,14 @@ hits one recognises it instead of rediscovering it.
   `@apply`) are counted unmappable and named in the report; the design is lost.
 - **`CUSTOM_CSS_CLASS` deducts from the components area, not styling** — the
   "Styling surface" row can still read "maps 1:1" while classes go unmapped.
-- **The storage question is asked but never applied** (`localStorage` →
-  AsyncStorage is decided and then not acted on).
+- **The Validator is blind to browser APIs.** `expo/tsconfig.base` sets
+  `lib: ["DOM", "ESNext"]`, so `localStorage`/`window`/`navigator`/`document`
+  type-check, and Metro bundles them as valid JS — tsc + Metro can never fail
+  on one. Measured on the 11-project benchmark: **31 real occurrences across 6
+  projects**, all invisible to the gates. A green run says nothing about this
+  class. Dropping the DOM lib is NOT the fix — it also errors on 66 globals RN
+  really does provide (`setTimeout` alone is 48). Anything in this family
+  (`document`, `window`, `navigator`) has the same root, not a new discovery.
 - **The Analyzer does not predict `import.meta.env`.** The transformer rewrites
   it, but the Report/Ask stage never mentions the project has build-time env at
   all, so the migrated app's missing `EXPO_PUBLIC_*` keys are a surprise.
