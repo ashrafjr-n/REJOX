@@ -31,7 +31,10 @@ UNSIZED_IMAGE = "UNSIZED_IMAGE"            # <img> without explicit size — RN 
 RN_INCOMPATIBLE_CSS_PROP = "RN_INCOMPATIBLE_CSS_PROP"  # inline style prop RN can't do
 
 # Source / APIs
-WEB_API_USAGE = "WEB_API_USAGE"            # localStorage/window/document...
+WEB_API_USAGE = "WEB_API_USAGE"            # window/document/navigator — no RN equivalent
+WEB_STORAGE_USAGE = "WEB_STORAGE_USAGE"    # localStorage/sessionStorage — the transformer
+                                           # maps these; a different fact from the above,
+                                           # and it must not score like unhandled residue
 
 # Libraries
 UNSUPPORTED_LIBRARY = "UNSUPPORTED_LIBRARY"
