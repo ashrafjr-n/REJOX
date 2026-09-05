@@ -7,6 +7,7 @@ import {
   type JsxElement,
   type JsxSelfClosingElement,
   type JsxOpeningElement,
+  type SourceFile,
 } from 'ts-morph';
 import type { Ctx } from './types';
 
@@ -73,6 +74,31 @@ export function requestNamedImport(ctx: Ctx, module: string, name: string): void
     ctx.namedImports.set(module, names);
   }
   names.add(name);
+}
+
+/** Request a default import (injected by the imports transform). */
+export function requestDefaultImport(ctx: Ctx, module: string, name: string): void {
+  ctx.defaultImports.set(module, name);
+}
+
+/**
+ * A binding name not already taken anywhere in `sf`.
+ *
+ * An injected binding (`AsyncStorage`, `storage`, the async wrapper inside an
+ * effect) is a name WE choose, dropped into a file someone else wrote. Reusing
+ * a name the file already has does not fail — it shadows, and the original
+ * value silently disappears at every later use. So the preferred name is taken
+ * only when the file proves it is free.
+ */
+export function freshName(sf: SourceFile, preferred: string): string {
+  const taken = new Set(
+    sf.getDescendantsOfKind(SyntaxKind.Identifier).map((id) => id.getText()),
+  );
+  if (!taken.has(preferred)) return preferred;
+  for (let i = 2; ; i++) {
+    const candidate = `${preferred}${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
 }
 
 /**
