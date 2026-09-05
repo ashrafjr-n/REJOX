@@ -22,6 +22,9 @@ add a row here **first**, then implement it.
 | `localStorage`/`sessionStorage` `.getItem`/`.setItem`/`.removeItem`/`.clear`, written bare **or** on a global host (`window.localStorage`, `globalThis.sessionStorage`) | `AsyncStorage` (`@react-native-async-storage/async-storage`) **or** `react-native-mmkv` — the Ask stage's `storage` answer decides | Medium | Two different problems behind one question. MMKV is **synchronous**, so it is a pure rename. AsyncStorage is **async**, so the rename is the easy half: every call site must also become awaited, and a `Promise` left where a `string` was is silent data corruption, not a type error. |
 | `sessionStorage` specifically     | the same store, with a **persistence warning**              | Medium | Neither RN store is session-scoped. The data now outlives the app launch that wrote it. The behaviour change is real and is reported, never silently absorbed. |
 | `localStorage.length` / `.key(i)` / property access (`localStorage.token`) / the object passed as a value | — (no equivalent) | Low | Residue code `WEB_STORAGE`. Neither RN store enumerates keys the way the Storage interface does, and an object passed around is a call site the transform cannot see. |
+| `document` / `history` / `location`  | — (no equivalent)                       | Low  | Residue code `WEB_GLOBAL`. React Native has no DOM and no URL bar: these are simply absent, and the first read throws. |
+| `window.X` / `navigator.X` (beyond storage) | `useWindowDimensions` / `Dimensions` / `Platform` / an Expo module | Low | Residue code `WEB_GLOBAL`. RN **does** define `window` and `navigator` as globals, so the identifier resolves and nothing throws until a DOM-only property comes back `undefined` — which is why these are the hardest of the family to notice. |
+| `alert(…)`                        | `Alert.alert(…)` (`react-native`)           | Medium | RN polyfills the global `alert`, so this one works — it is reported as a **warning**, not residue. `confirm`/`prompt` have no polyfill. |
 | `<a href>`                        | `Linking.openURL` / `<Pressable>`           | Medium     | External links → `Linking`; internal → navigation. |
 | `import.meta.env.VITE_X` (Vite build-time env) | `process.env.EXPO_PUBLIC_X`             | High       | Both are inlined by the bundler, so the read stays a static member expression — Metro only inlines `process.env.EXPO_PUBLIC_*` written out in full. The `VITE_` prefix is dropped: it is Vite's marker for "safe to ship to the client", and `EXPO_PUBLIC_` is Expo's. The **value** does not migrate — a `.env` is not part of an uploaded project, and a key that reaches the client is public either way. |
 | `import.meta.env.DEV` / `.PROD` / `.MODE` / `.SSR` | `__DEV__` / `(!__DEV__)` / `(__DEV__ ? 'development' : 'production')` / `false` | High | RN's own build flag. `SSR` is `false`: there is no server render of a native app. |
@@ -108,6 +111,7 @@ comment so nothing is ever silently dropped:
 | `WEB_ONLY_ELEMENT` | `table`/`canvas`/`iframe`/…                                   | needs a component redesign |
 | `BUILD_ENV`     | `import.meta` in a form no static rewrite covers                 | where the value comes from once a build-time bundler constant is gone — an `EXPO_PUBLIC_` key, a native config, or a runtime fetch — is an app-configuration decision |
 | `WEB_STORAGE`   | a web-storage call the async rewrite cannot place an `await` on (module scope, a `useState` initializer, an effect with a cleanup, a value consumed synchronously), or a Storage member with no RN equivalent (`.length`, `.key(i)`, property access) | where a synchronous read belongs once the store became a `Promise` — an initial-state effect, a loading flag, a different store — is a component-shape decision, not a rename. Only under the **MMKV** answer does this residue disappear entirely: a synchronous store needs no placement at all |
+| `WEB_GLOBAL`    | a browser global RN does not provide (`document`, `history`, `location`) or provides without its DOM surface (`window`, `navigator`) | what replaces a DOM read is a per-call-site design decision — `window.innerWidth` becomes `useWindowDimensions()`, `document.getElementById` becomes a ref, `location` becomes navigation state. There is no rename that covers them. |
 
 > **Update — most of this "residue" turned out to be rules.** Each of the codes
 > below now has an AI-Resolution-Engine resolver that handles it deterministically;
@@ -117,6 +121,32 @@ comment so nothing is ever silently dropped:
 > - `NAV_ACTIVE` → focus-state rule (`useIsFocused`) — **0 LLM**.
 > - `NAV_CONTAINER` wiring → navigator generated from the route table — **0 LLM, no TODO survives**.
 > - Navigator **shape** (tabs/stack/drawer) is the *only* genuine reasoning → **1 LLM call**, and even then the LLM returns a spec, not code.
+
+## The browser-globals guard — why a closed list, not the type checker
+
+`tsc` and Metro **cannot** catch this family, and the reason is structural:
+`expo/tsconfig.base` sets `lib: ["DOM", "ESNext"]`, so every browser global
+type-checks, and Metro bundles them because they are valid JavaScript. A
+migrated app can pass both gates and still die on its first render.
+
+The obvious fix — drop `DOM` from the emitted `tsconfig.json` — was measured
+against the 11-project benchmark and **rejected**:
+
+| | count |
+| --- | --- |
+| real hidden bugs it would newly catch (`window` 20, `localStorage` 10, `navigator` 1) | **31, across 6 of 11 projects** |
+| **false** errors on globals React Native really does provide (`setTimeout` 48, `FormData` 10, `clearTimeout` 2, `fetch` 2, `URL` 2, `setInterval`/`clearInterval` 2) | **66** |
+
+Two false alarms per real find, and one benchmark project alone (`07`) would
+turn red over 63 `setTimeout` calls that work perfectly on a device. A gate that
+fails working code teaches people to ignore it.
+
+So the guard is a **closed list we maintain**, not a lib the compiler maintains:
+`setTimeout` is not on it, so it can never be flagged, and the 31 real ones
+still are. The list lives in `backend/codemod-worker/src/transforms/globals.ts`,
+each entry carrying its own message and its own severity — a global RN really
+does provide (`alert`) is a warning, never residue, because claiming it crashes
+would be as wrong as missing it.
 
 ## Automated by the AI Resolution Engine — Styling Resolver (tiers 1–2)
 
