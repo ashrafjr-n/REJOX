@@ -142,11 +142,17 @@ turn red over 63 `setTimeout` calls that work perfectly on a device. A gate that
 fails working code teaches people to ignore it.
 
 So the guard is a **closed list we maintain**, not a lib the compiler maintains:
-`setTimeout` is not on it, so it can never be flagged, and the 31 real ones
-still are. The list lives in `backend/codemod-worker/src/transforms/globals.ts`,
+`setTimeout` is not on it, so it can never be flagged. Re-measured on the same
+11 projects after it shipped: **20 `WEB_GLOBAL` + 11 `WEB_STORAGE` residue + 10
+converted storage calls, across 6 projects — and zero of the 66 false alarms**
+(no `setTimeout`, `fetch`, `FormData`, `URL`, `clearTimeout`, `setInterval`).
+Before it, every one of those sites left the pipeline unmentioned. The list lives in `backend/codemod-worker/src/transforms/globals.ts`,
 each entry carrying its own message and its own severity — a global RN really
 does provide (`alert`) is a warning, never residue, because claiming it crashes
-would be as wrong as missing it.
+would be as wrong as missing it. One expression is named **once**:
+`window.location.pathname` is a single fix, so the inner, more specific global
+wins and `window` steps aside — including for `window.localStorage`, which the
+storage rule describes better than this list can.
 
 ## Automated by the AI Resolution Engine — Styling Resolver (tiers 1–2)
 
