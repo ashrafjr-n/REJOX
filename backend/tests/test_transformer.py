@@ -547,6 +547,100 @@ def test_scaffold_pins_a_storage_package_the_source_never_declared() -> None:
         assert "react-native-mmkv" in res.dependencies
 
 
+# --- The browser-globals guard: a closed list, not the type checker -----------
+#
+# `tsc` + Metro cannot fail on a browser global (Expo's tsconfig base includes
+# the DOM lib; Metro bundles valid JS), so a migrated app can pass both gates
+# and die on first render. Dropping the DOM lib was measured on the 11-project
+# benchmark and rejected: 31 real finds against 66 false ones. Hence a list we
+# maintain — these tests pin BOTH halves of it.
+
+
+def test_globals_with_no_rn_equivalent_are_residue(options: dict) -> None:
+    r = _transform_source(
+        "export function P() {\n"
+        "  const d = document.getElementById('x');\n"
+        "  const w = window.innerWidth;\n"
+        "  const n = navigator.clipboard;\n"
+        "  history.back();\n"
+        "  return <span>{String(d)}{w}{String(n)}</span>;\n"
+        "}\n",
+        options,
+    )
+    assert "WEB_GLOBAL" in _codes(r)
+    assert len([u for u in r.unhandled if u.code == "WEB_GLOBAL"]) == 4
+    # The message distinguishes absent from present-but-hollow — `window` is
+    # the dangerous one precisely because nothing throws.
+    todos = "\n".join(l for l in r.code.splitlines() if "WEB_GLOBAL" in l)
+    assert "document is not defined" in todos
+    assert "window exists in React Native but carries none" in todos
+
+
+def test_globals_react_native_really_provides_are_never_flagged(
+    options: dict,
+) -> None:
+    """The whole reason for a closed list. `setTimeout` alone was 48 of the 66
+    false errors that dropping the DOM lib would have produced."""
+    r = _transform_source(
+        "export function P() {\n"
+        "  const t = setTimeout(() => {}, 1);\n"
+        "  clearTimeout(t);\n"
+        "  const i = setInterval(() => {}, 1);\n"
+        "  clearInterval(i);\n"
+        "  const f = fetch('/x');\n"
+        "  const fd = new FormData();\n"
+        "  const u = new URL('https://x.dev');\n"
+        "  console.log(f, fd, u);\n"
+        "  return <span>ok</span>;\n"
+        "}\n",
+        options,
+    )
+    assert "WEB_GLOBAL" not in _codes(r)
+    assert not any(w.code == "WEB_GLOBAL" for w in r.warnings)
+
+
+def test_alert_is_a_warning_because_react_native_polyfills_it(
+    options: dict,
+) -> None:
+    """Claiming this one crashes would be as wrong as missing the others."""
+    r = _transform_source(
+        "export function P() {\n"
+        "  alert('hi');\n"
+        "  return <span>ok</span>;\n"
+        "}\n",
+        options,
+    )
+    assert "WEB_GLOBAL" not in _codes(r)  # NOT residue — it works
+    assert any(w.code == "WEB_GLOBAL" for w in r.warnings)
+    assert "polyfills" in " ".join(w.message for w in r.warnings)
+
+
+def test_a_local_name_matching_a_global_is_not_flagged(options: dict) -> None:
+    """A prop or field named `location` is not the browser's — zero noise is
+    the guard's whole claim, so the shadowing cases are part of the contract."""
+    r = _transform_source(
+        "const router = { location: '/x' };\n"
+        "export function P({ location }: { location: string }) {\n"
+        "  return <span>{router.location}{location}</span>;\n"
+        "}\n",
+        options,
+    )
+    assert "WEB_GLOBAL" not in _codes(r)
+    assert not any(w.code == "WEB_GLOBAL" for w in r.warnings)
+
+
+def test_storage_is_left_to_the_storage_rule_not_double_reported(
+    options: dict,
+) -> None:
+    """Both rules see `localStorage`; only the specific one may report it."""
+    r = _transform_source(
+        "export const boot = localStorage.getItem('k');\n",
+        {**options, **ASYNC_ANSWERS},
+    )
+    assert _codes(r) == {"WEB_STORAGE"}  # not WEB_GLOBAL as well
+    assert len(r.unhandled) == 1
+
+
 # --- The non-negotiable: every output is valid TS -------------------------------
 
 
