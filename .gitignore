@@ -67,3 +67,5 @@ hardening-projects/
 
 # graphify knowledge graph (local)
 graphify-out/
+
+.gitattributes
