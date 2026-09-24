@@ -5,9 +5,9 @@
 #
 #   backend/scripts/wheel-smoke.sh [python]      # default: python3
 #
-# Passes only when tsc and Metro both PASS on the emitted project. The venv's
-# site-packages is made read-only first, so any write into the install dir fails
-# the run instead of going unnoticed.
+# Passes only when `rejox migrate` exits 0: tsc and Metro both PASS on the
+# emitted project. The venv's site-packages is made read-only first, so any
+# write into the install dir fails the run instead of going unnoticed.
 set -euo pipefail
 
 BACKEND="$(cd "$(dirname "$0")/.." && pwd)"
@@ -39,10 +39,8 @@ cd "$WORK"
 export XDG_CACHE_HOME="$WORK/cache"
 export PYTHONDONTWRITEBYTECODE=1
 unset REJOX_WORKSPACE_ROOT REJOX_AI_CACHE GEMINI_API_KEY REJOX_AI_PROVIDER
-"$WORK/venv/bin/rejox" migrate "$SAMPLE" --yes --out "$WORK/out" 2>&1 | tee "$WORK/migrate.log"
-
-# ponytail: grep on the rendered table until `migrate` exits non-zero on a
-# failed validation (packaging plan, phase 2); then this is just the exit code.
-grep -Eq 'Typecheck \(tsc\) +PASS' "$WORK/migrate.log" || { echo "FAIL: tsc did not pass"; exit 1; }
-grep -Eq 'Bundle \(Metro\) +PASS' "$WORK/migrate.log" || { echo "FAIL: Metro did not pass"; exit 1; }
+"$WORK/venv/bin/rejox" doctor
+# Exit 0 means tsc and Metro both passed (1 = validation failed; see --help).
+"$WORK/venv/bin/rejox" migrate "$SAMPLE" --no-input --out "$WORK/out" \
+  || { echo "FAIL: rejox migrate exited $?"; exit 1; }
 echo "==> PASS: the installed wheel migrated sample-app (tsc + Metro)"
