@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "rejox"
@@ -9,6 +9,7 @@ description = "Rejox — AI migration engineer: React → React Native. CLI + pi
 requires-python = ">=3.11"
 # Functional Source License (FSL-1.1-ALv2) — see LICENSE at the repo root.
 license = "FSL-1.1-ALv2"
+license-files = ["LICENSE"]
 dependencies = [
     "fastapi==0.115.6",
     "uvicorn[standard]==0.34.0",
@@ -30,6 +31,29 @@ dev = ["pytest==8.3.4", "httpx==0.28.1"]
 rejox = "rejox.cli:app"
 rejox-worker = "rejox.server.worker:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["rejox*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/rejox"]
+# The worker bundles are built (hatch_build.py), not committed — gitignored
+# files are left out of a build unless named as artifacts.
+artifacts = ["src/rejox/_workers/*"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+
+# An sdist carries the worker sources, so a wheel built from it bundles them the
+# same way a checkout does (Node 20+ needed to build from source).
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/rejox",
+    "scripts/bundle_workers.py",
+    "hatch_build.py",
+    "LICENSE",
+    "parser-worker/src",
+    "parser-worker/package.json",
+    "parser-worker/package-lock.json",
+    "parser-worker/tsconfig.json",  # esbuild reads it (strict mode)
+    "codemod-worker/src",
+    "codemod-worker/package.json",
+    "codemod-worker/package-lock.json",
+    "codemod-worker/tsconfig.json",  # esbuild reads it (strict mode)
+]
+exclude = ["src/rejox/_workers"]
