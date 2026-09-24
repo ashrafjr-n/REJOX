@@ -58,6 +58,13 @@ def bundle(worker: Worker) -> Path:
     return path
 
 
+def preflight() -> None:
+    """Check Node and both bundles up front, so a run fails in its first second."""
+    node()
+    for worker in ("parser", "codemod"):
+        bundle(worker)
+
+
 def run(worker: Worker, args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
     """Run ``node <worker>.js *args`` and capture its text output.
 

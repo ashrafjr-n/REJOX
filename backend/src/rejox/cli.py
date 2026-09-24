@@ -1,6 +1,7 @@
 """Rejox CLI — run the whole migration end-to-end from the terminal.
 
-    rejox migrate <project-path> [--out <dir>] [--yes] [--no-validate]
+    rejox migrate <project-path> [--out <dir>] [--force] [--yes] [--no-validate] [--json]
+    rejox doctor
 
 This is the terminal face of the pipeline the API already chains
 (parse → analyze → plan → emit → validate). It calls the pipeline functions
@@ -15,12 +16,16 @@ shape) degrades to the deterministic default and everything else is unchanged.
 
 from __future__ import annotations
 
+import contextlib
+import importlib.metadata
 import os
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Optional
 
+import click
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -28,10 +33,12 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+from rejox import workers
 from rejox.models.analysis import AnalysisReport
 from rejox.models.knowledge_graph import KnowledgeGraph
 from rejox.models.plan import MigrationPlan, Question
-from rejox.pipeline.analyzer import AnalyzerError, analyze_graph
+from rejox.models.summary import LlmUsage, MigrationSummary, ResidueItem
+from rejox.pipeline.analyzer import AnalyzerError, NothingToMigrate, analyze_graph
 from rejox.pipeline.emit import emit_project
 from rejox.pipeline.intelligence import IntelligenceError, build_knowledge_graph
 from rejox.pipeline.planner import PlannerError, plan_migration
@@ -40,6 +47,7 @@ from rejox.pipeline.validator import (
     validate_project,
     validated_scores,
 )
+from rejox.workers import WorkerUnavailable
 
 app = typer.Typer(add_completion=False, help="Rejox — AI migration engineer: React → React Native.")
 console = Console()
@@ -518,64 +526,145 @@ def _seed_offline_shape(provider, routes, nav_ui) -> None:
 # --- command -----------------------------------------------------------------
 
 
+# --- exit codes ----------------------------------------------------------------
+# A contract with every script and CI job that runs `rejox migrate`: documented
+# in `rejox migrate --help` and the README, and never renumbered.
+EXIT_OK = 0
+EXIT_VALIDATION_FAILED = 1
+EXIT_USAGE = 2  # also what Typer/Click use for a bad flag or missing argument
+EXIT_ENVIRONMENT = 3
+EXIT_REFUSED = 4
+EXIT_INTERNAL = 70  # sysexits EX_SOFTWARE
+
+_EXIT_CODES_HELP = (
+    "Exit codes: 0 migrated (validation passed, or skipped with --no-validate) · "
+    "1 migrated but validation (tsc/Metro) failed · 2 usage error · "
+    "3 environment (Node 20+, npm or a worker bundle missing) · "
+    "4 input refused (no React components to migrate) · 70 internal error "
+    "(re-run with --debug for the traceback)."
+)
+
+
+def _fail(code: int, message: str) -> typer.Exit:
+    console.print(f"[red]{message}[/]")
+    return typer.Exit(code=code)
+
+
+@contextlib.contextmanager
+def _exit_codes(debug: bool):
+    """Turn the failures a user can act on into a message and an exit code.
+
+    Anything else is a bug in Rejox: one line and exit 70, or the traceback with
+    ``--debug``. Click's own exits (usage errors, ``typer.Exit``) pass through.
+    """
+    try:
+        yield
+    except (click.exceptions.Exit, click.exceptions.Abort, click.ClickException):
+        raise
+    except WorkerUnavailable as exc:
+        raise _fail(EXIT_ENVIRONMENT, str(exc)) from exc
+    except ValidatorError as exc:
+        raise _fail(EXIT_ENVIRONMENT, f"Validation could not run: {exc}") from exc
+    except NothingToMigrate as exc:
+        raise _fail(EXIT_REFUSED, f"Nothing to migrate: {exc}") from exc
+    except Exception as exc:
+        if debug:
+            raise
+        raise _fail(
+            EXIT_INTERNAL,
+            f"Internal error ({type(exc).__name__}): {exc}\nRe-run with --debug for the traceback.",
+        ) from exc
+
+
+def _version(value: bool) -> None:
+    if value:
+        typer.echo(f"rejox {importlib.metadata.version('rejox')}")
+        raise typer.Exit()
+
+
 @app.callback()
-def _main() -> None:
+def _main(
+    ctx: typer.Context,
+    version: bool = typer.Option(
+        False, "--version", callback=_version, is_eager=True, help="Print the version and exit."
+    ),
+    debug: bool = typer.Option(False, "--debug", help="Show the full traceback on an internal error."),
+) -> None:
     """Rejox — AI migration engineer: React → React Native."""
+    ctx.obj = {"debug": debug}
 
 
-@app.command()
+def _default_out(src: Path) -> Path:
+    return Path.cwd() / f"{src.name}-native"
+
+
+@app.command(epilog=_EXIT_CODES_HELP)
 def migrate(
+    ctx: typer.Context,
     project_path: Path = typer.Argument(..., help="Path to the React project to migrate."),
-    out: Optional[Path] = typer.Option(None, "--out", help="Output dir for the RN project (temp dir if omitted)."),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Accept all recommended answers non-interactively."),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Output dir for the RN project (default: ./<project>-native)."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Write into --out even if it is not empty (existing files are kept)."
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", "--no-input",
+        help="Accept every recommended answer without prompting (implied when stdin is not a terminal).",
+    ),
     no_validate: bool = typer.Option(False, "--no-validate", help="Skip the tsc + Metro validation stage."),
+    as_json: bool = typer.Option(
+        False, "--json",
+        help="Print a machine-readable summary on stdout; progress goes to stderr. Implies --no-input.",
+    ),
 ) -> None:
     """Migrate a React project to React Native, end to end."""
-    from rejox.ai.cache import ResolutionCache
+    debug = bool(ctx.obj and ctx.obj.get("debug"))
+    if as_json:
+        console.stderr = True
+    auto = yes or as_json or not sys.stdin.isatty()
 
     src = project_path.expanduser().resolve()
     if not src.is_dir():
-        console.print(f"[red]Not a directory:[/] {src}")
-        raise typer.Exit(code=1)
+        raise _fail(EXIT_USAGE, f"Not a directory: {src}")
+    out_dir = (out.expanduser().resolve() if out else _default_out(src))
+    if out_dir.exists() and not out_dir.is_dir():
+        raise _fail(EXIT_USAGE, f"--out is a file, not a directory: {out_dir}")
+    if out_dir.is_dir() and any(out_dir.iterdir()) and not force:
+        raise _fail(EXIT_USAGE, f"{out_dir} is not empty. Choose another --out, or pass --force.")
+
+    with _exit_codes(debug):
+        # Fail in the first second, not after the analysis: every stage needs these.
+        workers.preflight()
+        code = _migrate(src, out_dir, auto, no_validate, as_json)
+    raise typer.Exit(code=code)
+
+
+def _migrate(src: Path, out_dir: Path, auto: bool, no_validate: bool, as_json: bool) -> int:
+    from rejox.ai.cache import ResolutionCache
 
     console.print(Rule(Text("Rejox — React → React Native", style="bold white"), style="white"))
 
     # 1. Analyze.
     _stage("Intelligence — analyzing the project")
-    try:
-        with console.status("[cyan]Building the knowledge graph…[/]", spinner="dots"):
-            kg = build_knowledge_graph(src)
-            report = analyze_graph(kg)
-    except (IntelligenceError, AnalyzerError) as exc:
-        console.print(f"[red]Analysis failed:[/] {exc}")
-        raise typer.Exit(code=1)
+    with console.status("[cyan]Building the knowledge graph…[/]", spinner="dots"):
+        kg = build_knowledge_graph(src)
+        report = analyze_graph(kg)
     _render_report(report)
 
-    try:
-        plan = plan_migration(report, kg)
-    except PlannerError as exc:
-        console.print(f"[red]Planning failed:[/] {exc}")
-        raise typer.Exit(code=1)
+    plan = plan_migration(report, kg)
 
     # 2. Ask.
     inner, ai_label = _make_provider()
     console.print(f"[dim]AI provider:[/] {ai_label}")
     counter = _CountingProvider(inner) if inner is not None else _CountingProvider(_NullProvider())
-    answers, proposal = _ask(report, kg, plan, inner, counter, yes)
+    answers, proposal = _ask(report, kg, plan, inner, counter, auto)
 
     # 3. Plan.
     _render_plan(plan)
 
     # 4. Migrate.
     _stage("Migrate — emitting the React Native project")
-    # One workspace code path: an explicit --out wins; otherwise emit into a
-    # run's output/ dir (same layout uploads use), not an ad-hoc temp dir.
-    if out:
-        out_dir = out.expanduser().resolve()
-    else:
-        from rejox.pipeline import workspace
-
-        out_dir = workspace.new_run().output_dir
     with console.status("[cyan]Transforming files…[/]", spinner="dots"):
         emission = emit_project(plan, answers, kg, out_dir, report=report, source_root=src)
     console.print(f"Emitted [bold]{len([f for f in emission.files if f.sourceFile])}[/] files → [dim]{out_dir}[/]")
@@ -585,36 +674,129 @@ def migrate(
         tiers = _resolve_residue(emission, report, kg, src, counter, cache, proposal)
     _render_tier_breakdown(tiers, counter)
 
-    # 5. Validate (+ repair loop if needed).
+    # 5. Validate (+ repair loop if needed). A ValidatorError (a missing tool)
+    # propagates: the project is on disk, but its migration is unproven (exit 3).
     validation = scores = None
     repair = None
     if not no_validate:
-        try:
-            with console.status("[cyan]Validating (npm install · tsc · Metro)…[/]", spinner="dots"):
-                validation = validate_project(out_dir, install=True, run_bundle=True)
-            if not validation.passed and inner is not None:
-                from rejox.pipeline.repair import repair_project
+        with console.status("[cyan]Validating (npm install · tsc · Metro)…[/]", spinner="dots"):
+            validation = validate_project(out_dir, install=True, run_bundle=True)
+        if not validation.passed and inner is not None:
+            from rejox.pipeline.repair import repair_project
 
-                with console.status("[cyan]Repairing residue errors with the LLM…[/]", spinner="dots"):
-                    repair = repair_project(
-                        out_dir, emission, validation,
-                        provider=counter, source_root=src,
-                    )
-                validation = repair.validation or validation
-            scores = validated_scores(
-                emission, validation,
-                predicted_coverage=report.coverage, predicted_confidence=report.confidence,
-            )
-        except ValidatorError as exc:
-            console.print(f"[yellow]Validation could not run:[/] {exc}")
-        if validation is not None:
-            _render_validation(validation, scores, repair)
+            with console.status("[cyan]Repairing residue errors with the LLM…[/]", spinner="dots"):
+                repair = repair_project(
+                    out_dir, emission, validation,
+                    provider=counter, source_root=src,
+                )
+            validation = repair.validation or validation
+        scores = validated_scores(
+            emission, validation,
+            predicted_coverage=report.coverage, predicted_confidence=report.confidence,
+        )
+        _render_validation(validation, scores, repair)
 
     # 6. Final report.
     _render_final(
         emission, validation, scores, out_dir, counter, cache, proposal,
         answers.get("navigator-shape"),
     )
+    code = EXIT_VALIDATION_FAILED if validation is not None and not validation.passed else EXIT_OK
+    if as_json:
+        summary = MigrationSummary(
+            rejoxVersion=importlib.metadata.version("rejox"),
+            exitCode=code,
+            project=str(src),
+            output=str(out_dir),
+            answers=answers,
+            predictedCoverage=report.coverage,
+            predictedConfidence=report.confidence,
+            risk=report.risk,
+            filesConverted=len([f for f in emission.files if f.sourceFile]),
+            filesSkipped=len(emission.skipped),
+            todoCount=emission.todoCount,
+            residue=[
+                ResidueItem(file=f.path, code=u.code)
+                for f in emission.files for u in f.unhandled
+            ],
+            validation=validation,
+            scores=scores,
+            llm=LlmUsage(
+                provider=ai_label, calls=counter.calls,
+                tokensIn=counter.tokensIn, tokensOut=counter.tokensOut,
+            ),
+        )
+        sys.stdout.write(summary.model_dump_json(indent=2) + "\n")
+    return code
+
+
+@app.command()
+def doctor() -> None:
+    """Check this machine can run a migration: Node, npm, the worker bundles."""
+    import platform
+    import shutil
+    import subprocess
+    import tempfile
+
+    from rejox import paths
+
+    rows: list[tuple[str, Optional[bool], str]] = []  # (check, ok / None = optional, detail)
+
+    def required(name: str, probe) -> None:
+        try:
+            rows.append((name, True, probe()))
+        except Exception as exc:  # each probe reports its own failure
+            rows.append((name, False, str(exc)))
+
+    def node_detail() -> str:
+        node = workers.node()
+        return f"{subprocess.run([node, '--version'], capture_output=True, text=True).stdout.strip()} ({node})"
+
+    def npm_detail() -> str:
+        npm = shutil.which("npm")
+        if npm is None:
+            raise RuntimeError("not on PATH — needed to validate the output (or pass --no-validate)")
+        return npm
+
+    def cache_detail() -> str:
+        root = paths.cache_dir()
+        root.mkdir(parents=True, exist_ok=True)
+        tempfile.TemporaryFile(dir=root).close()
+        return f"{root} (writable)"
+
+    def docker_detail() -> str:
+        if shutil.which("docker") is None:
+            raise RuntimeError("REJOX_SANDBOX=docker but `docker` is not on PATH")
+        info = subprocess.run(["docker", "info", "--format", "{{.ServerVersion}}"],
+                              capture_output=True, text=True, timeout=15)
+        if info.returncode != 0:
+            raise RuntimeError("REJOX_SANDBOX=docker but no Docker daemon answers")
+        return f"daemon {info.stdout.strip()}"
+
+    rows.append(("rejox", True, f"{importlib.metadata.version('rejox')} on Python {platform.python_version()}"))
+    required(f"Node.js {workers.MIN_NODE_MAJOR}+", node_detail)
+    for worker in ("parser", "codemod"):
+        required(f"{worker} worker bundle", lambda w=worker: str(workers.bundle(w)))
+    required("npm", npm_detail)
+    required("cache directory", cache_detail)
+    if os.environ.get("REJOX_SANDBOX", "").strip().lower() == "docker":
+        required("Docker (REJOX_SANDBOX=docker)", docker_detail)
+    rows.append((
+        "GEMINI_API_KEY", None,
+        "set — the navigator step asks the AI" if os.environ.get("GEMINI_API_KEY")
+        else "not set — optional; the navigator step uses the deterministic default",
+    ))
+
+    t = Table(show_edge=False, box=None)
+    t.add_column(""); t.add_column("Check"); t.add_column("Detail", style="dim")
+    mark = {True: "[green]✓[/]", False: "[red]✗[/]", None: "[dim]–[/]"}
+    for name, ok, detail in rows:
+        t.add_row(mark[ok], name, detail)
+    console.print(t)
+
+    if any(ok is False for _, ok, _ in rows):
+        raise _fail(EXIT_ENVIRONMENT, "\nNot ready: fix the ✗ rows above.")
+    console.print("\n[green]Ready to migrate.[/]")
 
 
 # The committed benchmark and the graph fixture generated from it, relative to a
@@ -635,7 +817,7 @@ def _checkout_root() -> Path:
     return root
 
 
-@app.command(name="export-showcase")
+@app.command(name="export-showcase", hidden=True)
 def export_showcase(
     project_path: Path = typer.Option(
         None, "--project", help="Project to run (default: the committed sample-app benchmark)."
@@ -796,7 +978,7 @@ def export_showcase(
     console.print(t)
 
 
-@app.command(name="export-graph")
+@app.command(name="export-graph", hidden=True)
 def export_graph(
     project_path: Path = typer.Option(
         None, "--project", help="Project to parse (default: the committed sample-app benchmark)."
@@ -847,7 +1029,7 @@ def export_graph(
     console.print(t)
 
 
-@app.command()
+@app.command(hidden=True)
 def sweep(
     ttl: Optional[int] = typer.Option(
         None, "--ttl", help="Retention window in seconds (default: REJOX_RUN_TTL_SECONDS, else 24h)."
