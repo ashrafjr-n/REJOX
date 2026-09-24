@@ -47,12 +47,12 @@ Gates go red again when the thing they test changes. Treat these as automatic:
 
 | Change to | Invalidates |
 | --- | --- |
-| `backend/app/pipeline/sandbox.py` | all of **A** |
-| `backend/app/pipeline/validator.py` | A1, A4, B3 |
-| `backend/app/pipeline/scaffold.py` | A8, A9 |
-| `backend/app/queue.py`, `backend/app/jobs.py` | all of **B** |
-| `backend/app/security.py` | all of **C** |
-| `backend/app/main.py`, `backend/app/pipeline/workspace.py` | C3 |
+| `backend/src/rejox/pipeline/sandbox.py` | all of **A** |
+| `backend/src/rejox/pipeline/validator.py` | A1, A4, B3 |
+| `backend/src/rejox/pipeline/scaffold.py` | A8, A9 |
+| `backend/src/rejox/server/queue.py`, `backend/src/rejox/server/jobs.py` | all of **B** |
+| `backend/src/rejox/server/security.py` | all of **C** |
+| `backend/src/rejox/server/main.py`, `backend/src/rejox/pipeline/workspace.py` | C3 |
 | `docker-compose.yml`, `backend/Dockerfile` | A0, A1, all of **B** |
 
 Section **D** exists so that these re-runs are not a matter of anyone
@@ -201,7 +201,7 @@ signature below carries the output it came from.
 execution endpoint with a nice report attached.
 
 These gates run against the deployed worker, through
-`app.pipeline.sandbox.run()` — the real seam, not a hand-written `docker run`.
+`rejox.pipeline.sandbox.run()` — the real seam, not a hand-written `docker run`.
 Testing a reimplementation of the flags proves the flags, not the product.
 
 ### Setup — the probe helper
@@ -1511,7 +1511,7 @@ Both must be empty for the refusal to fire, so both are emptied here.
 ```bash
 docker compose -f docker-compose.yml run --rm \
   -e REJOX_API_KEYS= -e REJOX_INVITE_CODES= -e REJOX_ALLOW_ANONYMOUS= \
-  -p 8001:8000 api uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+  -p 8001:8000 api uvicorn rejox.server.main:app --host 0.0.0.0 --port 8000 &
 sleep 5
 curl -s -o /tmp/b -w '%{http_code}\n' -X POST localhost:8001/api/parse \
   -H 'Content-Type: application/json' -d '{"path":"/tmp"}'

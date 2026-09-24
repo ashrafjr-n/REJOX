@@ -158,7 +158,7 @@ storage rule describes better than this list can.
 
 These resolve `TW_UNSUPPORTED` residue **deterministically**, before any LLM is
 consulted (see `ARCHITECTURE.md` → *the three-tier ladder*). Tier 1 = static map
-(`app/ai/styling/known_map.py`); tier 2 = pattern (`patterns.py`). Anything a
+(`rejox/ai/styling/known_map.py`); tier 2 = pattern (`patterns.py`). Anything a
 row here handles must **not** go to the LLM — that is the design, enforced by the
 ordering in `resolver.py`.
 
@@ -245,7 +245,7 @@ genuinely unresolvable (a runtime `<Link to>` → `NAV_LINK`), and it does not
 break the build.
 
 Anything the deterministic pass cannot fix goes to the **repair loop**
-(`app/pipeline/repair.py`): a single targeted LLM edit per remaining error,
+(`rejox/pipeline/repair.py`): a single targeted LLM edit per remaining error,
 re-validated, at most two rounds. When touching the NativeWind / navigation
 paths, re-run `pytest -m slow` to keep the gate honest.
 
