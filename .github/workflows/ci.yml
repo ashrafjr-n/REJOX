@@ -69,11 +69,13 @@ jobs:
         working-directory: backend
         run: pip install -e ".[dev]"
 
-      - name: Build the Node workers
+      # Installing bundles the workers (hatch_build.py); esbuild does not
+      # typecheck, so tsc still does, emitting nothing.
+      - name: Typecheck the Node workers
         working-directory: backend
         run: |
           for worker in parser-worker codemod-worker; do
-            (cd "$worker" && npm ci --no-audit --no-fund && npm run build)
+            (cd "$worker" && npx tsc -p tsconfig.json --noEmit)
           done
 
       # `sandbox_live` is deselected here, not skipped: it needs a daemon, and a
@@ -117,11 +119,13 @@ jobs:
         working-directory: backend
         run: pip install -e ".[dev]"
 
-      - name: Build the Node workers
+      # Installing bundles the workers (hatch_build.py); esbuild does not
+      # typecheck, so tsc still does, emitting nothing.
+      - name: Typecheck the Node workers
         working-directory: backend
         run: |
           for worker in parser-worker codemod-worker; do
-            (cd "$worker" && npm ci --no-audit --no-fund && npm run build)
+            (cd "$worker" && npx tsc -p tsconfig.json --noEmit)
           done
 
       - name: Test (slow)
@@ -152,6 +156,11 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
+
+      # Installing bundles the Node workers (hatch_build.py).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Install backend
         working-directory: backend
@@ -201,6 +210,31 @@ jobs:
         run: |
           REJOX_DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)" \
             ./verify-deployment.sh
+
+  # What a user installs, not what CI installs: every job above runs an
+  # editable checkout, which cannot notice a file missing from the wheel. This
+  # builds the wheel, installs it into a clean venv with a read-only
+  # site-packages, and migrates the benchmark from outside the repo. Python 3.11
+  # because it is the floor `requires-python` promises.
+  package:
+    name: Package (installed wheel migrates sample-app)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Wheel smoke
+        run: backend/scripts/wheel-smoke.sh python
 
   frontend:
     name: Frontend (types + lint + build)
