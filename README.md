@@ -15,7 +15,8 @@ backend (:8000) and the Vite dev server (:5173).
 **Prerequisites**
 
 - **Python 3.11+**
-- **Node 18+** (the deterministic parser/codemod workers run in Node)
+- **Node 20+** (the deterministic parser/codemod workers run in Node; installing
+  the backend bundles them with esbuild, so `npm` must be on PATH)
 - **No `GEMINI_API_KEY` needed** — the Upload → Analyze → Report path is fully
   deterministic and makes zero LLM calls. (A key is only used for the one AI
   step in the full *migrate* flow; see “AI is optional” below.)
@@ -115,7 +116,7 @@ without the backend running. To regenerate after changing a pydantic model:
 
 ```bash
 # 1. start the backend (so /openapi.json is served)
-cd backend && source venv/bin/activate && uvicorn app.main:app --port 8000
+cd backend && source venv/bin/activate && uvicorn rejox.server.main:app --port 8000
 # 2. in another shell:
 cd frontend && npm run types:gen
 ```
