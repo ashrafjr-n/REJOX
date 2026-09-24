@@ -10,25 +10,35 @@
 # throw-away container (REJOX_SANDBOX=docker), never in this one. See
 # docs/SECURITY.md.
 
-# --- Node workers: compiled once, copied in as dist/ --------------------------
-FROM node:20-bookworm-slim AS workers
+# --- Wheel: the same artifact a user installs ---------------------------------
+# Building the wheel runs hatch_build.py, which bundles both Node workers into
+# rejox/_workers/ with esbuild. So this stage needs Python and Node; the
+# runtime stage gets one self-contained wheel and no node_modules at all.
+FROM python:3.12-slim-bookworm AS wheel
+COPY --from=node:20-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:20-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 WORKDIR /build
 
+# Worker dependencies first, so a source-only change does not reinstall them
+# (the build hook skips `npm ci` when node_modules is already there).
 COPY parser-worker/package.json parser-worker/package-lock.json ./parser-worker/
 RUN cd parser-worker && npm ci --no-audit --no-fund --ignore-scripts
-COPY parser-worker/ ./parser-worker/
-RUN cd parser-worker && npm run build && npm prune --omit=dev
-
 COPY codemod-worker/package.json codemod-worker/package-lock.json ./codemod-worker/
 RUN cd codemod-worker && npm ci --no-audit --no-fund --ignore-scripts
+
+COPY pyproject.toml hatch_build.py LICENSE ./
+COPY scripts/bundle_workers.py ./scripts/
+COPY parser-worker/ ./parser-worker/
 COPY codemod-worker/ ./codemod-worker/
-RUN cd codemod-worker && npm run build && npm prune --omit=dev
+COPY src/ ./src/
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
 
 
 # --- Runtime ------------------------------------------------------------------
 FROM python:3.12-slim-bookworm AS runtime
 
-# Node for the two workers; the docker CLI so the sandbox can start sibling
+# Node to run the two worker bundles; the docker CLI so the sandbox can start sibling
 # containers through a mounted socket. No build toolchain in the final image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg \
@@ -58,12 +68,8 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY pyproject.toml ./
-COPY src/ ./src/
-RUN pip install --no-cache-dir --no-deps -e .
-
-COPY --from=workers /build/parser-worker/ ./parser-worker/
-COPY --from=workers /build/codemod-worker/ ./codemod-worker/
+COPY --from=wheel /wheels/ /tmp/wheels/
+RUN pip install --no-cache-dir --no-deps /tmp/wheels/*.whl && rm -rf /tmp/wheels
 
 # Non-root. The workspace volume is chowned so uploads and emitted projects are
 # writable without granting the process any privilege it does not need.
