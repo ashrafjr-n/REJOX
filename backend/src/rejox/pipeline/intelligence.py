@@ -10,17 +10,13 @@ validates it into a :class:`KnowledgeGraph` pydantic model.
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
 from pydantic import ValidationError
 
+from rejox import workers
 from rejox.models.knowledge_graph import KnowledgeGraph
-
-# parser-worker lives at backend/parser-worker; this file is backend/src/rejox/pipeline.
-WORKER_DIR = Path(__file__).resolve().parents[3] / "parser-worker"
-WORKER_ENTRY = WORKER_DIR / "dist" / "index.js"
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
@@ -32,68 +28,10 @@ FIXTURES_DIR = REPO_ROOT / "backend" / "tests" / "fixtures"
 
 # Generous ceiling; parsing is CPU-bound and local.
 PARSE_TIMEOUT_SECONDS = 300
-BUILD_TIMEOUT_SECONDS = 600
 
 
 class IntelligenceError(RuntimeError):
     """Raised when the parser-worker cannot produce a valid Knowledge Graph."""
-
-
-def _require_node() -> str:
-    """Return the path to the `node` binary or raise a clear error."""
-    node = shutil.which("node")
-    if node is None:
-        raise IntelligenceError(
-            "Node.js is required to run the parser-worker but `node` was not "
-            "found on PATH. Install Node 18+ and try again."
-        )
-    return node
-
-
-def _run(cmd: list[str], cwd: Path, timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        cmd,
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-def ensure_worker_built(force: bool = False) -> None:
-    """Build the parser-worker on first use.
-
-    Installs npm dependencies (if ``node_modules`` is missing) and compiles the
-    TypeScript to ``dist/`` (if the entry is missing). Idempotent.
-    """
-    if WORKER_ENTRY.exists() and not force:
-        return
-
-    _require_node()
-    npm = shutil.which("npm")
-    if npm is None:
-        raise IntelligenceError(
-            "`npm` was not found on PATH; it is required to build the "
-            "parser-worker on first run."
-        )
-
-    if not (WORKER_DIR / "node_modules").exists():
-        install = _run([npm, "install"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
-        if install.returncode != 0:
-            raise IntelligenceError(
-                "Failed to install parser-worker dependencies.\n"
-                f"stderr:\n{install.stderr}"
-            )
-
-    build = _run([npm, "run", "build"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
-    if build.returncode != 0:
-        raise IntelligenceError(
-            f"Failed to build parser-worker.\nstderr:\n{build.stderr}"
-        )
-    if not WORKER_ENTRY.exists():
-        raise IntelligenceError(
-            f"parser-worker build reported success but {WORKER_ENTRY} is missing."
-        )
 
 
 def build_knowledge_graph(path: Path) -> KnowledgeGraph:
@@ -111,15 +49,8 @@ def build_knowledge_graph(path: Path) -> KnowledgeGraph:
     if not project_path.is_dir():
         raise IntelligenceError(f"Not a directory: {project_path}")
 
-    node = _require_node()
-    ensure_worker_built()
-
     try:
-        proc = _run(
-            [node, str(WORKER_ENTRY), str(project_path)],
-            WORKER_DIR,
-            PARSE_TIMEOUT_SECONDS,
-        )
+        proc = workers.run("parser", [str(project_path)], PARSE_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as exc:
         raise IntelligenceError(
             f"parser-worker timed out after {PARSE_TIMEOUT_SECONDS}s on {project_path}."

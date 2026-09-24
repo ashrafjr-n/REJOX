@@ -12,72 +12,22 @@ which handles only genuine-reasoning residue.
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import ValidationError
 
+from rejox import workers
 from rejox.models.analysis import AnalysisReport
 from rejox.models.knowledge_graph import KnowledgeGraph
 from rejox.models.transformation import TransformResult
 
-# codemod-worker lives at backend/codemod-worker; this file is backend/src/rejox/pipeline.
-WORKER_DIR = Path(__file__).resolve().parents[3] / "codemod-worker"
-WORKER_ENTRY = WORKER_DIR / "dist" / "index.js"
-CHECK_ENTRY = WORKER_DIR / "dist" / "check.js"
-
 CONVERT_TIMEOUT_SECONDS = 120
-BUILD_TIMEOUT_SECONDS = 600
 
 
 class TransformerError(RuntimeError):
     """Raised when the codemod-worker cannot produce a valid TransformResult."""
-
-
-def _require_node() -> str:
-    node = shutil.which("node")
-    if node is None:
-        raise TransformerError(
-            "Node.js is required to run the codemod-worker but `node` was not "
-            "found on PATH. Install Node 18+ and try again."
-        )
-    return node
-
-
-def _run(cmd: list[str], cwd: Path, timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
-
-
-def ensure_worker_built(force: bool = False) -> None:
-    """Build the codemod-worker on first use (idempotent)."""
-    if WORKER_ENTRY.exists() and not force:
-        return
-
-    _require_node()
-    npm = shutil.which("npm")
-    if npm is None:
-        raise TransformerError(
-            "`npm` was not found on PATH; it is required to build the "
-            "codemod-worker on first run."
-        )
-
-    if not (WORKER_DIR / "node_modules").exists():
-        install = _run([npm, "install"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
-        if install.returncode != 0:
-            raise TransformerError(
-                "Failed to install codemod-worker dependencies.\n"
-                f"stderr:\n{install.stderr}"
-            )
-
-    build = _run([npm, "run", "build"], WORKER_DIR, BUILD_TIMEOUT_SECONDS)
-    if build.returncode != 0:
-        raise TransformerError(f"Failed to build codemod-worker.\nstderr:\n{build.stderr}")
-    if not WORKER_ENTRY.exists():
-        raise TransformerError(
-            f"codemod-worker build reported success but {WORKER_ENTRY} is missing."
-        )
 
 
 # Any DOM attributes interface carries the DOM onClick — a component whose
@@ -150,12 +100,10 @@ def transform_component(
     if not source.is_file():
         raise TransformerError(f"Not a file: {source}")
 
-    node = _require_node()
-    ensure_worker_built()
-
-    args = [node, str(WORKER_ENTRY), str(source), json.dumps(options or {})]
     try:
-        proc = _run(args, WORKER_DIR, CONVERT_TIMEOUT_SECONDS)
+        proc = workers.run(
+            "codemod", ["convert", str(source), json.dumps(options or {})], CONVERT_TIMEOUT_SECONDS
+        )
     except subprocess.TimeoutExpired as exc:
         raise TransformerError(
             f"codemod-worker timed out after {CONVERT_TIMEOUT_SECONDS}s on {source}."
@@ -193,15 +141,13 @@ def check_syntax(code: str) -> int:
     """
     import tempfile
 
-    node = _require_node()
-    ensure_worker_built()
     with tempfile.NamedTemporaryFile(
         "w", suffix=".tsx", delete=False, encoding="utf-8"
     ) as fh:
         fh.write(code)
         tmp = Path(fh.name)
     try:
-        proc = _run([node, str(CHECK_ENTRY), str(tmp)], WORKER_DIR, CONVERT_TIMEOUT_SECONDS)
+        proc = workers.run("codemod", ["check", str(tmp)], CONVERT_TIMEOUT_SECONDS)
         if proc.returncode != 0:
             raise TransformerError(f"syntax check failed:\n{proc.stderr.strip()}")
         return int(proc.stdout.strip() or "0")

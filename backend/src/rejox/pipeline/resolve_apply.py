@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from rejox import workers
 from rejox.ai.cache import ResolutionCache
 from rejox.ai.css import resolve_css_module
 from rejox.ai.css.parser import rewrite_component
@@ -29,9 +30,7 @@ from rejox.ai.navigation import resolve_nav_active
 from rejox.ai.provider import LLMProvider
 from rejox.ai.styling import MappedResidue, resolve_styling
 from rejox.models.transformation import UnhandledItem
-from rejox.pipeline.transformer import WORKER_DIR, _require_node, _run, ensure_worker_built
 
-APPLY_ENTRY = WORKER_DIR / "dist" / "apply.js"
 _APPLY_TIMEOUT = 120
 
 _CSS_IMPORT_RE = re.compile(r"""import\s+\w+\s+from\s+['"]([^'"]+\.module\.css)['"]""")
@@ -52,15 +51,11 @@ class ApplyOutcome:
 
 
 def _run_apply(component_path: Path, plan: dict[str, Any]) -> str:
-    node = _require_node()
-    ensure_worker_built()
-    if not APPLY_ENTRY.exists():
-        ensure_worker_built(force=True)
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
         json.dump(plan, fh)
         plan_file = Path(fh.name)
     try:
-        proc = _run([node, str(APPLY_ENTRY), str(component_path), str(plan_file)], WORKER_DIR, _APPLY_TIMEOUT)
+        proc = workers.run("codemod", ["apply", str(component_path), str(plan_file)], _APPLY_TIMEOUT)
         if proc.returncode != 0:
             raise RuntimeError(f"apply-worker failed on {component_path}:\n{proc.stderr.strip()}")
         return proc.stdout
