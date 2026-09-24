@@ -324,20 +324,37 @@ ever — and both are listed under known gaps in
 cd backend
 python -m venv venv && source venv/bin/activate
 pip install -e .                 # installs the `rejox` CLI
+rejox doctor                     # checks Node 20+, npm and the worker bundles
 rejox migrate ../test-projects/sample-app
 ```
 
 That runs the whole pipeline end to end in the terminal:
 
 ```
-rejox migrate <project-path> [--out <dir>] [--yes] [--no-validate]
+rejox migrate <project-path> [--out <dir>] [--force] [--yes] [--no-validate] [--json]
 ```
 
 | Flag | Meaning |
 | --- | --- |
-| `--out <dir>` | Where to write the React Native project (a temp dir otherwise). |
-| `--yes`, `-y` | Accept every recommended answer non-interactively. |
+| `--out <dir>` | Where to write the React Native project (default: `./<project>-native`). |
+| `--force` | Write into `--out` even if it is not empty (files already there are kept). |
+| `--yes`, `-y`, `--no-input` | Accept every recommended answer without prompting. Implied when stdin is not a terminal. |
 | `--no-validate` | Skip the `tsc` + Metro validation stage (fast). |
+| `--json` | Print a machine-readable summary on stdout (progress goes to stderr). Implies `--no-input`. |
+
+`rejox --version` prints the version; `rejox --debug migrate …` shows the full
+traceback if Rejox itself fails.
+
+**Exit codes** — stable, for scripts and CI:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Migrated; validation passed (or was skipped with `--no-validate`). |
+| `1` | Migrated, but validation (`tsc` / Metro) failed. |
+| `2` | Usage error (bad flag, missing project, non-empty `--out` without `--force`). |
+| `3` | Environment: Node 20+, `npm` or a worker bundle is missing — run `rejox doctor`. |
+| `4` | Input refused: the project has no React components to migrate. |
+| `70` | Internal error in Rejox; re-run with `--debug` for the traceback. |
 
 ### AI is optional
 
