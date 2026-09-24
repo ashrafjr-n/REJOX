@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from app.ai.css import resolve_css_module, rewrite_component_source
-from app.ai.css.property_map import length, map_declaration, split_color
-from app.ai.provider import FakeProvider
+from rejox.ai.css import resolve_css_module, rewrite_component_source
+from rejox.ai.css.property_map import length, map_declaration, split_color
+from rejox.ai.provider import FakeProvider
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE = REPO_ROOT / "test-projects" / "sample-app" / "src" / "components"
@@ -119,8 +119,8 @@ def test_component_references_are_rewritten() -> None:
 
 def test_ambiguous_declaration_reaches_the_llm_when_a_provider_is_present() -> None:
     # No Node: drive the resolver's LLM tier directly with a synthetic ParsedCss.
-    from app.ai.css.models import CssDecl, CssRule, ParsedCss
-    from app.ai.css.resolver import CssModuleResolver
+    from rejox.ai.css.models import CssDecl, CssRule, ParsedCss
+    from rejox.ai.css.resolver import CssModuleResolver
 
     provider = FakeProvider()
     system = (

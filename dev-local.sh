@@ -65,7 +65,7 @@ export REJOX_COOKIE_INSECURE=1
 
 echo ">> backend  → http://localhost:8000  (docs at /docs)"
 echo "   (dev posture: no API key, no sandbox — local only)"
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload &
+uvicorn rejox.server.main:app --host 127.0.0.1 --port 8000 --reload &
 BACKEND_PID=$!
 
 # --- frontend ----------------------------------------------------------------

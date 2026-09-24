@@ -12,10 +12,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.models.analysis import AnalysisReport
-from app.models.knowledge_graph import KnowledgeGraph
-from app.pipeline.analyzer import AnalyzerError, analyze_graph
+from rejox.server.main import app
+from rejox.models.analysis import AnalysisReport
+from rejox.models.knowledge_graph import KnowledgeGraph
+from rejox.pipeline.analyzer import AnalyzerError, analyze_graph
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -278,8 +278,8 @@ def test_browser_storage_is_reported_as_handled_not_residue(
 
 def test_non_storage_web_apis_stay_unhandled() -> None:
     """`window`/`document` have no equivalent — that half must not soften."""
-    from app.models.knowledge_graph import Component
-    from app.pipeline.rules.components import _web_api_issues
+    from rejox.models.knowledge_graph import Component
+    from rejox.pipeline.rules.components import _web_api_issues
 
     comp = Component(
         id="c1",
@@ -386,7 +386,7 @@ def test_object_router_warning_is_reported_once_by_routing() -> None:
 
 def test_rule_failure_becomes_an_analyzer_error_with_context(monkeypatch) -> None:
     """An unexpected rule failure names the rule and the graph it was walking."""
-    import app.pipeline.analyzer as analyzer_mod
+    import rejox.pipeline.analyzer as analyzer_mod
 
     def boom(_kg):
         raise ZeroDivisionError("division by zero")
@@ -402,7 +402,7 @@ def test_rule_failure_becomes_an_analyzer_error_with_context(monkeypatch) -> Non
 
 def test_analyze_endpoint_reports_the_analyzer_failure(monkeypatch) -> None:
     """The API answers with the typed message, not an opaque 500 body."""
-    import app.pipeline.analyzer as analyzer_mod
+    import rejox.pipeline.analyzer as analyzer_mod
 
     def boom(_kg):
         raise ZeroDivisionError("division by zero")

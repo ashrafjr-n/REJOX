@@ -13,11 +13,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.models.knowledge_graph import KnowledgeGraph
-from app.models.plan import MigrationPlan
-from app.pipeline.analyzer import analyze_graph
-from app.pipeline.planner import PlannerError, plan_migration
+from rejox.server.main import app
+from rejox.models.knowledge_graph import KnowledgeGraph
+from rejox.models.plan import MigrationPlan
+from rejox.pipeline.analyzer import analyze_graph
+from rejox.pipeline.planner import PlannerError, plan_migration
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -280,7 +280,7 @@ def test_phase_failure_becomes_a_planner_error_with_context(
     sample_kg: KnowledgeGraph, monkeypatch
 ) -> None:
     """An unexpected planning failure names the phase and what it was planning."""
-    import app.pipeline.planner as planner_mod
+    import rejox.pipeline.planner as planner_mod
 
     def boom(_report, _kg):
         raise ZeroDivisionError("division by zero")
@@ -296,7 +296,7 @@ def test_phase_failure_becomes_a_planner_error_with_context(
 
 def test_plan_endpoint_reports_the_planner_failure(monkeypatch) -> None:
     """The API answers with the typed message, not an opaque 500 body."""
-    import app.pipeline.planner as planner_mod
+    import rejox.pipeline.planner as planner_mod
 
     def boom(_report, _kg):
         raise ZeroDivisionError("division by zero")

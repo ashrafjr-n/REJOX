@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from app.pipeline.sandbox import SandboxError, SandboxPolicy, run
+from rejox.pipeline.sandbox import SandboxError, SandboxPolicy, run
 
 pytestmark = pytest.mark.sandbox_live
 

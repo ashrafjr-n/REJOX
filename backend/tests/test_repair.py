@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import app.pipeline.repair as repair_mod
-from app.models.analysis import ConfidenceSource
-from app.models.emission import EmittedFile, EmittedProject
-from app.models.transformation import UnhandledItem
-from app.models.validation import Diagnostic, StageResult, ValidationResult
-from app.pipeline.repair import RepairAttempt, repair_project
+import rejox.pipeline.repair as repair_mod
+from rejox.models.analysis import ConfidenceSource
+from rejox.models.emission import EmittedFile, EmittedProject
+from rejox.models.transformation import UnhandledItem
+from rejox.models.validation import Diagnostic, StageResult, ValidationResult
+from rejox.pipeline.repair import RepairAttempt, repair_project
 
 
 def _validation(passed: bool, diagnostics=None) -> ValidationResult:
@@ -36,7 +36,7 @@ class ScriptedProvider:
         self.sent: list[str] = []
 
     def complete(self, system: str, user: str, *, max_tokens: int):
-        from app.ai.provider import LLMResponse
+        from rejox.ai.provider import LLMResponse
 
         self.sent.append(user)
         text = self.replies[min(len(self.sent) - 1, len(self.replies) - 1)]

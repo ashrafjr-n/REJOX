@@ -27,8 +27,9 @@ dependencies = [
 dev = ["pytest==8.3.4", "httpx==0.28.1"]
 
 [project.scripts]
-rejox = "app.cli:app"
-rejox-worker = "app.worker:main"
+rejox = "rejox.cli:app"
+rejox-worker = "rejox.server.worker:main"
 
 [tool.setuptools.packages.find]
-include = ["app*"]
+where = ["src"]
+include = ["rejox*"]

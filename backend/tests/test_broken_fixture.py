@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from app.pipeline.analyzer import NothingToMigrate, analyze_graph
-from app.pipeline.intelligence import build_knowledge_graph
+from rejox.pipeline.analyzer import NothingToMigrate, analyze_graph
+from rejox.pipeline.intelligence import build_knowledge_graph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BROKEN = REPO_ROOT / "test-projects" / "broken-app"

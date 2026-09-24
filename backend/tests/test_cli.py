@@ -15,8 +15,8 @@ from pathlib import Path
 from rich.console import Console
 from typer.testing import CliRunner
 
-from app.cli import _RUN_COMMAND, _project_panel, app
-from app.models.knowledge_graph import KnowledgeGraph
+from rejox.cli import _RUN_COMMAND, _project_panel, app
+from rejox.models.knowledge_graph import KnowledgeGraph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE = REPO_ROOT / "test-projects" / "sample-app"

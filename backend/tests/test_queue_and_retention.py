@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from app import jobs, queue, retention
-from app.pipeline import workspace
-from app.queue import QueueError
+from rejox.server import jobs, queue, retention
+from rejox.pipeline import workspace
+from rejox.server.queue import QueueError
 
 
 # --- Backend selection -------------------------------------------------------

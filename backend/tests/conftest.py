@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from app import security
-from app.pipeline import sandbox
+from rejox.server import security
+from rejox.pipeline import sandbox
 
 
 @pytest.fixture(autouse=True, scope="session")

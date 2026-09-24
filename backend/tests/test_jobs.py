@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from rejox.server.main import app
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE = REPO_ROOT / "test-projects" / "sample-app"
@@ -210,7 +210,7 @@ def test_failure_before_migration_reports_the_real_stage(
 ) -> None:
     """A job that dies while building the graph / analyzing / planning says so —
     it is not blamed on emit, which never started."""
-    import app.jobs as jobs_mod
+    import rejox.server.jobs as jobs_mod
 
     def boom(*_args, **_kwargs):
         raise RuntimeError(f"{target} exploded")
@@ -238,9 +238,9 @@ def test_the_api_sees_a_job_another_process_is_advancing(tmp_path, monkeypatch) 
     migration ran to completion behind it. `job.json` is the seam between the two
     processes, so a read must reflect what the other process last wrote.
     """
-    import app.jobs as jobs_mod
-    from app.models.jobs import JobState
-    from app.pipeline import workspace
+    import rejox.server.jobs as jobs_mod
+    from rejox.models.jobs import JobState
+    from rejox.pipeline import workspace
 
     monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
     jobs_mod._REGISTRY.clear()
@@ -269,7 +269,7 @@ def test_the_api_sees_a_job_another_process_is_advancing(tmp_path, monkeypatch) 
 
 def _worker_wrote(run, *, status: str, updated_at: float):
     """Rewrite job.json the way another process would, then hand it back."""
-    from app.models.jobs import JobState
+    from rejox.models.jobs import JobState
 
     state = JobState.model_validate_json((run.root / "job.json").read_text())
     state.status = status  # type: ignore[assignment]
@@ -283,8 +283,8 @@ def test_a_job_whose_worker_died_is_reported_failed(tmp_path, monkeypatch) -> No
     from a dead one by whether the file is still moving. A `running` job with no
     heartbeat past the grace must end as `failed`, with an error saying why —
     not stay `running` for a client to poll for ever."""
-    import app.jobs as jobs_mod
-    from app.pipeline import workspace
+    import rejox.server.jobs as jobs_mod
+    from rejox.pipeline import workspace
 
     monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
     monkeypatch.setenv("REJOX_JOB_HEARTBEAT_GRACE", "30")
@@ -310,8 +310,8 @@ def test_a_job_still_heartbeating_is_left_alone(tmp_path, monkeypatch) -> None:
     """The other half, and the one that costs real money if it is wrong: a
     migration that is merely slow and silent — npm install can be — must not be
     declared lost while its worker is still stamping the file."""
-    import app.jobs as jobs_mod
-    from app.pipeline import workspace
+    import rejox.server.jobs as jobs_mod
+    from rejox.pipeline import workspace
 
     monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
     monkeypatch.setenv("REJOX_JOB_HEARTBEAT_GRACE", "30")
@@ -329,8 +329,8 @@ def test_a_job_still_heartbeating_is_left_alone(tmp_path, monkeypatch) -> None:
 def test_a_queued_job_is_never_declared_lost(tmp_path, monkeypatch) -> None:
     """A job waiting in the queue has no executor by definition — an old
     `queued` means the fleet is busy, not that anything died."""
-    import app.jobs as jobs_mod
-    from app.pipeline import workspace
+    import rejox.server.jobs as jobs_mod
+    from rejox.pipeline import workspace
 
     monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
     monkeypatch.setenv("REJOX_JOB_HEARTBEAT_GRACE", "30")
@@ -347,8 +347,8 @@ def test_the_heartbeat_keeps_a_silent_job_alive(tmp_path, monkeypatch) -> None:
     """The heartbeat is what makes staleness mean something. Beating on a job
     that emits nothing must move `updatedAt` — and must stop moving it the
     moment the job is stopped."""
-    import app.jobs as jobs_mod
-    from app.pipeline import workspace
+    import rejox.server.jobs as jobs_mod
+    from rejox.pipeline import workspace
 
     monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
     monkeypatch.setenv("REJOX_JOB_HEARTBEAT", "1")
@@ -383,8 +383,8 @@ def test_a_failed_migration_tells_its_runner_so(tmp_path, monkeypatch) -> None:
     `run_job` swallowed everything and returned cleanly. The terminal event must
     still be written first — that contract is unchanged — but the runner has to
     hear about it too, or the worker's log contradicts the job's own state."""
-    import app.jobs as jobs_mod
-    from app.pipeline import workspace
+    import rejox.server.jobs as jobs_mod
+    from rejox.pipeline import workspace
 
     monkeypatch.setenv("REJOX_WORKSPACE_ROOT", str(tmp_path / "workspaces"))
     jobs_mod._REGISTRY.clear()

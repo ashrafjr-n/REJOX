@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from app.pipeline import workspace
-from app.pipeline.ingest import (
+from rejox.pipeline import workspace
+from rejox.pipeline.ingest import (
     IngestError,
     IngestLimits,
     _validate_github_url,

@@ -15,13 +15,13 @@ from pathlib import Path
 
 import pytest
 
-from app.models.analysis import ComponentFinding
-from app.models.emission import EmittedProject
-from app.models.knowledge_graph import KnowledgeGraph
-from app.models.validation import StageResult, ValidationResult
-from app.pipeline.analyzer import NothingToMigrate, analyze_graph
-from app.pipeline.rules import scoring
-from app.pipeline.validator import validated_scores
+from rejox.models.analysis import ComponentFinding
+from rejox.models.emission import EmittedProject
+from rejox.models.knowledge_graph import KnowledgeGraph
+from rejox.models.validation import StageResult, ValidationResult
+from rejox.pipeline.analyzer import NothingToMigrate, analyze_graph
+from rejox.pipeline.rules import scoring
+from rejox.pipeline.validator import validated_scores
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -129,8 +129,8 @@ def test_no_findings_at_all_is_unmeasured() -> None:
 
 
 def _one_unit_project() -> EmittedProject:
-    from app.models.analysis import ConfidenceSource
-    from app.models.emission import EmittedFile
+    from rejox.models.analysis import ConfidenceSource
+    from rejox.models.emission import EmittedFile
 
     return EmittedProject(
         outDir="/tmp/one",

@@ -13,8 +13,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from app import sessions
-from app.main import app
+from rejox.server import sessions
+from rejox.server.main import app
 
 CODE = "invite-alpha"
 OTHER = "invite-bravo"

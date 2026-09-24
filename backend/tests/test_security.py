@@ -11,8 +11,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app import security
-from app.main import app
+from rejox.server import security
+from rejox.server.main import app
 
 client = TestClient(app)
 

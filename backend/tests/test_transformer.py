@@ -14,11 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from app.models.knowledge_graph import KnowledgeGraph
-from app.models.transformation import TransformResult
-from app.pipeline.analyzer import analyze_graph
-from app.pipeline.scaffold import generate_scaffold
-from app.pipeline.transformer import (
+from rejox.models.knowledge_graph import KnowledgeGraph
+from rejox.models.transformation import TransformResult
+from rejox.pipeline.analyzer import analyze_graph
+from rejox.pipeline.scaffold import generate_scaffold
+from rejox.pipeline.transformer import (
     build_transform_options,
     check_syntax,
     transform_component,
@@ -682,7 +682,7 @@ def test_app_output_is_valid_typescript(options: dict) -> None:
 
 
 def test_missing_file_raises() -> None:
-    from app.pipeline.transformer import TransformerError
+    from rejox.pipeline.transformer import TransformerError
 
     with pytest.raises(TransformerError):
         transform_component(SRC / "components" / "DoesNotExist.tsx", ANSWERS)

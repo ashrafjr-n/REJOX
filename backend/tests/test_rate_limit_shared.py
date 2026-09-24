@@ -22,7 +22,7 @@ import uuid
 
 import pytest
 
-from app import security
+from rejox.server import security
 
 pytestmark = pytest.mark.redis_live
 

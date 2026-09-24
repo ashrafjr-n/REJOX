@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from app import cli
-from app.cli import (
+from rejox import cli
+from rejox.cli import (
     _CountingProvider,
     _CORE_QUESTION_IDS,
     _ask_navigator_shape,
@@ -28,11 +28,11 @@ from app.cli import (
     _recommended,
     app,
 )
-from app.pipeline.analyzer import analyze_graph
-from app.pipeline.emit import emit_project
-from app.pipeline.intelligence import build_knowledge_graph
-from app.pipeline.planner import plan_migration
-from app.pipeline.validator import validate_project, validated_scores
+from rejox.pipeline.analyzer import analyze_graph
+from rejox.pipeline.emit import emit_project
+from rejox.pipeline.intelligence import build_knowledge_graph
+from rejox.pipeline.planner import plan_migration
+from rejox.pipeline.validator import validate_project, validated_scores
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE = REPO_ROOT / "test-projects" / "sample-app"

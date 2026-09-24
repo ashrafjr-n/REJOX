@@ -59,7 +59,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY pyproject.toml ./
-COPY app/ ./app/
+COPY src/ ./src/
 RUN pip install --no-cache-dir --no-deps -e .
 
 COPY --from=workers /build/parser-worker/ ./parser-worker/
@@ -81,4 +81,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # rate-limit and thread-backend job state are per process (see docs/SECURITY.md).
 # Scale by running more API containers behind a proxy, and more `rejox-worker`
 # containers behind Redis.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "rejox.server.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
