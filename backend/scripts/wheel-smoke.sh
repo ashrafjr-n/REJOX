@@ -20,6 +20,13 @@ echo "==> build"
 uv build --wheel --out-dir "$WORK/dist" "$BACKEND" >/dev/null
 WHEEL="$(ls "$WORK"/dist/rejox-*.whl)"
 echo "    $(basename "$WHEEL") ($(du -h "$WHEEL" | cut -f1))"
+# backend/LICENSE is a copy of the repo's (pyproject cannot reach outside
+# backend/); a missing or drifted copy fails here rather than shipping.
+unzip -p "$WHEEL" '*.dist-info/licenses/LICENSE' | cmp -s - "$BACKEND/../LICENSE" \
+  || { echo "FAIL: the wheel's LICENSE is missing or differs from the repo's"; exit 1; }
+for f in parser.js codemod.js THIRD_PARTY_LICENSES.txt; do
+  unzip -l "$WHEEL" "rejox/_workers/$f" >/dev/null || { echo "FAIL: the wheel has no rejox/_workers/$f"; exit 1; }
+done
 
 echo "==> install into a clean venv ($("$PYTHON" --version))"
 "$PYTHON" -m venv "$WORK/venv"
