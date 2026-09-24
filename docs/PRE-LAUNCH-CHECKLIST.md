@@ -157,40 +157,60 @@ requiring the checks also stops direct pushes, so it changes how the repository
 is worked in day to day, and it was left until the engineering it guards was
 finished. **27 of 29 gates are signed** — A4 and E2 are the two that are not.
 
+2026-09-24: the backend became the `rejox` package (commit `ce73ab1`) — `app/` moved
+to `backend/src/rejox/` with the web service under `rejox.server`, the Node
+workers run as esbuild bundles instead of a runtime `npm run build`, run
+workspaces default to `~/.cache/rejox`, and the image installs the built wheel.
+Every file in the re-signing table moved (and `pipeline/workspace.py` and the
+`Dockerfile` changed in substance), so **all of A, B and C are re-red**, and E0
+and E1 with them.
+
+- `./verify-deployment.sh` (Docker Desktop 29.6.2, macOS;
+  `REJOX_DATA_DIR=/private/tmp/rejox-data`, `REJOX_DOCKER_GID=0`): **every gate
+  it covers passed in one pass — Preflight, B0, A0, A1, B1, Fixture, B2, B3,
+  A8, A9, C3, B5, C2** ("All deployment gates passed", exit 0). Those are
+  re-signed below.
+- `pytest -m sandbox_live` (`REJOX_SANDBOX=docker`): 9 passed — the host-side
+  run of A1–A7. That re-earns **A2, A3, A5, A6, A7**. A4's own two tests are
+  among the 9 and passed, but A4 has been held for more than that since
+  2026-09-04, so it stays `⟲ re-red` until someone decides what re-earns it.
+- **Not re-run, so `⟲ re-red`:** B4, B6, B7 (manual deployment gates), C0, C1,
+  C4, C5 (HTTP gates by hand), E0, E1.
+
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
 signature below carries the output it came from.
 
 | Gate | Proves | Status |
 | --- | --- | --- |
-| A0 | the worker can reach a Docker daemon at all | ☑ signed — RED first (socket permission), fixed; re-signed 2026-09-05 (verify-deployment pass) |
-| A1 | a sandboxed command runs, in the right directory | ☑ signed — canary read back, negative control refused; re-signed 2026-09-05 (verify-deployment pass) |
-| A2 | the container is non-root and holds no capabilities | ☑ signed |
-| A3 | only the run directory is writable | ☑ signed |
-| A4 | network is off for stages that did not ask for it | ⟲ re-red 2026-09-04 (validator.py) — not covered by `./verify-deployment.sh`, so the 2026-09-05 pass does not re-earn it |
-| A5 | the pid ceiling stops a fork storm | ☑ signed |
-| A6 | the memory ceiling is real, and the host survives it | ☑ signed — see the timeout note |
-| A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
-| A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped; re-signed 2026-09-05 (verify-deployment pass) |
-| A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped; re-signed 2026-09-05 (verify-deployment pass) |
-| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker; re-signed 2026-09-03 (session pass) |
-| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2); re-signed 2026-09-03 (session pass) |
-| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G; re-signed 2026-09-03 (session pass) |
-| C0 | a server with no keys refuses to serve | ☑ signed — re-signed 2026-09-03; refuses only when BOTH credentials are absent |
-| C1 | a wrong key is rejected | ☑ signed — re-signed 2026-09-03; bad key, forged cookie and bad invite code all 401 |
-| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3); re-signed 2026-09-05 (verify-deployment pass) |
-| C4 | CORS is never a wildcard | ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin |
-| C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03 |
+| A0 | the worker can reach a Docker daemon at all | ☑ signed — RED first (socket permission), fixed; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| A1 | a sandboxed command runs, in the right directory | ☑ signed — canary read back, negative control refused; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| A2 | the container is non-root and holds no capabilities | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A3 | only the run directory is writable | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A4 | network is off for stages that did not ask for it | ⟲ re-red 2026-09-04 (validator.py) — not covered by `./verify-deployment.sh`, so the 2026-09-05 pass does not re-earn it; its live tests passed 2026-09-24 (`sandbox_live`), not taken as re-earning it |
+| A5 | the pid ceiling stops a fork storm | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A6 | the memory ceiling is real, and the host survives it | ☑ signed — see the timeout note; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A7 | a missing daemon fails loudly instead of degrading | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B4 | an API restart does not lose an in-flight job | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker; re-signed 2026-09-03 (session pass) |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B6 | a killed worker does not silently strand a job | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2); re-signed 2026-09-03 (session pass) |
+| B7 | retention actually deletes a run workspace | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G; re-signed 2026-09-03 (session pass) |
+| C0 | a server with no keys refuses to serve | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — re-signed 2026-09-03; refuses only when BOTH credentials are absent |
+| C1 | a wrong key is rejected | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — re-signed 2026-09-03; bad key, forged cookie and bad invite code all 401 |
+| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| C4 | CORS is never a wildcard | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin |
+| C5 | an oversized body is refused before it costs anything | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03 |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ☑ signed — green in CI ×3, and required on master 2026-09-03 |
 | D1 | the compose deployment is exercised in CI | ☑ signed — green in CI ×3, and required on master 2026-09-03 |
-| E0 | a failed migration is diagnosable after the fact | ☑ signed — RED twice (silence, then a `Job OK` lie), both fixed 2026-09-03 |
-| E1 | one identity cannot fill the disk | ☑ signed — RED first (300 GB/hour, unbounded), quota + free-space floor 2026-09-03 |
+| E0 | a failed migration is diagnosable after the fact | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — RED twice (silence, then a `Job OK` lie), both fixed 2026-09-03 |
+| E1 | one identity cannot fill the disk | ⟲ re-red 2026-09-24 (package rename) — was: ☑ signed — RED first (300 GB/hour, unbounded), quota + free-space floor 2026-09-03 |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
 ---
