@@ -18,13 +18,11 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from rejox import cli
 from rejox.cli import (
     _CountingProvider,
     _CORE_QUESTION_IDS,
     _ask_navigator_shape,
     _make_provider,
-    _nav_ui_summary,
     _recommended,
     app,
 )

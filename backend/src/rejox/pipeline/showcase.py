@@ -27,7 +27,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from rejox.ai.navigation.models import NavUiSummary
 from rejox.ai.navigation.resolver import NavShapeProposal
 from rejox.models.analysis import AnalysisReport
-from rejox.models.emission import EmittedProject
 from rejox.models.knowledge_graph import KnowledgeGraph
 from rejox.models.plan import MigrationPlan
 from rejox.models.validation import ValidatedScores, ValidationResult

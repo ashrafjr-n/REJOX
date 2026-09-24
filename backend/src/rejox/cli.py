@@ -655,7 +655,6 @@ def export_showcase(
     import importlib.metadata
     import json
 
-    from rejox.ai.cache import ResolutionCache
     from rejox.pipeline import showcase as sc
 
     repo_root = _checkout_root()

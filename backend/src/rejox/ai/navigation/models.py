@@ -11,7 +11,7 @@ here is constrained (types are an enum; screen names must be route-table names).
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 

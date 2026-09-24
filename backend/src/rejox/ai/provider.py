@@ -22,7 +22,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class LLMResponse(BaseModel):

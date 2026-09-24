@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import tempfile
 from collections import Counter
 from dataclasses import dataclass, field
@@ -26,7 +25,6 @@ from rejox import workers
 from rejox.ai.cache import ResolutionCache
 from rejox.ai.css import resolve_css_module
 from rejox.ai.css.parser import rewrite_component
-from rejox.ai.navigation import resolve_nav_active
 from rejox.ai.provider import LLMProvider
 from rejox.ai.styling import MappedResidue, resolve_styling
 from rejox.models.transformation import UnhandledItem

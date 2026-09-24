@@ -9,7 +9,6 @@ code**, and our generator writes the code. These tests pin that contract.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 

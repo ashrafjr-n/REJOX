@@ -31,7 +31,7 @@ import re
 import shutil
 from collections import Counter
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Iterable, Optional
 
 from rejox.ai.cache import ResolutionCache
 from rejox.ai.provider import LLMProvider
@@ -827,9 +827,8 @@ def _render_report(project: EmittedProject, kg: KnowledgeGraph) -> str:
     )
 
     residue = [f for f in project.files if f.unhandled]
-    clean = [f for f in project.files if f.sourceFile and not f.unhandled and not f.warnings]
 
-    lines.append(f"\n## Summary\n")
+    lines.append("\n## Summary\n")
     lines.append(f"- Files emitted: **{len(project.files)}**")
     lines.append(f"- Files with residue (TODOs): **{len(residue)}**")
     lines.append(f"- Total REJOX-TODO items: **{project.todoCount}**")
