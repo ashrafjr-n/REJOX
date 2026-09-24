@@ -457,7 +457,7 @@ missing, it is added to the Node worker first; that is why the KG carries
 `webApis`). Entry point:
 
 ```python
-from app.pipeline.analyzer import analyze_graph   # analyze_graph(kg) -> AnalysisReport
+from rejox.pipeline.analyzer import analyze_graph   # analyze_graph(kg) -> AnalysisReport
 ```
 
 ```
@@ -636,7 +636,7 @@ The Planner turns an `AnalysisReport` (plus the KG it came from) into an ordered
 deterministic — it plans, it does not convert. Entry point:
 
 ```python
-from app.pipeline.planner import plan_migration   # plan_migration(report, kg) -> MigrationPlan
+from rejox.pipeline.planner import plan_migration   # plan_migration(report, kg) -> MigrationPlan
 ```
 
 Schema in `rejox/models/plan.py`: `Question` / `QuestionOption` / `PlanStep`

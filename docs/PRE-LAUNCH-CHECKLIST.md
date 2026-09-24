@@ -233,7 +233,7 @@ sbx() {  # sbx <net|nonet> <argv...> — one command through the real sandbox se
   docker compose exec -T worker python - "$@" <<'PY'
 import sys
 from pathlib import Path
-from app.pipeline.sandbox import run, SandboxPolicy
+from rejox.pipeline.sandbox import run, SandboxPolicy
 
 cwd = Path("${REJOX_DATA_DIR}/workspaces/probe")  # e.g. /srv/rejox-data/workspaces/probe
 cwd.mkdir(parents=True, exist_ok=True)
@@ -559,7 +559,7 @@ worthless if an unavailable daemon quietly turns into un-sandboxed execution.
 docker compose exec -T worker sh -c 'mv /usr/bin/docker /usr/bin/docker.hidden 2>/dev/null || echo "read-only fs — use PATH override instead"'
 docker compose exec -T -e PATH=/nonexistent worker python -c "
 from pathlib import Path
-from app.pipeline.sandbox import run, SandboxPolicy, SandboxError
+from rejox.pipeline.sandbox import run, SandboxPolicy, SandboxError
 try:
     run(['echo','hi'], Path('/data/workspaces/probe'), 10, policy=SandboxPolicy.from_env())
     print('FELL BACK — RED')
