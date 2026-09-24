@@ -26,6 +26,7 @@ import sqlite3
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -132,6 +133,8 @@ class SqliteBackend(CacheBackend):
 
     def __init__(self, path: str = ":memory:") -> None:
         self.path = path
+        if path != ":memory:":
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(path)
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS resolutions ("

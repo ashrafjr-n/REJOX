@@ -9,7 +9,8 @@ Environment variables
 - ``REJOX_AI_PROVIDER`` — ``"gemini"`` (default) or ``"fake"``.
 - ``GEMINI_API_KEY``    — required by the Gemini provider.
 - ``GEMINI_MODEL``      — Gemini model id (default: a Flash-tier model).
-- ``REJOX_AI_CACHE``    — SQLite path for the resolution cache.
+- ``REJOX_AI_CACHE``    — SQLite path for the resolution cache (default:
+  ``~/.cache/rejox/ai-cache.sqlite3``, see :mod:`rejox.paths`).
 - ``REJOX_AI_MAX_SNIPPET_LINES`` — snippet+context line budget (default 60).
 """
 
@@ -17,9 +18,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
+from rejox import paths
 from rejox.ai.provider import (
     DEFAULT_GEMINI_MODEL,
     FakeProvider,
@@ -28,7 +29,7 @@ from rejox.ai.provider import (
 )
 from rejox.ai.schemas import DEFAULT_MAX_SNIPPET_LINES
 
-_DEFAULT_CACHE_PATH = Path(__file__).resolve().parents[3] / ".rejox-ai-cache.sqlite3"
+_DEFAULT_CACHE_PATH = paths.cache_dir() / "ai-cache.sqlite3"
 
 
 @dataclass(frozen=True)

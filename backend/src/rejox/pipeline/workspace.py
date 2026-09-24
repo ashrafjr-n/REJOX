@@ -25,7 +25,8 @@ has no HTTP identity) is owned by nobody, and :meth:`Run.owned_by` answers
 ``False`` for every caller: unowned means unreachable over HTTP, never public.
 
 Environment:
-  ``REJOX_WORKSPACE_ROOT`` — root for all runs (default: ``backend/.rejox-workspaces``).
+  ``REJOX_WORKSPACE_ROOT`` — root for all runs (default: ``~/.cache/rejox/workspaces``,
+  see :mod:`rejox.paths`).
 """
 
 from __future__ import annotations
@@ -40,8 +41,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-# workspace.py is backend/src/rejox/pipeline/workspace.py → parents[3] == backend.
-_DEFAULT_WORKSPACE_ROOT = Path(__file__).resolve().parents[3] / ".rejox-workspaces"
+from rejox import paths
+
 
 # A runId is a hex token (uuid4().hex). Validated on every lookup so a runId
 # taken from an HTTP path can never contain "/" or ".." and escape the root.
@@ -76,7 +77,7 @@ class WorkspaceError(RuntimeError):
 
 def workspace_root() -> Path:
     """The configured root for all run workspaces (created on demand)."""
-    root = Path(os.environ.get("REJOX_WORKSPACE_ROOT", str(_DEFAULT_WORKSPACE_ROOT)))
+    root = Path(os.environ.get("REJOX_WORKSPACE_ROOT") or paths.cache_dir() / "workspaces")
     root = root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     return root
