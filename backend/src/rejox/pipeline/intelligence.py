@@ -18,14 +18,6 @@ from pydantic import ValidationError
 from rejox import workers
 from rejox.models.knowledge_graph import KnowledgeGraph
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-
-# The committed benchmark and the graph fixture generated from it. Named here so
-# the generator (`rejox export-graph`) and the staleness gate that guards the
-# file cannot drift apart on where either one lives.
-BENCHMARK_PROJECT = REPO_ROOT / "test-projects" / "sample-app"
-FIXTURES_DIR = REPO_ROOT / "backend" / "tests" / "fixtures"
-
 # Generous ceiling; parsing is CPU-bound and local.
 PARSE_TIMEOUT_SECONDS = 300
 
@@ -99,7 +91,7 @@ def _portable_root(project_path: Path, repo_root: Path) -> str:
 
 
 def render_graph_fixture(
-    kg: KnowledgeGraph, *, project_path: Path, repo_root: Path = REPO_ROOT
+    kg: KnowledgeGraph, *, project_path: Path, repo_root: Path
 ) -> str:
     """Serialize ``kg`` as a committed test fixture.
 

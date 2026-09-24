@@ -184,7 +184,7 @@ def test_committed_fixture_equals_a_fresh_parse(kg: KnowledgeGraph) -> None:
     fixture that has aged behind the benchmark makes every one of those tests
     assert about a project that no longer exists. This module parses for real —
     so it is the one place that can prove the file is still current."""
-    fresh = render_graph_fixture(kg, project_path=SAMPLE_APP)
+    fresh = render_graph_fixture(kg, project_path=SAMPLE_APP, repo_root=REPO_ROOT)
     committed = COMMITTED_GRAPH.read_text(encoding="utf-8")
     if fresh == committed:
         return

@@ -617,6 +617,24 @@ def migrate(
     )
 
 
+# The committed benchmark and the graph fixture generated from it, relative to a
+# checkout. Named once so the generators (`export-showcase`, `export-graph`) and
+# the staleness gates that guard their output cannot drift apart.
+BENCHMARK = Path("test-projects") / "sample-app"
+FIXTURES = Path("backend") / "tests" / "fixtures"
+
+
+def _checkout_root() -> Path:
+    """The Rejox checkout this code runs from. The export commands regenerate
+    committed files, so they exist only in a checkout (an editable install) —
+    an installed wheel has no repo to write into."""
+    root = Path(__file__).resolve().parents[3]
+    if not (root / BENCHMARK).is_dir():
+        console.print("[red]This command needs a Rejox checkout (pip install -e backend).[/]")
+        raise typer.Exit(code=1)
+    return root
+
+
 @app.command(name="export-showcase")
 def export_showcase(
     project_path: Path = typer.Option(
@@ -640,8 +658,8 @@ def export_showcase(
     from rejox.ai.cache import ResolutionCache
     from rejox.pipeline import showcase as sc
 
-    repo_root = Path(__file__).resolve().parents[3]
-    src = (project_path or (repo_root / "test-projects" / "sample-app")).expanduser().resolve()
+    repo_root = _checkout_root()
+    src = (project_path or (repo_root / BENCHMARK)).expanduser().resolve()
     if not src.is_dir():
         console.print(f"[red]Not a directory:[/] {src}")
         raise typer.Exit(code=1)
@@ -797,13 +815,10 @@ def export_graph(
     written with a portable ``project.root``. ``test_parser.py`` fails when the
     committed file no longer equals what this command would write.
     """
-    from rejox.pipeline.intelligence import (
-        BENCHMARK_PROJECT,
-        FIXTURES_DIR,
-        render_graph_fixture,
-    )
+    from rejox.pipeline.intelligence import render_graph_fixture
 
-    src = (project_path or BENCHMARK_PROJECT).expanduser().resolve()
+    repo_root = _checkout_root()
+    src = (project_path or (repo_root / BENCHMARK)).expanduser().resolve()
     if not src.is_dir():
         console.print(f"[red]Not a directory:[/] {src}")
         raise typer.Exit(code=1)
@@ -816,8 +831,8 @@ def export_graph(
         console.print(f"[red]Parse failed:[/] {exc}")
         raise typer.Exit(code=1)
 
-    payload = render_graph_fixture(kg, project_path=src)
-    path = out.expanduser().resolve() if out else (FIXTURES_DIR / f"{kg.project.name}.kg.json")
+    payload = render_graph_fixture(kg, project_path=src, repo_root=repo_root)
+    path = out.expanduser().resolve() if out else (repo_root / FIXTURES / f"{kg.project.name}.kg.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(payload, encoding="utf-8")
 
