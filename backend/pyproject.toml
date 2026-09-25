@@ -1,12 +1,25 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.27", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
 
 [project]
 name = "rejox"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Rejox — AI migration engineer: React → React Native. CLI + pipeline."
+readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "Ashraf" }]
+keywords = ["react", "react-native", "migration", "codemod", "ast", "cli"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+]
 # Functional Source License (FSL-1.1-ALv2). backend/LICENSE is a copy of the
 # repo root LICENSE (a build cannot reach outside backend/); wheel-smoke.sh fails
 # if they differ.
@@ -36,9 +49,23 @@ server = [
 ]
 dev = ["pytest>=8.3.4,<9", "httpx>=0.28.1,<1"]
 
+[project.urls]
+Homepage = "https://github.com/ashrafjr-n/REJOX"
+Repository = "https://github.com/ashrafjr-n/REJOX"
+Issues = "https://github.com/ashrafjr-n/REJOX/issues"
+Changelog = "https://github.com/ashrafjr-n/REJOX/blob/master/backend/CHANGELOG.md"
+
 [project.scripts]
 rejox = "rejox.cli:app"
 rejox-worker = "rejox.server.worker:main"
+
+# The version comes from the nearest git tag (`v0.1.0` -> `0.1.0`), not a
+# hand-maintained number — `git tag v1.2.3 && git push --tags` is the release.
+# The fallback only applies to an sdist built with no `.git` (e.g. from a
+# tarball); every real build here has the repo, so it never fires in practice.
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rejox"]
