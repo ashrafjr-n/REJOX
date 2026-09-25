@@ -5,6 +5,10 @@
 #
 #   backend/scripts/wheel-smoke.sh [python]      # default: python3
 #
+# Set WHEEL_PATH to smoke an already-built wheel instead of building a new
+# one — release.yml uses this so the gate proves the exact artifact that gets
+# published, not a separate rebuild of it.
+#
 # Passes only when `rejox migrate` exits 0: tsc and Metro both PASS on the
 # emitted project. The venv's site-packages is made read-only first, so any
 # write into the install dir fails the run instead of going unnoticed.
@@ -16,9 +20,14 @@ PYTHON="${1:-python3}"
 WORK="$(mktemp -d)"
 trap 'chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT
 
-echo "==> build"
-uv build --wheel --out-dir "$WORK/dist" "$BACKEND" >/dev/null
-WHEEL="$(ls "$WORK"/dist/rejox-*.whl)"
+if [ -n "${WHEEL_PATH:-}" ]; then
+  echo "==> using prebuilt wheel"
+  WHEEL="$WHEEL_PATH"
+else
+  echo "==> build"
+  uv build --wheel --out-dir "$WORK/dist" "$BACKEND" >/dev/null
+  WHEEL="$(ls "$WORK"/dist/rejox-*.whl)"
+fi
 echo "    $(basename "$WHEEL") ($(du -h "$WHEEL" | cut -f1))"
 # backend/LICENSE is a copy of the repo's (pyproject cannot reach outside
 # backend/); a missing or drifted copy fails here rather than shipping.
