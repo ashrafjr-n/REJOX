@@ -183,7 +183,7 @@ jobs:
 
       - name: Install backend
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,server]"
 
       # Fail loudly rather than letting the suite skip itself green: these tests
       # skip where no daemon answers, which is right on a laptop and worthless
