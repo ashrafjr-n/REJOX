@@ -1,0 +1,119 @@
+name: Release
+
+# Tag-driven: a real release is `git tag v1.2.3 && git push --tags`, never a
+# manual dispatch. hatch-vcs reads that tag for the version, so this is the
+# only place PyPI publishing happens.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  # Full history + tags, or hatch-vcs cannot see the tag that triggered this.
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Build
+        working-directory: backend
+        run: uv build --out-dir dist
+
+      - name: The version actually came from the tag
+        working-directory: backend
+        run: |
+          ls dist/
+          case "$GITHUB_REF_NAME" in
+            v*) expected="${GITHUB_REF_NAME#v}" ;;
+          esac
+          ls dist/ | grep -qF "rejox-${expected}" \
+            || { echo "FAIL: dist/ has no rejox-${expected} artifact — hatch-vcs did not see tag $GITHUB_REF_NAME"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: backend/dist/
+
+  # Proves the EXACT artifact about to be published actually works — not a
+  # separate rebuild of it (wheel-smoke.sh's own `uv build` would re-run
+  # hatch-vcs and could in principle disagree with what `build` produced).
+  smoke:
+    name: Smoke the built wheel
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: backend/dist
+
+      - name: Wheel smoke
+        run: |
+          WHEEL_PATH="$(ls backend/dist/*.whl)" backend/scripts/wheel-smoke.sh python3
+
+  # Register this exact repo + workflow filename (release.yml) + environment
+  # name ("testpypi") as a Trusted Publisher on TestPyPI first — no token
+  # lives here or anywhere else.
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: smoke
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/rejox
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  # Same idea, environment name "pypi", registered as a Trusted Publisher on
+  # real PyPI. Gated on TestPyPI succeeding first.
+  publish-pypi:
+    name: Publish to PyPI
+    needs: publish-testpypi
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/rejox
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
