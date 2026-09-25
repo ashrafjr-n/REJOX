@@ -31,6 +31,11 @@ done
 echo "==> install into a clean venv ($("$PYTHON" --version))"
 "$PYTHON" -m venv "$WORK/venv"
 "$WORK/venv/bin/pip" install -q "$WHEEL"
+# The CLI alone must never pull in the server's extras (fastapi, redis, rq).
+if "$WORK/venv/bin/pip" list --format=freeze | grep -iqE '^(fastapi|redis|rq|uvicorn)=='; then
+  echo "FAIL: the bare CLI install pulled in a server-only dependency"
+  exit 1
+fi
 SITE="$("$WORK/venv/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 chmod -R a-w "$SITE"
 
