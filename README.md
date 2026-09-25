@@ -27,7 +27,7 @@ backend (:8000) and the Vite dev server (:5173).
 # backend
 cd backend
 python -m venv venv && source venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,server]"
 
 # frontend
 cd ../frontend
