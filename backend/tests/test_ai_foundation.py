@@ -11,27 +11,27 @@ import sys
 
 import pytest
 
-from app.ai.cache import (
+from rejox.ai.cache import (
     ResolutionCache,
     SqliteBackend,
     cache_key,
     normalize_snippet,
 )
-from app.ai.config import AIConfig, get_provider, load_config
-from app.ai.provider import (
+from rejox.ai.config import AIConfig, get_provider, load_config
+from rejox.ai.provider import (
     FakeProvider,
     GeminiProvider,
     LLMResponse,
     ProviderError,
     prompt_hash,
 )
-from app.ai.schemas import (
+from rejox.ai.schemas import (
     DEFAULT_MAX_SNIPPET_LINES,
     ResolutionRequest,
     ResolutionResponse,
     SnippetBudgetError,
 )
-from app.models.validation import Diagnostic
+from rejox.models.validation import Diagnostic
 
 
 # --- No network --------------------------------------------------------------

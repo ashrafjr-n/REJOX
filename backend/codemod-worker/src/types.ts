@@ -23,6 +23,12 @@ export interface Options {
    * attributes interface, so its onClick is the DOM event).
    */
   componentEvents?: Record<string, Record<string, string>>;
+  /**
+   * Ask-stage `storage` answer: which RN store replaces browser storage.
+   * `'mmkv'` is synchronous (a pure rename); `'async-storage'` is not (every
+   * call site must also be awaited). Defaults to the recommended AsyncStorage.
+   */
+  storage?: string;
   [key: string]: unknown;
 }
 
@@ -56,4 +62,10 @@ export interface Ctx {
   rnUsed: Set<string>;
   /** module specifier → named imports to inject (e.g. @react-navigation/native). */
   namedImports: Map<string, Set<string>>;
+  /**
+   * module specifier → local name for a DEFAULT import to inject. Separate from
+   * `namedImports` because a default import has no name of its own to
+   * de-duplicate on — the local binding is ours to choose (AsyncStorage).
+   */
+  defaultImports: Map<string, string>;
 }

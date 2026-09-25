@@ -15,6 +15,8 @@ __pycache__/
 dist/
 build/
 *.tsbuildinfo
+# esbuild bundles of the Node workers (backend/scripts/bundle_workers.py)
+backend/src/rejox/_workers/
 
 # Playwright (E2E) — artifacts and generated fixtures
 test-results/
@@ -61,6 +63,12 @@ vibe.md
 reactjs-principles.md
 
 rejox-docs.md
+rejox-package-plan.md
 
 # Hardening diagnosis clones (throwaway)
 hardening-projects/
+
+# graphify knowledge graph (local)
+graphify-out/
+
+.gitattributes

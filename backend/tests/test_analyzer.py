@@ -12,10 +12,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.models.analysis import AnalysisReport
-from app.models.knowledge_graph import KnowledgeGraph
-from app.pipeline.analyzer import AnalyzerError, analyze_graph
+from rejox.server.main import app
+from rejox.models.analysis import AnalysisReport
+from rejox.models.knowledge_graph import KnowledgeGraph
+from rejox.pipeline.analyzer import AnalyzerError, analyze_graph
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -257,9 +257,42 @@ def test_table_component_is_blocked(redux_report: AnalysisReport) -> None:
     )
 
 
-def test_web_api_usage_flagged(redux_report: AnalysisReport) -> None:
+def test_browser_storage_is_reported_as_handled_not_residue(
+    redux_report: AnalysisReport,
+) -> None:
+    """`localStorage` is mapped by the transformer, so it is not `WEB_API_USAGE`.
+
+    The two facts were one code while nothing converted storage. Once the
+    storage transform existed, keeping them merged meant every project using
+    localStorage was scored as carrying unmigrated residue for work the
+    pipeline actually does — and the report told the user there was "no RN
+    equivalent" for something it had just converted.
+    """
     dashboard = _component(redux_report, "Dashboard")
-    assert any(i.code == "WEB_API_USAGE" for i in dashboard.issues)
+    storage = [i for i in dashboard.issues if i.code == "WEB_STORAGE_USAGE"]
+    assert len(storage) == 1
+    assert "localStorage" in storage[0].evidence.detail
+    # ...and it is NOT reported as the unhandled browser-API code.
+    assert not any(i.code == "WEB_API_USAGE" for i in dashboard.issues)
+
+
+def test_non_storage_web_apis_stay_unhandled() -> None:
+    """`window`/`document` have no equivalent — that half must not soften."""
+    from rejox.models.knowledge_graph import Component
+    from rejox.pipeline.rules.components import _web_api_issues
+
+    comp = Component(
+        id="c1",
+        name="Probe",
+        file="src/Probe.tsx",
+        exportType="default",
+        webApis=["document", "localStorage", "window"],
+    )
+    issues = {i.code: i for i in _web_api_issues(comp)}
+    assert set(issues) == {"WEB_STORAGE_USAGE", "WEB_API_USAGE"}
+    assert "localStorage" in issues["WEB_STORAGE_USAGE"].evidence.detail
+    assert "localStorage" not in issues["WEB_API_USAGE"].evidence.detail
+    assert "document" in issues["WEB_API_USAGE"].evidence.detail
 
 
 def test_coverage_drops_for_unsupported_project(
@@ -353,7 +386,7 @@ def test_object_router_warning_is_reported_once_by_routing() -> None:
 
 def test_rule_failure_becomes_an_analyzer_error_with_context(monkeypatch) -> None:
     """An unexpected rule failure names the rule and the graph it was walking."""
-    import app.pipeline.analyzer as analyzer_mod
+    import rejox.pipeline.analyzer as analyzer_mod
 
     def boom(_kg):
         raise ZeroDivisionError("division by zero")
@@ -369,7 +402,7 @@ def test_rule_failure_becomes_an_analyzer_error_with_context(monkeypatch) -> Non
 
 def test_analyze_endpoint_reports_the_analyzer_failure(monkeypatch) -> None:
     """The API answers with the typed message, not an opaque 500 body."""
-    import app.pipeline.analyzer as analyzer_mod
+    import rejox.pipeline.analyzer as analyzer_mod
 
     def boom(_kg):
         raise ZeroDivisionError("division by zero")

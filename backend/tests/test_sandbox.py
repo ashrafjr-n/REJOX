@@ -1,4 +1,4 @@
-"""Tests for the sandbox seam (``app/pipeline/sandbox.py``) and the dependency
+"""Tests for the sandbox seam (``rejox/pipeline/sandbox.py``) and the dependency
 hardening around it.
 
 The Validator executes `npm install`, `tsc` and Metro against a project derived
@@ -15,14 +15,14 @@ from pathlib import Path
 
 import pytest
 
-from app.pipeline import sandbox
-from app.pipeline.sandbox import (
+from rejox.pipeline import sandbox
+from rejox.pipeline.sandbox import (
     SandboxError,
     SandboxPolicy,
     assert_safe_for_untrusted_input,
     docker_argv,
 )
-from app.pipeline.scaffold import _build_dependencies, generate_scaffold
+from rejox.pipeline.scaffold import _build_dependencies, generate_scaffold
 
 DOCKER = SandboxPolicy(mode="docker")
 
@@ -284,7 +284,7 @@ def test_validator_containerizes_every_command_it_runs(
     """The wiring, not just the argv builder: in docker mode the Validator must
     issue `docker run` for each stage — and only the install stage may have a
     network. A stage that escaped the seam would show up here as a bare `npm`."""
-    from app.pipeline import validator
+    from rejox.pipeline import validator
 
     (tmp_path / "package.json").write_text('{"name":"x"}')
     # A local tsc, so the typecheck stage really runs instead of skipping.
@@ -323,7 +323,7 @@ def test_validator_containerizes_every_command_it_runs(
 def test_install_ignores_dependency_lifecycle_scripts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from app.pipeline import validator
+    from rejox.pipeline import validator
 
     (tmp_path / "package.json").write_text('{"name":"x"}')
     issued: list[list[str]] = []

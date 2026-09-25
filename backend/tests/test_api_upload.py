@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from rejox.server.main import app
 
 
 def _await_job(client, job_id: str, timeout: float = 60.0) -> dict:
@@ -126,7 +126,7 @@ def test_download_before_migrate_is_404(client) -> None:
 def test_plan_is_cached_per_run(client, monkeypatch) -> None:
     """A second /api/plan for the same runId is served from the workspace cache
     — it must not rebuild the knowledge graph (the expensive recompute)."""
-    import app.main as main
+    import rejox.server.main as main
 
     up = client.post(
         "/api/upload",

@@ -47,12 +47,12 @@ Gates go red again when the thing they test changes. Treat these as automatic:
 
 | Change to | Invalidates |
 | --- | --- |
-| `backend/app/pipeline/sandbox.py` | all of **A** |
-| `backend/app/pipeline/validator.py` | A1, A4, B3 |
-| `backend/app/pipeline/scaffold.py` | A8, A9 |
-| `backend/app/queue.py`, `backend/app/jobs.py` | all of **B** |
-| `backend/app/security.py` | all of **C** |
-| `backend/app/main.py`, `backend/app/pipeline/workspace.py` | C3 |
+| `backend/src/rejox/pipeline/sandbox.py` | all of **A** |
+| `backend/src/rejox/pipeline/validator.py` | A1, A4, B3 |
+| `backend/src/rejox/pipeline/scaffold.py` | A8, A9 |
+| `backend/src/rejox/server/queue.py`, `backend/src/rejox/server/jobs.py` | all of **B** |
+| `backend/src/rejox/server/security.py` | all of **C** |
+| `backend/src/rejox/server/main.py`, `backend/src/rejox/pipeline/workspace.py` | C3 |
 | `docker-compose.yml`, `backend/Dockerfile` | A0, A1, all of **B** |
 
 Section **D** exists so that these re-runs are not a matter of anyone
@@ -157,40 +157,65 @@ requiring the checks also stops direct pushes, so it changes how the repository
 is worked in day to day, and it was left until the engineering it guards was
 finished. **27 of 29 gates are signed** — A4 and E2 are the two that are not.
 
+2026-09-24: the backend became the `rejox` package (commit `ce73ab1`) — `app/` moved
+to `backend/src/rejox/` with the web service under `rejox.server`, the Node
+workers run as esbuild bundles instead of a runtime `npm run build`, run
+workspaces default to `~/.cache/rejox`, and the image installs the built wheel.
+Every file in the re-signing table moved (and `pipeline/workspace.py` and the
+`Dockerfile` changed in substance), so **all of A, B and C are re-red**, and E0
+and E1 with them.
+
+- `./verify-deployment.sh` (Docker Desktop 29.6.2, macOS;
+  `REJOX_DATA_DIR=/private/tmp/rejox-data`, `REJOX_DOCKER_GID=0`): **every gate
+  it covers passed in one pass — Preflight, B0, A0, A1, B1, Fixture, B2, B3,
+  A8, A9, C3, B5, C2** ("All deployment gates passed", exit 0). Those are
+  re-signed below.
+- `pytest -m sandbox_live` (`REJOX_SANDBOX=docker`): 9 passed — the host-side
+  run of A1–A7. That re-earns **A2, A3, A5, A6, A7**. A4's own two tests are
+  among the 9 and passed, but A4 has been held for more than that since
+  2026-09-04, so it stays `⟲ re-red` until someone decides what re-earns it.
+- **Not re-run, so `⟲ re-red`:** B4, B6, B7 (manual deployment gates), C0, C1,
+  C4, C5 (HTTP gates by hand), E0, E1.
+- **The same day, commit `f916d95`, those were run live and re-signed** — B4, B6,
+  B7, C0, C1, C4, C5, E0, E1 — and **A4 with them**, by its own command through
+  the worker's sandbox seam (BLOCKED without network, REACHED with it), which
+  retires the hold it had carried since 2026-09-04. Every gate in A, B and C is
+  green again; each entry below carries its output.
+
 **Three gates found release blockers that code review had not.** A0, B2 and C3
 were red on their first run and are signed with the failure kept in place. Every
 signature below carries the output it came from.
 
 | Gate | Proves | Status |
 | --- | --- | --- |
-| A0 | the worker can reach a Docker daemon at all | ☑ signed — RED first (socket permission), fixed; re-signed 2026-09-05 (verify-deployment pass) |
-| A1 | a sandboxed command runs, in the right directory | ☑ signed — canary read back, negative control refused; re-signed 2026-09-05 (verify-deployment pass) |
-| A2 | the container is non-root and holds no capabilities | ☑ signed |
-| A3 | only the run directory is writable | ☑ signed |
-| A4 | network is off for stages that did not ask for it | ⟲ re-red 2026-09-04 (validator.py) — not covered by `./verify-deployment.sh`, so the 2026-09-05 pass does not re-earn it |
-| A5 | the pid ceiling stops a fork storm | ☑ signed |
-| A6 | the memory ceiling is real, and the host survives it | ☑ signed — see the timeout note |
-| A7 | a missing daemon fails loudly instead of degrading | ☑ signed |
-| A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped; re-signed 2026-09-05 (verify-deployment pass) |
-| A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped; re-signed 2026-09-05 (verify-deployment pass) |
-| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker; re-signed 2026-09-03 (session pass) |
-| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2); re-signed 2026-09-03 (session pass) |
-| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G; re-signed 2026-09-03 (session pass) |
-| C0 | a server with no keys refuses to serve | ☑ signed — re-signed 2026-09-03; refuses only when BOTH credentials are absent |
-| C1 | a wrong key is rejected | ☑ signed — re-signed 2026-09-03; bad key, forged cookie and bad invite code all 401 |
-| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass) |
-| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3); re-signed 2026-09-05 (verify-deployment pass) |
-| C4 | CORS is never a wildcard | ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin |
-| C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03 |
+| A0 | the worker can reach a Docker daemon at all | ☑ signed — RED first (socket permission), fixed; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| A1 | a sandboxed command runs, in the right directory | ☑ signed — canary read back, negative control refused; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| A2 | the container is non-root and holds no capabilities | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A3 | only the run directory is writable | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A4 | network is off for stages that did not ask for it | ☑ signed — re-signed 2026-09-24 (package rename — live run: BLOCKED / REACHED through the worker's sandbox seam) |
+| A5 | the pid ceiling stops a fork storm | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A6 | the memory ceiling is real, and the host survives it | ☑ signed — see the timeout note; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A7 | a missing daemon fails loudly instead of degrading | ☑ signed; re-signed 2026-09-24 (package rename — `pytest -m sandbox_live`, 9 passed) |
+| A8 | the uploaded project's npm scripts never reach the output | ☑ signed — hostile postinstall dropped; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| A9 | a non-registry dependency spec never reaches `npm install` | ☑ signed — URL spec dropped; re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B0 | all three services come up and stay up | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B1 | the worker is registered with Redis and takes jobs | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B2 | a full migration completes through the queue | ☑ signed — RED first (API served stale state), fixed; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B3 | the emitted project is downloadable and real | ☑ signed — re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B4 | an API restart does not lose an in-flight job | ☑ signed — re-signed 2026-09-03 (×2); also proves the heartbeat spares a live worker; re-signed 2026-09-03 (session pass); re-signed 2026-09-24 (package rename — live run) |
+| B5 | Redis down answers 503 — fast, and never in-process | ☑ signed — 503 in <1s, queue refusal asserted directly; re-signed 2026-09-03 (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| B6 | a killed worker does not silently strand a job | ☑ signed — RED first (wedged at `running` for ever), fixed 2026-09-03; re-signed (×2); re-signed 2026-09-03 (session pass); re-signed 2026-09-24 (package rename — live run) |
+| B7 | retention actually deletes a run workspace | ☑ signed — RED first (the dry run over-promised), fixed; re-signed (×2), 27-for-27 at 1.1G; re-signed 2026-09-03 (session pass); re-signed 2026-09-24 (package rename — live run) |
+| C0 | a server with no keys refuses to serve | ☑ signed — re-signed 2026-09-03; refuses only when BOTH credentials are absent; re-signed 2026-09-24 (package rename — live run) |
+| C1 | a wrong key is rejected | ☑ signed — re-signed 2026-09-03; bad key, forged cookie and bad invite code all 401; re-signed 2026-09-24 (package rename — live run) |
+| C2 | the rate limit is shared across API replicas | ☑ signed — 2 replicas, 40 requests, 10 allowed; re-signed 2026-09-03 (session pass); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| C3 | a run belongs to one identity and no other | ☑ signed — RED first (a second identity downloaded another's run), fixed; re-signed 2026-09-03 (×3); re-signed 2026-09-05 (verify-deployment pass); re-signed 2026-09-24 (package rename — verify-deployment pass) |
+| C4 | CORS is never a wildcard | ☑ signed — re-signed 2026-09-03; no credentialed CORS, one origin; re-signed 2026-09-24 (package rename — live run) |
+| C5 | an oversized body is refused before it costs anything | ☑ signed — refused at 400, API peak 55.87 MiB; re-signed 2026-09-03; re-signed 2026-09-24 (package rename — live run) |
 | D0 | docker mode is exercised in CI, not just on someone's laptop | ☑ signed — green in CI ×3, and required on master 2026-09-03 |
 | D1 | the compose deployment is exercised in CI | ☑ signed — green in CI ×3, and required on master 2026-09-03 |
-| E0 | a failed migration is diagnosable after the fact | ☑ signed — RED twice (silence, then a `Job OK` lie), both fixed 2026-09-03 |
-| E1 | one identity cannot fill the disk | ☑ signed — RED first (300 GB/hour, unbounded), quota + free-space floor 2026-09-03 |
+| E0 | a failed migration is diagnosable after the fact | ☑ signed — RED twice (silence, then a `Job OK` lie), both fixed 2026-09-03; re-signed 2026-09-24 (package rename — live run) |
+| E1 | one identity cannot fill the disk | ☑ signed — RED first (300 GB/hour, unbounded), quota + free-space floor 2026-09-03; re-signed 2026-09-24 (package rename — live run) |
 | E2 | one upload cannot spend an unbounded amount of LLM quota | ☐ not run |
 
 ---
@@ -201,7 +226,7 @@ signature below carries the output it came from.
 execution endpoint with a nice report attached.
 
 These gates run against the deployed worker, through
-`app.pipeline.sandbox.run()` — the real seam, not a hand-written `docker run`.
+`rejox.pipeline.sandbox.run()` — the real seam, not a hand-written `docker run`.
 Testing a reimplementation of the flags proves the flags, not the product.
 
 ### Setup — the probe helper
@@ -213,7 +238,7 @@ sbx() {  # sbx <net|nonet> <argv...> — one command through the real sandbox se
   docker compose exec -T worker python - "$@" <<'PY'
 import sys
 from pathlib import Path
-from app.pipeline.sandbox import run, SandboxPolicy
+from rejox.pipeline.sandbox import run, SandboxPolicy
 
 cwd = Path("${REJOX_DATA_DIR}/workspaces/probe")  # e.g. /srv/rejox-data/workspaces/probe
 cwd.mkdir(parents=True, exist_ok=True)
@@ -444,6 +469,13 @@ red first line by turning the network on everywhere.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+$ sbx nonet node -e '...dns.lookup("registry.npmjs.org")...'   (helper imports rejox.pipeline.sandbox)
+BLOCKED
+$ sbx net   node -e '...dns.lookup("registry.npmjs.org")...'
+REACHED
+
 Signed: 2026-08-31 — Ashraf (verification run, Docker Desktop 29.6.2, macOS) — commit 6c504e4
 $ sbx nonet node -e '...dns.lookup("registry.npmjs.org")...'
 BLOCKED
@@ -539,7 +571,7 @@ worthless if an unavailable daemon quietly turns into un-sandboxed execution.
 docker compose exec -T worker sh -c 'mv /usr/bin/docker /usr/bin/docker.hidden 2>/dev/null || echo "read-only fs — use PATH override instead"'
 docker compose exec -T -e PATH=/nonexistent worker python -c "
 from pathlib import Path
-from app.pipeline.sandbox import run, SandboxPolicy, SandboxError
+from rejox.pipeline.sandbox import run, SandboxPolicy, SandboxError
 try:
     run(['echo','hi'], Path('/data/workspaces/probe'), 10, policy=SandboxPolicy.from_env())
     print('FELL BACK — RED')
@@ -1079,6 +1111,16 @@ in this scenario would mean the grace is too narrow, not that B4 passed.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+Job f8a9d8b2bad740a2a2946651bb5b43a8.
+before restart: {"status":"running","nevents":1}
+$ docker compose restart api
+$ curl /health   -> {"status":"ok"}
+after restart:  {"status":"running","nevents":1}
+final:          {"status":"succeeded","nevents":12,"error":null}
+No WorkerLost on the live worker across the API restart.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
 
 Job 68a15e4b…, run 3d70b1c0… (see p2 log).
@@ -1271,6 +1313,20 @@ as a known gap, not something to sign around.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+Job ca3a7ee489064038b335a55abb12a900.
+before the kill:      {"status":"running","nevents":1,"error":null}
+$ docker compose kill worker
++10s (inside grace):  {"status":"running","error":null}
++72s (past grace):    {"status":"failed","error":{"type":"WorkerLost","message":
+                       "The process running this migration stopped without
+                        reporting a result (no heartbeat for 74s, past the 60s
+                        grace). The migration did not complete; start it
+                        again.","stage":"emit"}}
+$ docker compose start worker
++60s after restart:   {"status":"failed","error":"WorkerLost"}
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass. GREEN, unchanged.
 
 Job 01f5054e25d544ba913a37408bf2ec9c, run 127d80f8ff3949fba2d3be4899fd3c72.
@@ -1407,6 +1463,16 @@ docker compose exec -T api sh -c 'du -sh /data/workspaces'
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+REJOX_DATA_DIR=/private/tmp/rejox-data (the compose root; /data/workspaces in
+the command above is the image default, not this deployment's path).
+before:   17 entries, 723M
+$ REJOX_RUN_TTL_SECONDS=1 rejox sweep --dry-run   -> 15 run(s) past a 1s window (dry run — nothing deleted)
+$ REJOX_RUN_TTL_SECONDS=1 rejox sweep             -> 15 run(s) reaped past a 1s window.
+after:    2 entries, 4.0K   (the sandbox probe dir and one run inside the window)
+`rejox sweep` is now hidden from `rejox --help`; the command is unchanged.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
 
 $ ls .../workspaces   -> 14 entries, 723M
@@ -1511,7 +1577,7 @@ Both must be empty for the refusal to fire, so both are emptied here.
 ```bash
 docker compose -f docker-compose.yml run --rm \
   -e REJOX_API_KEYS= -e REJOX_INVITE_CODES= -e REJOX_ALLOW_ANONYMOUS= \
-  -p 8001:8000 api uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+  -p 8001:8000 api uvicorn rejox.server.main:app --host 0.0.0.0 --port 8000 &
 sleep 5
 curl -s -o /tmp/b -w '%{http_code}\n' -X POST localhost:8001/api/parse \
   -H 'Content-Type: application/json' -d '{"path":"/tmp"}'
@@ -1532,6 +1598,14 @@ of the two does not trip it.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+both credentials empty -> 503 {"detail":"This Rejox server has no API keys or
+  invite codes configured, so it will not serve requests. Set REJOX_API_KEYS or
+  REJOX_INVITE_CODES (comma-separated), or REJOX_ALLOW_ANONYMOUS=1 for a local
+  development server."}
+only REJOX_API_KEYS empty (invite codes set) -> 401 — the refusal did not trip.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
 
 All three cases, because with two credentials the refusal must fire on NEITHER
@@ -1594,6 +1668,12 @@ validation took over).
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+no-key=401
+bad-key=401
+good-key=403   (not 401: the key passed; local-path mode refuses the body)
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
 
   no-key          = 401
@@ -1837,6 +1917,11 @@ the second.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+Origin: https://evil.example -> no access-control-allow-origin header
+Origin: http://localhost:5173 -> access-control-allow-origin: http://localhost:5173
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
 
   Origin: https://evil.example
@@ -1893,6 +1978,15 @@ than application code.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+$ curl --limit-rate 20M … -F file=@/tmp/big.zip   (200 MB)
+http=400 time=9.6s
+{"detail":"Rejected upload: archive is 200000000 bytes, over the 104857600-byte limit."}
+API memory: idle 49.88 MiB; during the upload 52.16 → 53.11 → 53.91 → 55.4 MiB; peak 55.4 MiB.
+The upload was throttled so `docker stats` (~2s per sample) could sample it
+four times; unthrottled it finished in 2.8s with one sample, 57.48 MiB.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — re-signed after the session/auth pass.
 
 $ head -c 200000000 /dev/urandom > big.zip     # 200 MB, over the 100 MB limit
@@ -2164,6 +2258,24 @@ worth more than a green mark that nobody tested.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+Case 1 — broken-app, job 0d670146a786430383a46ab97174fbcb:
+  {"status":"failed","error":{"type":"NothingToMigrate","stage":"analyze",
+   "message":"No React components found in project 'broken-app' (9 files, 0
+   components, …)"}}
+  1. Stage: analyze — the container logs say so themselves (a JSON job_failed
+     line with stage and errorType), not only job.json.
+  2. Why: the upload holds no React components; the message tells the user to
+     check they uploaded the app directory.
+  3. Correlation: grep -c "$JOB" over api+worker logs = 10. The traceback line
+     now names `rejox.server.jobs.MigrationFailed`.
+Case 2 — the B6 WorkerLost job ca3a7ee489064038b335a55abb12a900:
+  1. Stage: emit — the last job_stage_started line the worker logged before the
+     kill, and job.json's WorkerLost error agree.
+  2. Why: the worker process died mid-migration; start it again.
+  3. Correlation: 16.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — GREEN. This gate has been RED twice (both records kept below); both findings are now fixed and observed fixed.
 
 Both failures produced again, and this time BOTH are explainable from the
@@ -2341,6 +2453,15 @@ deliberately in a scratch environment and find out.
 **Evidence:**
 
 ```text
+Signed: 2026-09-24 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit f916d95 — re-signed after the backend became the `rejox` package (every seam file moved).
+
+REJOX_ACCOUNT_QUOTA_BYTES=2147483648 REJOX_MIN_FREE_BYTES=2147483648 (read in the container)
+upload within quota                -> 200
+same upload, quota lowered to 1    -> 413 {"detail":"Storage quota reached: your runs occupy 0.6 GB of 0.0 GB. …"}
+free-space floor above the disk    -> 503 {"detail":"The server is low on storage (1546.1 GB free, needs 931322.6 GB) … This is a server condition, not a problem with your upload …"}
+The limit of the 2026-09-03 signature still stands: a volume that genuinely
+fills mid-migration has not been exercised.
+
 Signed: 2026-09-03 — Ashraf (live run, Docker Desktop 29.6.2, macOS) — commit 701095d — GREEN. RED on its first pass (the arithmetic below); both questions are now answered.
 
 Configured, read from inside the container rather than assumed:

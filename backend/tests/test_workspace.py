@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from app.pipeline import workspace
-from app.pipeline.workspace import WorkspaceError
+from rejox.pipeline import workspace
+from rejox.pipeline.workspace import WorkspaceError
 
 
 @pytest.fixture

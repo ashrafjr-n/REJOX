@@ -9,11 +9,10 @@ code**, and our generator writes the code. These tests pin that contract.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
-from app.ai.navigation import (
+from rejox.ai.navigation import (
     NavLinkSummary,
     NavTier,
     NavUiSummary,
@@ -23,9 +22,9 @@ from app.ai.navigation import (
     stack_spec_from_routes,
     unhoistable_screens,
 )
-from app.ai.provider import LLMProvider, LLMResponse
-from app.models.analysis import RouteMapping
-from app.models.knowledge_graph import RouteElementProp, RouteHostState
+from rejox.ai.provider import LLMProvider, LLMResponse
+from rejox.models.analysis import RouteMapping
+from rejox.models.knowledge_graph import RouteElementProp, RouteHostState
 
 ROUTES = [
     RouteMapping(screenName="Home", componentName="HomePage", path="/"),
@@ -161,7 +160,7 @@ def test_unhoistable_screens_names_only_what_it_cannot_place() -> None:
 def test_generated_navigator_with_relocated_state_is_valid_typescript() -> None:
     if not _has_node():
         pytest.skip("node/npm not on PATH")
-    from app.pipeline.transformer import check_syntax
+    from rejox.pipeline.transformer import check_syntax
 
     routes = _settings_carrying(
         RouteElementProp(name="darkMode", binding="darkMode"),
@@ -173,7 +172,7 @@ def test_generated_navigator_with_relocated_state_is_valid_typescript() -> None:
 def test_generated_stack_navigator_is_valid_typescript() -> None:
     if not _has_node():
         pytest.skip("node/npm not on PATH")
-    from app.pipeline.transformer import check_syntax
+    from rejox.pipeline.transformer import check_syntax
 
     res = resolve_nav_container(ROUTES)
     assert check_syntax(res.navigatorSource) == 0
@@ -224,7 +223,7 @@ def test_two_malformed_specs_fall_back_to_deterministic_stack() -> None:
 
 
 def test_spec_may_not_invent_screens_outside_the_route_table() -> None:
-    from app.ai.navigation import NavigatorSpec
+    from rejox.ai.navigation import NavigatorSpec
 
     spec = NavigatorSpec.model_validate(
         {"type": "tabs", "screens": ["Home", "Ghost"], "nested": [], "rationale": "x"}

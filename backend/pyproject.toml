@@ -1,34 +1,68 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "rejox"
 version = "0.1.0"
 description = "Rejox — AI migration engineer: React → React Native. CLI + pipeline."
 requires-python = ">=3.11"
-# Proprietary — see LICENSE at the repo root. Not redistributable.
-license = "LicenseRef-Proprietary"
+# Functional Source License (FSL-1.1-ALv2). backend/LICENSE is a copy of the
+# repo root LICENSE (a build cannot reach outside backend/); wheel-smoke.sh fails
+# if they differ.
+license = "FSL-1.1-ALv2"
+license-files = ["LICENSE"]
 dependencies = [
-    "fastapi==0.115.6",
-    "uvicorn[standard]==0.34.0",
-    "pydantic==2.10.4",
-    "python-multipart==0.0.20",
-    "google-genai==1.15.0",
-    "typer==0.26.8",
-    "rich==13.9.4",
-    # Durable job queue: migrations outlive an API restart and scale across
-    # worker processes (REJOX_QUEUE=rq). The `thread` backend needs neither.
-    "rq==2.1.0",
-    "redis==5.2.1",
+    "pydantic>=2.10,<3",
+    "google-genai>=1.15.0,<2",
+    "typer>=0.26.8,<1",
+    "rich>=13.9.4,<14",
+    # cli.py catches click's own exception types directly; typer no longer
+    # declares click as a dependency, so this can't be left implicit.
+    "click>=8.1,<9",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.3.4", "httpx==0.28.1"]
+# The web service (rejox.server): API, job queue, worker. `pip install rejox`
+# alone is the CLI and never pulls these in.
+server = [
+    "fastapi>=0.115.6,<1",
+    "uvicorn[standard]>=0.34.0,<1",
+    "python-multipart>=0.0.20,<1",
+    # Durable job queue: migrations outlive an API restart and scale across
+    # worker processes (REJOX_QUEUE=rq). The `thread` backend needs neither.
+    "rq>=2.1.0,<3",
+    "redis>=5.2.1,<6",
+]
+dev = ["pytest>=8.3.4,<9", "httpx>=0.28.1,<1"]
 
 [project.scripts]
-rejox = "app.cli:app"
-rejox-worker = "app.worker:main"
+rejox = "rejox.cli:app"
+rejox-worker = "rejox.server.worker:main"
 
-[tool.setuptools.packages.find]
-include = ["app*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/rejox"]
+# The worker bundles are built (hatch_build.py), not committed — gitignored
+# files are left out of a build unless named as artifacts.
+artifacts = ["src/rejox/_workers/*"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+
+# An sdist carries the worker sources, so a wheel built from it bundles them the
+# same way a checkout does (Node 20+ needed to build from source).
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/rejox",
+    "scripts/bundle_workers.py",
+    "hatch_build.py",
+    "LICENSE",
+    "parser-worker/src",
+    "parser-worker/package.json",
+    "parser-worker/package-lock.json",
+    "parser-worker/tsconfig.json",  # esbuild reads it (strict mode)
+    "codemod-worker/src",
+    "codemod-worker/package.json",
+    "codemod-worker/package-lock.json",
+    "codemod-worker/tsconfig.json",  # esbuild reads it (strict mode)
+]
+exclude = ["src/rejox/_workers"]

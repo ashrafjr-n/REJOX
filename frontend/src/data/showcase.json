@@ -714,7 +714,7 @@
     "reproduce": "REJOX_AI_PROVIDER=fake rejox export-showcase",
     "sampleProject": "test-projects/sample-app",
     "schemaVersion": 1,
-    "sourceCommit": "87364c33c1aa2a6fbf3286cc28f86ad9fb39be04"
+    "sourceCommit": "5a6c599731f0546a282b52d13374f6827d4b04da"
   },
   "project": {
     "counts": {

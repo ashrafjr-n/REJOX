@@ -19,7 +19,12 @@ add a row here **first**, then implement it.
 | `className` naming a class the project defines in its own CSS (`.app`, `.black_btn` — usually via `@apply`) | — (NativeWind resolves Tailwind utilities only) | Low | **Not a Tailwind class.** NativeWind ignores it silently, so the element renders unstyled. Counted as **unmappable** and named in the report — never counted as a mapped Tailwind class, which would inflate Coverage while the app loses its design. |
 | `react-router-dom`                | React Navigation (`@react-navigation/*`)    | Medium     | `Link`→`navigation.navigate` and `useParams`→`useRoute` are **automated** (route table); navigator STRUCTURE (stack/tab) stays a design decision. |
 | CSS `:hover`                      | — (no equivalent)                           | Low        | No hover on touch. Flag; optionally map to press/focus state. |
-| `localStorage`                    | `AsyncStorage` (`@react-native-async-storage`) | Medium  | API is async — call sites must be awaited. |
+| `localStorage`/`sessionStorage` `.getItem`/`.setItem`/`.removeItem`/`.clear`, written bare **or** on a global host (`window.localStorage`, `globalThis.sessionStorage`) | `AsyncStorage` (`@react-native-async-storage/async-storage`) **or** `react-native-mmkv` — the Ask stage's `storage` answer decides | Medium | Two different problems behind one question. MMKV is **synchronous**, so it is a pure rename. AsyncStorage is **async**, so the rename is the easy half: every call site must also become awaited, and a `Promise` left where a `string` was is silent data corruption, not a type error. |
+| `sessionStorage` specifically     | the same store, with a **persistence warning**              | Medium | Neither RN store is session-scoped. The data now outlives the app launch that wrote it. The behaviour change is real and is reported, never silently absorbed. |
+| `localStorage.length` / `.key(i)` / property access (`localStorage.token`) / the object passed as a value | — (no equivalent) | Low | Residue code `WEB_STORAGE`. Neither RN store enumerates keys the way the Storage interface does, and an object passed around is a call site the transform cannot see. |
+| `document` / `history` / `location`  | — (no equivalent)                       | Low  | Residue code `WEB_GLOBAL`. React Native has no DOM and no URL bar: these are simply absent, and the first read throws. |
+| `window.X` / `navigator.X` (beyond storage) | `useWindowDimensions` / `Dimensions` / `Platform` / an Expo module | Low | Residue code `WEB_GLOBAL`. RN **does** define `window` and `navigator` as globals, so the identifier resolves and nothing throws until a DOM-only property comes back `undefined` — which is why these are the hardest of the family to notice. |
+| `alert(…)`                        | `Alert.alert(…)` (`react-native`)           | Medium | RN polyfills the global `alert`, so this one works — it is reported as a **warning**, not residue. `confirm`/`prompt` have no polyfill. |
 | `<a href>`                        | `Linking.openURL` / `<Pressable>`           | Medium     | External links → `Linking`; internal → navigation. |
 | `import.meta.env.VITE_X` (Vite build-time env) | `process.env.EXPO_PUBLIC_X`             | High       | Both are inlined by the bundler, so the read stays a static member expression — Metro only inlines `process.env.EXPO_PUBLIC_*` written out in full. The `VITE_` prefix is dropped: it is Vite's marker for "safe to ship to the client", and `EXPO_PUBLIC_` is Expo's. The **value** does not migrate — a `.env` is not part of an uploaded project, and a key that reaches the client is public either way. |
 | `import.meta.env.DEV` / `.PROD` / `.MODE` / `.SSR` | `__DEV__` / `(!__DEV__)` / `(__DEV__ ? 'development' : 'production')` / `false` | High | RN's own build flag. `SSR` is `false`: there is no server render of a native app. |
@@ -80,6 +85,10 @@ self-checks that its output is syntactically valid TS before emitting.
 | `createRoot(…).render(<P a={a}><App/></P>)` / `ReactDOM.render(…)` → the provider chain is lifted into the generated root `App.tsx`, with the values it reads (imports + top-level declarations of the entry file) carried across | entry-point provider lift; `createRoot`/`document.getElementById`/`react-dom` have no RN equivalent and are dropped, the app-level configuration they wrapped is not | ✅ High / automated |
 | `<StrictMode>` / `<React.Fragment>` / `<BrowserRouter>`… wrapping the root | dropped from the lifted chain — a stateless wrapper carries no app configuration, and a router provider is subsumed by the generated navigator | ✅ High / automated |
 | `import.meta.env.VITE_X` → `process.env.EXPO_PUBLIC_X`; `import.meta.env.DEV`/`PROD`/`MODE`/`SSR` → `__DEV__`/`(!__DEV__)`/`(__DEV__ ? 'development' : 'production')`/`false` | static env read rewritten in place — the replacement is written out as a full member expression because that is the only form Metro inlines, and a parenthesised replacement keeps the surrounding expression's meaning. Anything else about `import.meta` (dynamic key, whole-object read, `.url`/`.hot`/`.glob`) is `BUILD_ENV` residue, never a guess: Metro refuses to bundle a file containing `import.meta` at all, so leaving one behind costs the whole app, not one value | ✅ High / automated |
+| `localStorage.X(…)` → `storage.X(…)` under the Ask stage's `storage` answer: **MMKV** (`import { MMKV } from 'react-native-mmkv'` + one module-level `const storage = new MMKV()`) or **AsyncStorage** (default import, awaited) | web-storage call rewrite — the answer to the storage question is finally APPLIED, not collected and dropped | ✅ High / automated |
+| AsyncStorage `await` placement — **A** call already inside an `async` function → insert `await`; **B** inside a `useEffect` callback with no `return` → the body moves into an injected `const run = async () => {…}; run();`; **C** a non-`async` function whose return value is never read → the function is marked `async` | await placement, decided from the enclosing function, never assumed | ✅ High / automated |
+| An AsyncStorage call site matching **none** of A/B/C (module scope, a `useState(...)` initializer, an effect that returns a cleanup, a call whose value is consumed synchronously) → **left untouched** + `WEB_STORAGE` residue | deliberate non-transform. An un-awaited rewrite substitutes a `Promise` for a `string` — a wrong value that type-checks and corrupts data silently. An untouched `localStorage` throws at the exact line the TODO names. Between a silent wrong answer and a loud missing one, the rule picks loud | ✅ High / automated |
+| `@react-native-async-storage/async-storage` / `react-native-mmkv` → pinned into the scaffold's `package.json` | **Rejox-introduced** dependency. Distinct from carry-over: this package is in no uploaded `package.json`, so there is no version to carry — without an explicit pin the import resolves to nothing and Metro fails | ✅ High / automated |
 | `import './App.css'` (a plain, non-module stylesheet) → dropped (+ `GLOBAL_CSS` unhandled) | import removal — RN has no stylesheet imports at all, and the file is never emitted; the TODO names the stylesheet so the loss is visible at the call site rather than only in the skip list. The skip note says the rules were **lost**, never that the scaffold handles them: the scaffold emits Tailwind directives only and knows nothing about the file's own classes | ✅ High / automated |
 | **Every** package the emitted code imports (`@reduxjs/toolkit`, `react-redux`, `axios`, …) → carried into the scaffold's `package.json` | dependency carry-over, driven by scanning the module specifiers of the files that were actually WRITTEN — never a fixed list, and never only the import a provider lift happened to touch. A deep import (`@reduxjs/toolkit/query/react`) resolves to its package root. A package the output imports and `package.json` omits is an unresolvable module, and Metro fails on the first one | ✅ High / automated |
 
@@ -101,6 +110,8 @@ comment so nothing is ever silently dropped:
 | `PROPS_HTML_TYPE` | DOM types with no clean RN equivalent (post-map)               | props API redesign |
 | `WEB_ONLY_ELEMENT` | `table`/`canvas`/`iframe`/…                                   | needs a component redesign |
 | `BUILD_ENV`     | `import.meta` in a form no static rewrite covers                 | where the value comes from once a build-time bundler constant is gone — an `EXPO_PUBLIC_` key, a native config, or a runtime fetch — is an app-configuration decision |
+| `WEB_STORAGE`   | a web-storage call the async rewrite cannot place an `await` on (module scope, a `useState` initializer, an effect with a cleanup, a value consumed synchronously), or a Storage member with no RN equivalent (`.length`, `.key(i)`, property access) | where a synchronous read belongs once the store became a `Promise` — an initial-state effect, a loading flag, a different store — is a component-shape decision, not a rename. Only under the **MMKV** answer does this residue disappear entirely: a synchronous store needs no placement at all |
+| `WEB_GLOBAL`    | a browser global RN does not provide (`document`, `history`, `location`) or provides without its DOM surface (`window`, `navigator`) | what replaces a DOM read is a per-call-site design decision — `window.innerWidth` becomes `useWindowDimensions()`, `document.getElementById` becomes a ref, `location` becomes navigation state. There is no rename that covers them. |
 
 > **Update — most of this "residue" turned out to be rules.** Each of the codes
 > below now has an AI-Resolution-Engine resolver that handles it deterministically;
@@ -111,11 +122,43 @@ comment so nothing is ever silently dropped:
 > - `NAV_CONTAINER` wiring → navigator generated from the route table — **0 LLM, no TODO survives**.
 > - Navigator **shape** (tabs/stack/drawer) is the *only* genuine reasoning → **1 LLM call**, and even then the LLM returns a spec, not code.
 
+## The browser-globals guard — why a closed list, not the type checker
+
+`tsc` and Metro **cannot** catch this family, and the reason is structural:
+`expo/tsconfig.base` sets `lib: ["DOM", "ESNext"]`, so every browser global
+type-checks, and Metro bundles them because they are valid JavaScript. A
+migrated app can pass both gates and still die on its first render.
+
+The obvious fix — drop `DOM` from the emitted `tsconfig.json` — was measured
+against the 11-project benchmark and **rejected**:
+
+| | count |
+| --- | --- |
+| real hidden bugs it would newly catch (`window` 20, `localStorage` 10, `navigator` 1) | **31, across 6 of 11 projects** |
+| **false** errors on globals React Native really does provide (`setTimeout` 48, `FormData` 10, `clearTimeout` 2, `fetch` 2, `URL` 2, `setInterval`/`clearInterval` 2) | **66** |
+
+Two false alarms per real find, and one benchmark project alone (`07`) would
+turn red over 63 `setTimeout` calls that work perfectly on a device. A gate that
+fails working code teaches people to ignore it.
+
+So the guard is a **closed list we maintain**, not a lib the compiler maintains:
+`setTimeout` is not on it, so it can never be flagged. Re-measured on the same
+11 projects after it shipped: **20 `WEB_GLOBAL` + 11 `WEB_STORAGE` residue + 10
+converted storage calls, across 6 projects — and zero of the 66 false alarms**
+(no `setTimeout`, `fetch`, `FormData`, `URL`, `clearTimeout`, `setInterval`).
+Before it, every one of those sites left the pipeline unmentioned. The list lives in `backend/codemod-worker/src/transforms/globals.ts`,
+each entry carrying its own message and its own severity — a global RN really
+does provide (`alert`) is a warning, never residue, because claiming it crashes
+would be as wrong as missing it. One expression is named **once**:
+`window.location.pathname` is a single fix, so the inner, more specific global
+wins and `window` steps aside — including for `window.localStorage`, which the
+storage rule describes better than this list can.
+
 ## Automated by the AI Resolution Engine — Styling Resolver (tiers 1–2)
 
 These resolve `TW_UNSUPPORTED` residue **deterministically**, before any LLM is
 consulted (see `ARCHITECTURE.md` → *the three-tier ladder*). Tier 1 = static map
-(`app/ai/styling/known_map.py`); tier 2 = pattern (`patterns.py`). Anything a
+(`rejox/ai/styling/known_map.py`); tier 2 = pattern (`patterns.py`). Anything a
 row here handles must **not** go to the LLM — that is the design, enforced by the
 ordering in `resolver.py`.
 
@@ -202,7 +245,7 @@ genuinely unresolvable (a runtime `<Link to>` → `NAV_LINK`), and it does not
 break the build.
 
 Anything the deterministic pass cannot fix goes to the **repair loop**
-(`app/pipeline/repair.py`): a single targeted LLM edit per remaining error,
+(`rejox/pipeline/repair.py`): a single targeted LLM edit per remaining error,
 re-validated, at most two rounds. When touching the NativeWind / navigation
 paths, re-run `pytest -m slow` to keep the gate honest.
 

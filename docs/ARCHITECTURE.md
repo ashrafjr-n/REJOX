@@ -77,12 +77,12 @@ The engine works from a local filesystem path, but the **product starts from a
 user upload**. The Upload stage lands that untrusted input on disk and hands the
 rest of the pipeline a plain directory path — nothing downstream changes.
 
-- Python module: `app/pipeline/ingest.py` (`ingest_zip`, `ingest_github`) +
-  `app/pipeline/workspace.py` (run directories).
+- Python module: `rejox/pipeline/ingest.py` (`ingest_zip`, `ingest_github`) +
+  `rejox/pipeline/workspace.py` (run directories).
 - Two sources: an uploaded **ZIP** (`POST /api/upload`) or a public **GitHub
   URL** (`POST /api/upload/github`, shallow `--depth 1` clone; private repos are
   a later feature and fail with a clear message).
-- Output: an `IngestedProject` (`app/models/ingest.py`) —
+- Output: an `IngestedProject` (`rejox/models/ingest.py`) —
   `{ runId, rootPath, source, detectedRoot, candidateRoots, fileCount,
   sizeBytes, warnings }` — persisted as `ingest.json` in the run so later
   `runId`-mode calls need no re-derivation.
@@ -95,7 +95,7 @@ rest of the pipeline a plain directory path — nothing downstream changes.
   wrapper over the TypeScript Compiler API) — best-in-class TS/JSX parsing.
   (The worker directory keeps the name `parser-worker`.)
 - Output: the Knowledge Graph JSON (below). No interpretation, no LLM.
-- Python module: `app/pipeline/intelligence.py` (`build_knowledge_graph`).
+- Python module: `rejox/pipeline/intelligence.py` (`build_knowledge_graph`).
 - See **[Project Intelligence Engine — implementation](#project-intelligence-engine--implementation)**.
 
 ### Knowledge Graph (JSON)
@@ -210,7 +210,7 @@ The ladder generalizes. Each residue class got its own resolver, and applying
 the core question (*reasoning, or a rule in disguise?*) to each one collapsed
 almost all of it to rules:
 
-| Residue        | Resolver (`app/ai/…`) | Verdict | LLM on `sample-app` |
+| Residue        | Resolver (`rejox/ai/…`) | Verdict | LLM on `sample-app` |
 | -------------- | --------------------- | ------- | ------------------- |
 | `TW_UNSUPPORTED` | `styling/`          | **rule** — static-map + pattern | 0 |
 | `CSS_MODULE`     | `css/`              | **rule** — parsing, not reasoning | 0 |
@@ -285,13 +285,13 @@ The Upload stage turns an untrusted upload into files on disk inside an isolated
 after Upload accepts either a `runId` (a landed upload) or a local `path`
 (dev/CLI) — the same pipeline functions run underneath.
 
-### Run workspaces (`app/pipeline/workspace.py`)
+### Run workspaces (`rejox/pipeline/workspace.py`)
 
 Every migration is a *run* with a stable `runId`, and all its files live under
 one config-driven root:
 
 ```
-{REJOX_WORKSPACE_ROOT}/{runId}/     # default root: backend/.rejox-workspaces (gitignored)
+{REJOX_WORKSPACE_ROOT}/{runId}/     # default root: ~/.cache/rejox/workspaces (rejox/paths.py)
 ├── source/        # the ingested React project (upload lands here)
 ├── output/        # the emitted React Native project (emit writes here)
 ├── ingest.json    # the IngestedProject manifest (root detection, warnings)
@@ -313,7 +313,7 @@ a single place (`_get_run_or_404`), answering `404` to anyone else so a response
 cannot be used to probe for other people's runIds. See
 [`SECURITY.md`](SECURITY.md).
 
-### Ingestion (`app/pipeline/ingest.py`)
+### Ingestion (`rejox/pipeline/ingest.py`)
 
 `ingest_zip(data, run)` / `ingest_github(url, run, ref=None)` → `IngestedProject`.
 
@@ -376,17 +376,19 @@ backend/
 │           ├── styling.ts      # tailwind / css-module / inline detection
 │           ├── api.ts          # axios / fetch clients + endpoints
 │           └── state.ts        # zustand stores + state keys
-└── app/pipeline/intelligence.py  # runs the worker via subprocess, validates with pydantic
+└── rejox/pipeline/intelligence.py  # runs the worker via subprocess, validates with pydantic
 ```
 
 **Contract.** The worker prints a single JSON document (the Knowledge Graph) to
 stdout; diagnostics go to stderr. `intelligence.py::build_knowledge_graph(path)` runs it,
 captures stdout, and validates it into the `KnowledgeGraph` pydantic model
-(`app/models/knowledge_graph.py`). The worker is built automatically on first
-run (`npm install && npm run build`), or manually:
+(`rejox/models/knowledge_graph.py`). Python runs an esbuild bundle of the worker,
+`rejox/_workers/parser.js`, through `rejox/workers.py` — nothing is built at run
+time. Installing the backend writes the bundles (`hatch_build.py`); to rebuild
+them after changing a worker:
 
 ```bash
-cd backend/parser-worker && npm install && npm run build
+cd backend && python scripts/bundle_workers.py
 ```
 
 **Determinism.** All collections are sorted and de-duplicated; node ids are
@@ -455,11 +457,11 @@ missing, it is added to the Node worker first; that is why the KG carries
 `webApis`). Entry point:
 
 ```python
-from app.pipeline.analyzer import analyze_graph   # analyze_graph(kg) -> AnalysisReport
+from rejox.pipeline.analyzer import analyze_graph   # analyze_graph(kg) -> AnalysisReport
 ```
 
 ```
-backend/app/pipeline/
+backend/src/rejox/pipeline/
 ├── analyzer.py           # composes the rules into an AnalysisReport
 └── rules/
     ├── codes.py          # stable issue codes (report contract)
@@ -634,10 +636,10 @@ The Planner turns an `AnalysisReport` (plus the KG it came from) into an ordered
 deterministic — it plans, it does not convert. Entry point:
 
 ```python
-from app.pipeline.planner import plan_migration   # plan_migration(report, kg) -> MigrationPlan
+from rejox.pipeline.planner import plan_migration   # plan_migration(report, kg) -> MigrationPlan
 ```
 
-Schema in `app/models/plan.py`: `Question` / `QuestionOption` / `PlanStep`
+Schema in `rejox/models/plan.py`: `Question` / `QuestionOption` / `PlanStep`
 (`kind ∈ setup|routing|components|styling|state|api|assets|navigation|validation`)
 / `ManualReviewCandidate` / `UnsupportedItem` / `MigrationPlan`. The API returns a
 `PlanResponse { report, plan }` so the frontend gets both together.
@@ -703,10 +705,10 @@ orchestrated from Python via subprocess — the same pattern for both:
 
 ```
 backend/
-├── parser-worker/     # React → Knowledge Graph (facts)          → app/pipeline/intelligence.py
-├── codemod-worker/    # one React file → one React Native file   → app/pipeline/transformer.py
+├── parser-worker/     # React → Knowledge Graph (facts)          → rejox/pipeline/intelligence.py
+├── codemod-worker/    # one React file → one React Native file   → rejox/pipeline/transformer.py
 │   └── src/transforms/{navigation,events,elements,images,text,styles,propsTypes,imports}.ts
-└── app/pipeline/
+└── rejox/pipeline/
     ├── scaffold.py    # Expo(TS) project skeleton from answers (templates/)
     └── transformer.py # build_transform_options(kg, report, answers) → options
                        # transform_component(file, options) -> TransformResult
@@ -789,7 +791,7 @@ web-only utility classes (pressed states, flex reflow, gradients, animations).
 skeleton from the answered questions, wiring NativeWind (babel `jsxImportSource`
 + `nativewind/babel`, metro `withNativeWind` + `global.css`, `tailwind.config.js`)
 and the chosen navigation library, carrying over compatible deps (zustand,
-axios). Templates are real files under `app/pipeline/templates/`. No source is
+axios). Templates are real files under `rejox/pipeline/templates/`. No source is
 copied — skeleton only.
 
 **NativeWind dependency wiring (load-bearing).** Making NativeWind actually
@@ -814,7 +816,7 @@ pins, each verified by `tsc` + `expo export` (not guessed):
 ## Migration Engine — Full-project emission
 
 The Deterministic Transformer converts one file at a time; **emission**
-(`app/pipeline/emit.py`) assembles a whole runnable RN project.
+(`rejox/pipeline/emit.py`) assembles a whole runnable RN project.
 `emit_project(plan, answers, kg, out_dir, *, report=None, source_root=None) →
 EmittedProject`:
 
@@ -833,7 +835,7 @@ EmittedProject`:
    `vite.svg`) with a recorded reason;
 5. write `REJOX-REPORT.md` — per-file provenance, residue, and skips.
 
-`EmittedProject` (`app/models/emission.py`) carries, per file, `{path,
+`EmittedProject` (`rejox/models/emission.py`) carries, per file, `{path,
 sourceFile, provenance: ConfidenceSource, warnings, unhandled, todoCodes}` plus
 `skipped[]` and `todoCount`. Provenance is derived from what actually happened:
 `deterministic` (rule, clean) / `deterministic-warning` (flagged or generated) /
@@ -843,7 +845,7 @@ sourceFile, provenance: ConfidenceSource, warnings, unhandled, todoCodes}` plus
 
 Emission no longer stops at "transform + leave a TODO". For **every** file that
 carries residue, emit now runs the AI Resolution Engine and **applies** the
-result to the file, in tier order (`app/pipeline/resolve_apply.py`):
+result to the file, in tier order (`rejox/pipeline/resolve_apply.py`):
 
 - **CSS_MODULE** → `resolve_css_module` inlines a `StyleSheet.create({…})` and
   the `cssmodule.js` codemod drops the `.module.css` import and flips
@@ -870,7 +872,7 @@ Each file's `ConfidenceSource` is stamped from the tier that resolved it; only
 **genuinely unresolvable** residue (a runtime `<Link to>` → `NAV_LINK`, an LLM
 `unresolvable`) keeps its REJOX-TODO.
 
-**The repair loop** (`app/pipeline/repair.py`) closes the loop. After
+**The repair loop** (`rejox/pipeline/repair.py`) closes the loop. After
 emit → validate, if `tsc`/Metro still report errors, each error that maps to a
 *resolvable* residue code (via `map_diagnostics`) gets **one targeted LLM
 repair** — only the offending line + the diagnostic is sent, never the file. The
@@ -886,7 +888,7 @@ rounds**. The migration produces a project that runs under Expo.
 
 ## Migration Engine — Validator
 
-**The system's judge** (`app/pipeline/validator.py`). It runs BEFORE any AI
+**The system's judge** (`rejox/pipeline/validator.py`). It runs BEFORE any AI
 exists: its first job is to prove the *deterministic* output is sound. If our own
 codemods produced TypeScript errors, we learn it now — we never blame a future
 LLM for our bugs. It runs **real tools, never heuristics**:
@@ -983,7 +985,7 @@ the AI layer is invoked only over the honest residue the Validator surfaces
 those arrive in later sessions.
 
 ```
-backend/app/ai/
+backend/src/rejox/ai/
 ├── provider.py   # LLMProvider ABC + LLMResponse; GeminiProvider, FakeProvider
 ├── config.py     # env-driven provider/model/cache selection (one-line vendor swap)
 ├── cache.py      # content-addressed ResolutionCache over a swappable backend

@@ -1,4 +1,4 @@
-"""Tests for full-project emission (``app/pipeline/emit.py``).
+"""Tests for full-project emission (``rejox/pipeline/emit.py``).
 
 These are fast: they emit the sample-app tree (each file through the real
 codemod-worker) but do NOT install/validate — that is ``test_validator.py``.
@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from app.models.analysis import ConfidenceSource
-from app.models.emission import EmittedProject
-from app.models.knowledge_graph import KnowledgeGraph
-from app.pipeline.analyzer import analyze_graph
-from app.pipeline.emit import emit_project
-from app.pipeline.planner import plan_migration
-from app.pipeline.transformer import TransformerError
+from rejox.models.analysis import ConfidenceSource
+from rejox.models.emission import EmittedProject
+from rejox.models.knowledge_graph import KnowledgeGraph
+from rejox.pipeline.analyzer import analyze_graph
+from rejox.pipeline.emit import emit_project
+from rejox.pipeline.planner import plan_migration
+from rejox.pipeline.transformer import TransformerError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "test-projects" / "sample-app"
@@ -219,7 +219,7 @@ JS_SRC_ROOT = REPO_ROOT / "test-projects" / "plain-js-app"
 
 @pytest.fixture(scope="module")
 def emitted_js(tmp_path_factory: pytest.TempPathFactory) -> EmittedProject:
-    from app.pipeline.intelligence import build_knowledge_graph
+    from rejox.pipeline.intelligence import build_knowledge_graph
 
     kg = build_knowledge_graph(JS_SRC_ROOT)
     report = analyze_graph(kg)
@@ -290,8 +290,8 @@ def test_one_failing_transform_does_not_abort_the_whole_migration(
     One file the codemod-worker cannot safely handle must be isolated: skipped
     with a reason, not allowed to abort every other file's conversion.
     """
-    from app.pipeline.intelligence import build_knowledge_graph
-    import app.pipeline.emit as emit_module
+    from rejox.pipeline.intelligence import build_knowledge_graph
+    import rejox.pipeline.emit as emit_module
 
     kg = build_knowledge_graph(JS_SRC_ROOT)
     report = analyze_graph(kg)
@@ -371,7 +371,7 @@ NO_ROUTER_SRC_ROOT = REPO_ROOT / "test-projects" / "no-router-app"
 
 @pytest.fixture(scope="module")
 def emitted_no_router(tmp_path_factory: pytest.TempPathFactory) -> EmittedProject:
-    from app.pipeline.intelligence import build_knowledge_graph
+    from rejox.pipeline.intelligence import build_knowledge_graph
 
     kg = build_knowledge_graph(NO_ROUTER_SRC_ROOT)
     report = analyze_graph(kg)
@@ -461,7 +461,7 @@ def test_provider_is_dropped_when_its_package_was_not_installed(
     import json as _json
     import shutil
 
-    from app.pipeline.intelligence import build_knowledge_graph
+    from rejox.pipeline.intelligence import build_knowledge_graph
 
     src = tmp_path_factory.mktemp("hostile") / "app"
     shutil.copytree(NO_ROUTER_SRC_ROOT, src)
@@ -492,7 +492,7 @@ def test_provider_configured_from_import_meta_is_dropped_not_smuggled_in(
     all, so that one attribute costs the entire app, not one value."""
     import shutil
 
-    from app.pipeline.intelligence import build_knowledge_graph
+    from rejox.pipeline.intelligence import build_knowledge_graph
 
     src = tmp_path_factory.mktemp("vite-env") / "app"
     shutil.copytree(NO_ROUTER_SRC_ROOT, src)
@@ -526,7 +526,7 @@ def test_declaration_built_from_import_meta_is_not_lifted_either(
     of the entry file, and those are spliced into App.tsx as source text too."""
     import shutil
 
-    from app.pipeline.intelligence import build_knowledge_graph
+    from rejox.pipeline.intelligence import build_knowledge_graph
 
     src = tmp_path_factory.mktemp("vite-env-decl") / "app"
     shutil.copytree(NO_ROUTER_SRC_ROOT, src)

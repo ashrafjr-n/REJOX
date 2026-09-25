@@ -112,7 +112,7 @@ gate "A1 — the sandbox is handed the real run directory"
 canary="$(docker compose exec -T worker python - <<'PY' 2>&1 | tail -1
 from pathlib import Path
 import os
-from app.pipeline.sandbox import run, SandboxPolicy, SandboxError
+from rejox.pipeline.sandbox import run, SandboxPolicy, SandboxError
 
 d = Path(os.environ["REJOX_WORKSPACE_ROOT"]) / "gate-probe"
 d.mkdir(parents=True, exist_ok=True)
@@ -287,7 +287,7 @@ fi
 # must not serve, and the queue must not quietly run the job in a thread.)
 qverdict="$(docker compose exec -T api python - <<'PY' 2>&1 | tail -1
 from pathlib import Path
-from app import queue
+from rejox.server import queue
 
 try:
     queue.enqueue(

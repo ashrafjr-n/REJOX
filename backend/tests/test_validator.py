@@ -1,4 +1,4 @@
-"""Integration tests for the Validator (``app/pipeline/validator.py``).
+"""Integration tests for the Validator (``rejox/pipeline/validator.py``).
 
 These run the FULL emit → npm install → tsc → Metro pipeline on sample-app, so
 they are marked ``slow`` and excluded from the fast suite:
@@ -24,11 +24,11 @@ from pathlib import Path
 
 import pytest
 
-from app.models.knowledge_graph import KnowledgeGraph
-from app.pipeline.analyzer import analyze_graph
-from app.pipeline.emit import emit_project
-from app.pipeline.planner import plan_migration
-from app.pipeline.validator import (
+from rejox.models.knowledge_graph import KnowledgeGraph
+from rejox.pipeline.analyzer import analyze_graph
+from rejox.pipeline.emit import emit_project
+from rejox.pipeline.planner import plan_migration
+from rejox.pipeline.validator import (
     map_diagnostics,
     unexplained_diagnostics,
     validate_project,

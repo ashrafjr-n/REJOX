@@ -21,7 +21,7 @@ own run, exhaust the box, or spend the operator's LLM quota without limit.
 
 ### 1. Ingest — before anything runs
 
-`app/pipeline/ingest.py` rejects the archive itself:
+`rejox/pipeline/ingest.py` rejects the archive itself:
 
 | Guard | Limit |
 | --- | --- |
@@ -33,7 +33,7 @@ own run, exhaust the box, or spend the operator's LLM quota without limit.
 
 ### 2. Execution — the sandbox
 
-Every external command the Validator runs goes through `app/pipeline/sandbox.py`
+Every external command the Validator runs goes through `rejox/pipeline/sandbox.py`
 and nowhere else. In `docker` mode each one runs in a throw-away container:
 
 - `--cap-drop ALL`, `--security-opt no-new-privileges`, non-root `--user`
@@ -83,13 +83,13 @@ reintroducing it quietly.
 
 ### 4. HTTP — who may spend what
 
-`app/security.py`:
+`rejox/server/security.py`:
 
 - **Identity**: two credentials, because the two clients cannot use the same
   one. `key:<digest>` from a shared API key (`Authorization: Bearer` or
   `X-API-Key`, from `REJOX_API_KEYS`) for CLI and CI. `acct:<digest>` from a
   browser session cookie minted from an invite code (`REJOX_INVITE_CODES`, see
-  `app/sessions.py`). Both compared as digests in constant time. With neither
+  `rejox/server/sessions.py`). Both compared as digests in constant time. With neither
   configured the API returns **503 and says so** rather than serving everyone;
   `REJOX_ALLOW_ANONYMOUS=1` opts a dev machine out. The header is consulted
   first: a caller that presented a key meant to act as that key, and a stray
@@ -124,7 +124,7 @@ reintroducing it quietly.
   place, so a quota configured well below 1 GB reads as "0.0 GB of 0.0 GB". The
   numbers are correct at the shipped default and anywhere near it; only an
   unusually small `REJOX_ACCOUNT_QUOTA_BYTES` makes the text unhelpful. Left
-  alone deliberately: the fix is one format string in `app/security.py`, and by
+  alone deliberately: the fix is one format string in `rejox/server/security.py`, and by
   the re-signing table any change there re-reds all of section **C**, which is
   three verification passes for a rounding artifact.
 
@@ -158,7 +158,7 @@ reintroducing it quietly.
 
 ### 5. Ownership — whose run is whose
 
-`app/main.py` + `app/pipeline/workspace.py`:
+`rejox/server/main.py` + `rejox/pipeline/workspace.py`:
 
 - **A run belongs to exactly one identity.** The identity `guard()` establishes
   is stamped on the run at creation, into `{run}/owner` — a file, because the
@@ -234,11 +234,11 @@ Stated plainly, because a security document that only lists wins is marketing:
   Since 2026-09-03 `run_job` raises `MigrationFailed` **after** writing the
   terminal event, so the worker's record agrees with the job's and names the
   stage and reason:
-  `app.jobs.MigrationFailed: <job> failed during analyze — NothingToMigrate: …`.
+  `rejox.server.jobs.MigrationFailed: <job> failed during analyze — NothingToMigrate: …`.
   The event stream never depends on that raise, and the `thread` backend
   swallows it (there is no second record to correct in-process).
 
-  *Also fixed — a failure nothing logged at all.* `app/logs.py` now emits one
+  *Also fixed — a failure nothing logged at all.* `rejox/server/logs.py` now emits one
   JSON line per event, carrying the run id, job id and the caller's identity
   digest, bound through `contextvars` so every stage carries them without being
   handed them. Lines are written at each stage boundary, at every terminal

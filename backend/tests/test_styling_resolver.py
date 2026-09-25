@@ -11,17 +11,17 @@ from __future__ import annotations
 
 from collections import Counter
 
-from app.ai.cache import ResolutionCache
-from app.ai.provider import FakeProvider
-from app.ai.schemas import ResolutionResponse
-from app.ai.styling import (
+from rejox.ai.cache import ResolutionCache
+from rejox.ai.provider import FakeProvider
+from rejox.ai.schemas import ResolutionResponse
+from rejox.ai.styling import (
     MappedResidue,
     Resolution,
     ResolutionTier,
     resolve_styling,
 )
-from app.ai.styling.models import confidence_source_for
-from app.models.analysis import ConfidenceSource
+from rejox.ai.styling.models import confidence_source_for
+from rejox.models.analysis import ConfidenceSource
 
 NW = {"stylingEngine": "nativewind"}
 
@@ -165,7 +165,7 @@ def test_unparseable_llm_output_retries_once_then_unresolvable() -> None:
 def test_llm_unresolvable_sentinel_needs_no_parse_gate() -> None:
     provider = FakeProvider()
     # Register the model's answer for this exact prompt: the UNRESOLVABLE sentinel.
-    from app.ai.styling.resolver import _build_system, _build_user
+    from rejox.ai.styling.resolver import _build_system, _build_user
 
     system = _build_system("nativewind")
     user = _build_user("mix-blend-multiply", "", NW)
