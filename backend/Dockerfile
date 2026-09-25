@@ -27,7 +27,7 @@ RUN cd parser-worker && npm ci --no-audit --no-fund --ignore-scripts
 COPY codemod-worker/package.json codemod-worker/package-lock.json ./codemod-worker/
 RUN cd codemod-worker && npm ci --no-audit --no-fund --ignore-scripts
 
-COPY pyproject.toml hatch_build.py LICENSE ./
+COPY pyproject.toml hatch_build.py LICENSE README.md ./
 COPY scripts/bundle_workers.py ./scripts/
 COPY parser-worker/ ./parser-worker/
 COPY codemod-worker/ ./codemod-worker/
