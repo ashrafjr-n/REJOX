@@ -32,26 +32,19 @@ jobs:
   # between a PR verdict inside a coffee break and one after a quarter of an hour.
   backend:
     name: Backend (fast)
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    # The shared rate-limit gate (C2) asserts against a real Redis and skips
-    # itself where none answers. Without this it would skip on every CI run —
-    # a green tick for a test that never executed.
-    services:
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 3s
-          --health-retries 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
@@ -65,9 +58,35 @@ jobs:
             backend/parser-worker/package-lock.json
             backend/codemod-worker/package-lock.json
 
+      # The shared rate-limit gate (C2) asserts against a real Redis and skips
+      # itself where none answers — a green tick for a test that never
+      # executed. GitHub-hosted macOS runners have no Docker daemon (no
+      # `services:`), so this starts Redis natively per OS instead of relying
+      # on a service container.
+      - name: Start redis (ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: docker run -d -p 6379:6379 --name redis redis:7-alpine
+
+      - name: Start redis (macos)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install redis
+          brew services start redis
+
+      # No redis-cli on the ubuntu host (only inside the container); a bare
+      # TCP probe works identically on both OSes without another dependency.
+      - name: Wait for redis
+        run: |
+          for _ in $(seq 1 30); do
+            (exec 3<>/dev/tcp/127.0.0.1/6379) 2>/dev/null && exit 0
+            sleep 1
+          done
+          echo "redis never came up" >&2
+          exit 1
+
       - name: Install backend
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,server]"
 
       # Installing bundles the workers (hatch_build.py); esbuild does not
       # typecheck, so tsc still does, emitting nothing.
@@ -117,7 +136,7 @@ jobs:
 
       - name: Install backend
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,server]"
 
       # Installing bundles the workers (hatch_build.py); esbuild does not
       # typecheck, so tsc still does, emitting nothing.
