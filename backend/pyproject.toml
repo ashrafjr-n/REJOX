@@ -13,21 +13,28 @@ requires-python = ">=3.11"
 license = "FSL-1.1-ALv2"
 license-files = ["LICENSE"]
 dependencies = [
-    "fastapi==0.115.6",
-    "uvicorn[standard]==0.34.0",
-    "pydantic==2.10.4",
-    "python-multipart==0.0.20",
-    "google-genai==1.15.0",
-    "typer==0.26.8",
-    "rich==13.9.4",
-    # Durable job queue: migrations outlive an API restart and scale across
-    # worker processes (REJOX_QUEUE=rq). The `thread` backend needs neither.
-    "rq==2.1.0",
-    "redis==5.2.1",
+    "pydantic>=2.10,<3",
+    "google-genai>=1.15.0,<2",
+    "typer>=0.26.8,<1",
+    "rich>=13.9.4,<14",
+    # cli.py catches click's own exception types directly; typer no longer
+    # declares click as a dependency, so this can't be left implicit.
+    "click>=8.1,<9",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.3.4", "httpx==0.28.1"]
+# The web service (rejox.server): API, job queue, worker. `pip install rejox`
+# alone is the CLI and never pulls these in.
+server = [
+    "fastapi>=0.115.6,<1",
+    "uvicorn[standard]>=0.34.0,<1",
+    "python-multipart>=0.0.20,<1",
+    # Durable job queue: migrations outlive an API restart and scale across
+    # worker processes (REJOX_QUEUE=rq). The `thread` backend needs neither.
+    "rq>=2.1.0,<3",
+    "redis>=5.2.1,<6",
+]
+dev = ["pytest>=8.3.4,<9", "httpx>=0.28.1,<1"]
 
 [project.scripts]
 rejox = "rejox.cli:app"
