@@ -978,7 +978,7 @@ wiring* above), fixed at the source. No per-component transform logic changed.
 ## Migration Engine — AI Resolution Engine (foundation)
 
 The AI Resolution Engine is a **scalpel for the residue, never the default
-path** (see `CLAUDE.md`). Everything that can be resolved by rules already was;
+path** (see [Guiding principle](#guiding-principle)). Everything that can be resolved by rules already was;
 the AI layer is invoked only over the honest residue the Validator surfaces
 (`NAV_CONTAINER`, `NAV_ACTIVE`, `CSS_MODULE`, …). This section describes the
 **plumbing** — provider seam, cache, and contract. No resolver logic exists yet;

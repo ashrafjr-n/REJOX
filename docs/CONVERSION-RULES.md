@@ -2,8 +2,8 @@
 
 This is a **living document**. It is the single source of truth for how React
 (web) patterns map to React Native. Before writing or changing any conversion
-logic (see `CLAUDE.md` golden rule), consult this table. If a pattern is missing,
-add a row here **first**, then implement it.
+logic, consult this table. If a pattern is missing, add a row here **first**,
+then implement it.
 
 **Confidence** = how safely the mapping can be applied automatically:
 `High` (mechanical, safe), `Medium` (usually safe, may need review),

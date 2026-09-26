@@ -469,7 +469,8 @@ The CLI is a thin face over the pipeline the API already exposes
 (`parse → analyze → plan → emit → validate`); it calls the pipeline functions
 directly, never over HTTP. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for
 the engine design, [`docs/CONVERSION-RULES.md`](docs/CONVERSION-RULES.md) for the
-React → RN mapping table, and `CLAUDE.md` for the core principle.
+React → RN mapping table, and the [guiding principle](docs/ARCHITECTURE.md#guiding-principle)
+behind both.
 
 Requirements: Python 3.11+, Node 20+ (the deterministic transforms and CSS/JSX
 parsing run in a ts-morph/postcss worker).

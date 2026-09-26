@@ -50,4 +50,4 @@ the **Analysis / Ask** stages rather than attempting a conversion:
 ## Primary user flow
 
 Upload → Analysis → Report → Plan → Ask → Migrate → Review → Download.
-(See [`../CLAUDE.md`](../CLAUDE.md) for the canonical stage list.)
+(See [`ARCHITECTURE.md`](ARCHITECTURE.md#stage-detail) for the canonical stage list.)
