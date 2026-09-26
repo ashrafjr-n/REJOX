@@ -33,6 +33,9 @@ dependencies = [
     # cli.py catches click's own exception types directly; typer no longer
     # declares click as a dependency, so this can't be left implicit.
     "click>=8.1,<9",
+    # Pulled in by google-genai → google-auth. 49+ ships no macOS x86_64 wheels,
+    # so Intel Macs would compile it from source (Rust).
+    "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
 [project.optional-dependencies]
