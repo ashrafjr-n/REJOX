@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="476" viewBox="0 0 980 476" role="img" aria-labelledby="tt td">
+  <title id="tt">rejox migrate — a real run</title>
+  <desc id="td">Terminal replay of rejox migrating the bundled sample app: 21 components analysed, 27 files emitted, 0 LLM calls, tsc and Metro both pass.</desc>
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace; font-size: 15px; white-space: pre; }
+    .cover { animation: type 17.0s infinite; }
+    @keyframes type {
+      0%, 2.94% { transform: translateX(0); animation-timing-function: steps(38, end); }
+      13.53%, 100% { transform: translateX(346px); }
+    }
+    .caret { animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }@keyframes l0 { 0%, 17.06% { opacity: 0; transform: translateY(6px); } 18.53%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l0 { animation: l0 17.0s infinite; }@keyframes l1 { 0%, 20.71% { opacity: 0; transform: translateY(6px); } 22.18%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l1 { animation: l1 17.0s infinite; }@keyframes l2 { 0%, 24.35% { opacity: 0; transform: translateY(6px); } 25.82%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l2 { animation: l2 17.0s infinite; }@keyframes l3 { 0%, 28.00% { opacity: 0; transform: translateY(6px); } 29.47%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l3 { animation: l3 17.0s infinite; }@keyframes l4 { 0%, 31.65% { opacity: 0; transform: translateY(6px); } 33.12%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l4 { animation: l4 17.0s infinite; }@keyframes l5 { 0%, 35.29% { opacity: 0; transform: translateY(6px); } 36.76%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l5 { animation: l5 17.0s infinite; }@keyframes l6 { 0%, 38.94% { opacity: 0; transform: translateY(6px); } 40.41%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l6 { animation: l6 17.0s infinite; }@keyframes l7 { 0%, 42.59% { opacity: 0; transform: translateY(6px); } 44.06%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l7 { animation: l7 17.0s infinite; }@keyframes l8 { 0%, 46.24% { opacity: 0; transform: translateY(6px); } 47.71%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l8 { animation: l8 17.0s infinite; }@keyframes l9 { 0%, 49.88% { opacity: 0; transform: translateY(6px); } 51.35%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l9 { animation: l9 17.0s infinite; }@keyframes l10 { 0%, 53.53% { opacity: 0; transform: translateY(6px); } 55.00%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l10 { animation: l10 17.0s infinite; }@keyframes l11 { 0%, 57.18% { opacity: 0; transform: translateY(6px); } 58.65%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l11 { animation: l11 17.0s infinite; }@keyframes l12 { 0%, 60.82% { opacity: 0; transform: translateY(6px); } 62.29%, 95% { opacity: 1; transform: translateY(0); } 98%, 100% { opacity: 0; } }
+    .l12 { animation: l12 17.0s infinite; }
+    @media (prefers-reduced-motion: reduce) { .cover, .caret, .l0, .l1, .l2, .l3, .l4, .l5, .l6, .l7, .l8, .l9, .l10, .l11, .l12 { animation: none; } .cover { transform: translateX(346px); } }
+  </style>
+  <defs>
+    <linearGradient id="tbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1117"/><stop offset="1" stop-color="#080b10"/></linearGradient>
+  </defs>
+  <rect width="980" height="476" rx="14" fill="url(#tbg)"/>
+  <rect x=".5" y=".5" width="979" height="475" rx="14" fill="none" stroke="#30363d"/>
+  <path d="M14 .5h952a13.5 13.5 0 0 1 13.5 13.5v26H.5V14A13.5 13.5 0 0 1 14 .5z" fill="#161b22"/>
+  <line x1="0" y1="40" x2="980" y2="40" stroke="#30363d"/>
+  <circle cx="24" cy="20" r="6.5" fill="#ff5f57"/><circle cx="46" cy="20" r="6.5" fill="#febc2e"/><circle cx="68" cy="20" r="6.5" fill="#28c840"/>
+  <text x="490.0" y="25" text-anchor="middle" fill="#8b949e" style="font-size:13px">~/my-react-app — rejox</text>
+  <text x="34" y="92"><tspan fill="#3fb950">$ </tspan><tspan fill="#f0f6fc">uvx rejox migrate ./my-react-app --yes</tspan></text>
+  <g class="cover">
+    <rect x="52.0" y="75" width="366.0" height="24" fill="#0c1016"/>
+    <rect class="caret" x="52.0" y="77" width="9" height="19" fill="#5fd4f0"/>
+  </g>
+  <text class="l0" x="34" y="117"><tspan fill="#6e7681">── </tspan><tspan fill="#5fd4f0">Intelligence</tspan><tspan fill="#6e7681"> ────────── </tspan><tspan fill="#c9d1d9">knowledge graph of the project</tspan></text><text class="l1" x="34" y="142"><tspan fill="#c9d1d9">   Components </tspan><tspan fill="#f0f6fc">21</tspan><tspan fill="#c9d1d9"> · Pages </tspan><tspan fill="#f0f6fc">4</tspan><tspan fill="#c9d1d9"> · Routes </tspan><tspan fill="#f0f6fc">4</tspan><tspan fill="#c9d1d9"> · Endpoints </tspan><tspan fill="#f0f6fc">2</tspan><tspan fill="#c9d1d9"> · Stores </tspan><tspan fill="#f0f6fc">1</tspan></text><text class="l2" x="34" y="167"><tspan fill="#6e7681">   COVERAGE </tspan><tspan fill="#f0f6fc">83%</tspan><tspan fill="#6e7681">   CONFIDENCE </tspan><tspan fill="#f0f6fc">98%</tspan><tspan fill="#6e7681">   RISK </tspan><tspan fill="#3fb950">LOW</tspan></text><text class="l3" x="34" y="192"><tspan fill="#6e7681">── </tspan><tspan fill="#5fd4f0">Ask</tspan><tspan fill="#6e7681"> ─────────────────── </tspan><tspan fill="#c9d1d9">4 decisions, recommended answers</tspan></text><text class="l4" x="34" y="217"><tspan fill="#6e7681">   scaffold </tspan><tspan fill="#f0f6fc">expo</tspan><tspan fill="#6e7681">  ·  styling </tspan><tspan fill="#f0f6fc">nativewind</tspan><tspan fill="#6e7681">  ·  router </tspan><tspan fill="#f0f6fc">react-navigation</tspan><tspan fill="#6e7681">  ·  navigator </tspan><tspan fill="#f0f6fc">stack</tspan></text><text class="l5" x="34" y="242"><tspan fill="#6e7681">── </tspan><tspan fill="#5fd4f0">Plan</tspan><tspan fill="#6e7681"> ────────────────── </tspan><tspan fill="#c9d1d9">13 ordered steps</tspan></text><text class="l6" x="34" y="267"><tspan fill="#6e7681">── </tspan><tspan fill="#5fd4f0">Migrate</tspan><tspan fill="#6e7681"> ─────────────── </tspan><tspan fill="#c9d1d9">27 files emitted</tspan></text><text class="l7" x="34" y="292"><tspan fill="#c9d1d9">   residue resolved by rule </tspan><tspan fill="#f0f6fc">4/4</tspan><tspan fill="#c9d1d9">  ·  LLM calls </tspan><tspan fill="#ff6fa8">0</tspan></text><text class="l8" x="34" y="317"><tspan fill="#6e7681">── </tspan><tspan fill="#5fd4f0">Review</tspan><tspan fill="#6e7681"> ──────────────── </tspan><tspan fill="#c9d1d9">the real toolchain</tspan></text><text class="l9" x="34" y="342"><tspan fill="#c9d1d9">   Typecheck (tsc)   </tspan><tspan fill="#3fb950">PASS</tspan><tspan fill="#6e7681">   0 errors</tspan></text><text class="l10" x="34" y="367"><tspan fill="#c9d1d9">   Bundle (Metro)    </tspan><tspan fill="#3fb950">PASS</tspan></text><text class="l11" x="34" y="392"><tspan fill="#3fb950">✔ </tspan><tspan fill="#f0f6fc">Validated</tspan><tspan fill="#6e7681">  strict </tspan><tspan fill="#f0f6fc">62%</tspan><tspan fill="#6e7681">  ·  compiles + bundles </tspan><tspan fill="#f0f6fc">100%</tspan><tspan fill="#6e7681">  ·  confidence </tspan><tspan fill="#f0f6fc">98%</tspan></text><text class="l12" x="34" y="417"><tspan fill="#5fd4f0">  → </tspan><tspan fill="#c9d1d9">cd my-react-app-native &amp;&amp; npx expo start</tspan></text>
+</svg>
