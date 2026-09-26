@@ -1,6 +1,10 @@
+<p align="center">
+  <img alt="Rejox — migrate a React web app to React Native: rules first, AI only for the residue" src="https://raw.githubusercontent.com/ashrafjr-n/REJOX/master/docs/assets/readme/hero-light.svg" width="100%">
+</p>
+
 # rejox
 
-**AI-assisted migration from React (web) to React Native.** Rejox resolves by
+**React to React Native migration tool.** Rejox resolves by
 rules whatever rules can resolve, and invokes AI only where genuine reasoning
 is required — at most **one LLM call** per migration. It builds a knowledge
 graph of a React project, scores its migratability, plans the work, performs
