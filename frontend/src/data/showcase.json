@@ -710,7 +710,7 @@
   "meta": {
     "aiProvider": "fake",
     "generatedAt": "2026-08-31T18:37:12+04:00",
-    "rejoxVersion": "0.0.0",
+    "rejoxVersion": "0.1.0",
     "reproduce": "REJOX_AI_PROVIDER=fake rejox export-showcase",
     "sampleProject": "test-projects/sample-app",
     "schemaVersion": 1,
