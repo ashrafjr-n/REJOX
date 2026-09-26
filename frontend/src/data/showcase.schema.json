@@ -122,9 +122,6 @@
         "generatedAt": {
           "type": "string"
         },
-        "rejoxVersion": {
-          "type": "string"
-        },
         "reproduce": {
           "type": "string"
         },
@@ -150,7 +147,6 @@
       "required": [
         "generatedAt",
         "aiProvider",
-        "rejoxVersion",
         "sampleProject",
         "reproduce"
       ],

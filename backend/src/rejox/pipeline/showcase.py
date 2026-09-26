@@ -54,7 +54,6 @@ class ShowcaseMeta(ShowcaseBase):
     schemaVersion: int = SHOWCASE_SCHEMA_VERSION
     generatedAt: str
     aiProvider: str
-    rejoxVersion: str
     sampleProject: str
     sourceCommit: Optional[str] = None
     reproduce: str
@@ -402,7 +401,7 @@ def build_showcase_data(
 
 
 def resolve_meta(
-    *, source_root: Path, repo_root: Path, provider_label: str, rejox_version: str
+    *, source_root: Path, repo_root: Path, provider_label: str
 ) -> ShowcaseMeta:
     """Build reproducible run metadata.
 
@@ -432,7 +431,6 @@ def resolve_meta(
     return ShowcaseMeta(
         generatedAt=generated_at,
         aiProvider=provider_label,
-        rejoxVersion=rejox_version,
         sampleProject=sample_rel,
         sourceCommit=commit,
         reproduce="REJOX_AI_PROVIDER=fake rejox export-showcase",
@@ -462,19 +460,3 @@ def _git_subtree_commit(repo_root: Path, sample_rel: str) -> tuple[Optional[str]
     iso, sha = line.split("\t", 1)
     return iso.strip() or None, sha.strip() or None
 
-
-def git_last_release(repo_root: Path) -> str:
-    """The last `v*` release tag, without the `v` — "0.0.0" before the first one.
-
-    Not the installed package version: under hatch-vcs that is a dev version
-    that changes on every commit, which would make the committed export stale
-    on every commit. The last release only changes when a release is cut."""
-    try:
-        out = subprocess.run(
-            ["git", "-C", str(repo_root), "describe", "--tags", "--abbrev=0", "--match", "v*"],
-            capture_output=True, text=True, timeout=15,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return "0.0.0"
-    tag = out.stdout.strip()
-    return tag[1:] if out.returncode == 0 and tag else "0.0.0"

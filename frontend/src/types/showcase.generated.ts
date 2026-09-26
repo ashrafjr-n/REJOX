@@ -38,7 +38,6 @@ export interface ShowcaseNode {
 export interface ShowcaseMeta {
   aiProvider: string
   generatedAt: string
-  rejoxVersion: string
   reproduce: string
   sampleProject: string
   schemaVersion?: number

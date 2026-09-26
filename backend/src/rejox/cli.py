@@ -938,7 +938,6 @@ def export_showcase(
     # 5. Serialize — pure mapping of real artifacts → the contract-checked shape.
     meta = sc.resolve_meta(
         source_root=src, repo_root=repo_root, provider_label="fake",
-        rejox_version=sc.git_last_release(repo_root),
     )
     data = sc.build_showcase_data(
         kg=kg, report=report, plan=plan, proposal=proposal, nav_ui=nav_ui,

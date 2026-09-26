@@ -471,5 +471,5 @@ directly, never over HTTP. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) fo
 the engine design, [`docs/CONVERSION-RULES.md`](docs/CONVERSION-RULES.md) for the
 React → RN mapping table, and `CLAUDE.md` for the core principle.
 
-Requirements: Python 3.11+, Node 18+ (the deterministic transforms and CSS/JSX
+Requirements: Python 3.11+, Node 20+ (the deterministic transforms and CSS/JSX
 parsing run in a ts-morph/postcss worker).
