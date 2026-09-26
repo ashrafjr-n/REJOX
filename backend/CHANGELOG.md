@@ -7,6 +7,8 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-26
+
 ### Added
 
 - `rejox` and `rejox-worker` CLI entry points, installable from PyPI via
@@ -14,3 +16,6 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
 - `rejox[server]` extra for the web service (FastAPI + RQ/Redis job queue).
 - `rejox doctor`, `--version`, `--json`, `--no-input`/`--yes`, `--force`, and
   documented exit codes (see `README.md`).
+
+[Unreleased]: https://github.com/ashrafjr-n/REJOX/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ashrafjr-n/REJOX/releases/tag/v0.1.0
