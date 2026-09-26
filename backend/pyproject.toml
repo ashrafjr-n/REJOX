@@ -66,6 +66,11 @@ rejox-worker = "rejox.server.worker:main"
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "0.0.0"
+# pyproject.toml lives in backend/, not the repo root where .git actually is —
+# without this, hatch-vcs looks for a repo right here, finds none, and always
+# falls back silently (tag or no tag; caught by testing a real tag before
+# pushing it — see v0.1.0's history).
+raw-options = { root = ".." }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rejox"]

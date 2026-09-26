@@ -834,7 +834,6 @@ def export_showcase(
     AI provider is forced to the offline ``fake`` so the single navigator-shape
     reasoning call is deterministic and the export is byte-reproducible.
     """
-    import importlib.metadata
     import json
 
     from rejox.pipeline import showcase as sc
@@ -937,12 +936,9 @@ def export_showcase(
     )
 
     # 5. Serialize — pure mapping of real artifacts → the contract-checked shape.
-    try:
-        rejox_version = importlib.metadata.version("rejox")
-    except importlib.metadata.PackageNotFoundError:  # pragma: no cover
-        rejox_version = "0.0.0"
     meta = sc.resolve_meta(
-        source_root=src, repo_root=repo_root, provider_label="fake", rejox_version=rejox_version,
+        source_root=src, repo_root=repo_root, provider_label="fake",
+        rejox_version=sc.git_last_release(repo_root),
     )
     data = sc.build_showcase_data(
         kg=kg, report=report, plan=plan, proposal=proposal, nav_ui=nav_ui,
