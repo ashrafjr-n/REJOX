@@ -1,7 +1,7 @@
 """AI Resolution Engine — request/response contract.
 
 The AI Resolution Engine is a **scalpel for the residue**, never the default
-path (see ``CLAUDE.md``). Its entire input is one piece of residue at a time —
+path (see ``docs/ARCHITECTURE.md``). Its entire input is one piece of residue at a time —
 NEVER a whole file. That principle is enforced *mechanically* here, not merely
 documented: constructing a :class:`ResolutionRequest` whose snippet + context
 exceeds the line budget raises :class:`SnippetBudgetError`.

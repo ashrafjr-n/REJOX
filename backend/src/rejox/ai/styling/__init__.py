@@ -7,7 +7,7 @@ first, AI last:
     static_map  →  pattern  →  llm
 
 Only what tiers 1 and 2 genuinely cannot answer reaches the LLM. That ladder is
-Rejox's core principle made mechanical (see ``CLAUDE.md``): the lower the LLM
+Rejox's core principle made mechanical (see ``docs/ARCHITECTURE.md``): the lower the LLM
 count, the better the design.
 """
 
