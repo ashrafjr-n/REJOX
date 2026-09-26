@@ -18,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Code Generators",
 ]
 # Functional Source License (FSL-1.1-ALv2). backend/LICENSE is a copy of the
@@ -33,6 +34,9 @@ dependencies = [
     # cli.py catches click's own exception types directly; typer no longer
     # declares click as a dependency, so this can't be left implicit.
     "click>=8.1,<9",
+    # Pulled in by google-genai → google-auth. 49+ ships no macOS x86_64 wheels,
+    # so Intel Macs would compile it from source (Rust).
+    "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
 [project.optional-dependencies]
