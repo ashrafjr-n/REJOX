@@ -5,11 +5,15 @@ build-backend = "hatchling.build"
 [project]
 name = "rejox"
 dynamic = ["version"]
-description = "Rejox — AI migration engineer: React → React Native. CLI + pipeline."
+description = "React to React Native migration tool: turns a React web app into a working Expo app — AST codemods first, AI only for the residue, validated with tsc + Metro."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Ashraf" }]
-keywords = ["react", "react-native", "migration", "codemod", "ast", "cli"]
+keywords = [
+    "react", "react-native", "react-to-react-native", "expo", "migration",
+    "migration-tool", "web-to-mobile", "codemod", "ast", "nativewind",
+    "tailwindcss", "react-navigation", "react-router", "typescript", "cli",
+]
 classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
