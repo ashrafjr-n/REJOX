@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="t d">
+  <title id="t">Rejox</title>
+  <desc id="d">Rejox migrates React web apps to React Native: deterministic AST codemods first, AI only for the residue, validated with tsc and Metro.</desc>
+  <style>
+    .in { opacity: 0; animation: rise .9s cubic-bezier(.2,.8,.2,1) both; }
+    .i1 { animation-delay: .05s; } .i2 { animation-delay: .2s; } .i3 { animation-delay: .38s; } .i4 { animation-delay: .52s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(70px); } to { opacity: 1; transform: translateY(0); } }
+    .pulse { opacity: .25; animation: pulse 3.2s ease-in-out 1s infinite alternate; }
+    @keyframes pulse { from { opacity: .15; } to { opacity: .6; } }
+    .shine { animation: shine 5.5s ease-in-out 1.4s infinite; }
+    @keyframes shine { 0% { transform: skewX(-28deg) translateX(0); } 45%, 100% { transform: skewX(-28deg) translateX(1900px); } }
+    .fade { opacity: 0; animation: fade 1s ease-out both; }
+    .f1 { animation-delay: .5s; } .f2 { animation-delay: .75s; } .f3 { animation-delay: 1s; } .f4 { animation-delay: 1.25s; }
+    @keyframes fade { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
+    .caret { animation: blink 1.1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    
+    .pair { opacity: 0; animation: pair 15.600000000000001s infinite both; }
+    @keyframes pair {
+      0% { opacity: 0; transform: translateY(12px); }
+      2.00% { opacity: 1; transform: translateY(0); }
+      15.67% { opacity: 1; transform: translateY(0); }
+      18.33% { opacity: 0; transform: translateY(-12px); }
+      100% { opacity: 0; transform: translateY(-12px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .in, .fade, .pair:first-of-type { animation: none; opacity: 1; }
+      .pulse, .shine, .caret, .pair { animation: none; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3f5f8"/></linearGradient>
+    <radialGradient id="gp" cx="0.22" cy="0.45" r="0.42"><stop offset="0" stop-color="#e83f8f" stop-opacity="0.16"/><stop offset="1" stop-color="#e83f8f" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gc" cx="0.82" cy="0.75" r="0.5"><stop offset="0" stop-color="#3fc6ea" stop-opacity="0.12"/><stop offset="1" stop-color="#3fc6ea" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#0d1117" stroke-opacity="0.045"/></pattern>
+    <linearGradient id="fadeMask" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".12" stop-color="#fff"/><stop offset=".88" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <mask id="m"><rect width="1280" height="520" fill="url(#fadeMask)"/></mask>
+  </defs>
+  <rect width="1280" height="520" rx="24" fill="url(#bg)"/>
+  <rect width="1280" height="520" rx="24" fill="url(#grid)" mask="url(#m)"/>
+  <rect width="1280" height="520" rx="24" fill="url(#gp)"/>
+  <rect width="1280" height="520" rx="24" fill="url(#gc)"/>
+  <rect x=".5" y=".5" width="1279" height="519" rx="24" fill="none" stroke="#0d11171f"/>
+
+  <g transform="translate(47.9 81.7) scale(0.37)">
+  <defs>
+    <linearGradient id="Ls" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#9aa1ab"/><stop offset="45%" stop-color="#6e7580"/><stop offset="70%" stop-color="#4b515b"/><stop offset="100%" stop-color="#2c3038"/></linearGradient>
+    <linearGradient id="Lp" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#ff9fd6"/><stop offset="45%" stop-color="#e83f8f"/><stop offset="100%" stop-color="#9b1f5c"/>
+    </linearGradient>
+    <linearGradient id="Lshine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="Lblur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="28"/></filter>
+    <filter id="Lsoft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="Lclip">
+      <polygon points="520,98 686,98 288,822 130,822"/>
+      <polygon points="742,98 878,98 495,822 358,822"/>
+      <polygon points="700,548 838,565 1132,858 838,858 686,700"/>
+    </clipPath>
+  </defs>
+  <path class="pulse" filter="url(#Lblur)" fill="#e83f8f" d="M 934,98 L 1112,98 Q 1160,98 1160,146 L 1160,272 Q 1160,318 1120,332 L 700,548 Z"/>
+  <g class="in i1" filter="url(#Lsoft)"><polygon points="520,98 686,98 288,822 130,822" fill="url(#Ls)" stroke="#d0287a" stroke-opacity="0.55" stroke-width="2"/></g>
+  <g class="in i2" filter="url(#Lsoft)"><polygon points="742,98 878,98 495,822 358,822" fill="url(#Ls)" stroke="#d0287a" stroke-opacity="0.55" stroke-width="2"/></g>
+  <g class="in i3"><path d="M 934,98 L 1112,98 Q 1160,98 1160,146 L 1160,272 Q 1160,318 1120,332 L 700,548 Z" fill="url(#Lp)" stroke="#ffd0ec" stroke-width="2.5"/></g>
+  <g class="in i4"><polygon points="700,548 838,565 1132,858 838,858 686,700" fill="url(#Ls)" stroke="#d0287a" stroke-opacity="0.55" stroke-width="2"/></g>
+  <g clip-path="url(#Lclip)"><rect class="shine" x="-420" y="60" width="300" height="840" fill="url(#Lshine)" transform="skewX(-28)"/></g>
+  </g>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+    <text class="fade f1" x="560" y="196" fill="#57606a" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" letter-spacing="4">REACT  →  REACT NATIVE  ·  MIGRATION ENGINE</text>
+    <text class="fade f2" x="554" y="292" fill="#0d1117" font-size="112" font-weight="800" letter-spacing="10">REJOX</text>
+    <text class="fade f3" x="560" y="346" fill="#24292f" font-size="27" font-weight="500">Your React web app, migrated to React Native —</text>
+    <text class="fade f3" x="560" y="382" fill="#24292f" font-size="27" font-weight="500">by rules first, <tspan fill="#d0287a" font-weight="700">AI only for the residue</tspan>.</text>
+  </g>
+
+  <g class="fade f4">
+    <rect x="560" y="414" width="656" height="58" rx="14" fill="#ffffff" stroke="#0d11171f"/>
+    <text x="848" y="452" text-anchor="middle" fill="#57606a" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20">→</text>
+    <g font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="17">
+<g class="pair" style="animation-delay:1.3s"><text x="826" y="452" text-anchor="end" fill="#d0287a">&lt;div&gt;</text><text x="870" y="452" fill="#0b87a8">&lt;View&gt;</text></g>
+<g class="pair" style="animation-delay:3.9s"><text x="826" y="452" text-anchor="end" fill="#d0287a">onClick</text><text x="870" y="452" fill="#0b87a8">onPress</text></g>
+<g class="pair" style="animation-delay:6.5s"><text x="826" y="452" text-anchor="end" fill="#d0287a">&lt;Link to=&quot;/cart&quot;&gt;</text><text x="870" y="452" fill="#0b87a8">navigation.navigate(&#x27;Cart&#x27;)</text></g>
+<g class="pair" style="animation-delay:9.1s"><text x="826" y="452" text-anchor="end" fill="#d0287a">localStorage</text><text x="870" y="452" fill="#0b87a8">AsyncStorage</text></g>
+<g class="pair" style="animation-delay:11.7s"><text x="826" y="452" text-anchor="end" fill="#d0287a">import.meta.env.VITE_API</text><text x="870" y="452" fill="#0b87a8">process.env.EXPO_PUBLIC_API</text></g>
+<g class="pair" style="animation-delay:14.3s"><text x="826" y="452" text-anchor="end" fill="#d0287a">hover:bg-pink-500</text><text x="870" y="452" fill="#0b87a8">active:bg-pink-500</text></g>
+    </g>
+  </g>
+</svg>
