@@ -21,9 +21,33 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
   declaration or `:hover` rule the StyleSheet could not carry, now leaves a
   `TW_STRUCTURAL` / `CSS_STRUCTURAL` TODO with the React Native code to write.
   Such files no longer count as fully migrated: the benchmark's strict
-  coverage is **42%**, not the 62% previously reported.
+  coverage is **38%**, not the 62% previously reported (42% from this
+  change, and 38% once the navigator's missing `<Navbar>`/`<Footer>` is
+  flagged too — see `NAV_CHROME` below).
 - The residue tier breakdown shows what the emit step actually did, including
   classes left unresolved, instead of re-running the resolvers afterwards.
+- `onChange={(e) => set(e.target.value)}` came out as an `onChangeText`
+  handler still reading `e.target` — a tsc error in the most common input
+  pattern. A handler that only reads the value now takes the string (inline or
+  named); one that reads more keeps its `EVENT_ADAPTER` TODO.
+- `useNavigate()` lost its import and kept its calls, so the file no longer
+  compiled. It now becomes `useNavigation()`: route-table paths navigate to
+  their screen, `navigate(-1)` goes back, and a runtime path stays a
+  compiling `navigation.navigate(…)` call with a `NAV_HOOK` TODO.
+- `<a href>` became `<Pressable href>` (a tsc error). An absolute URL now opens
+  with `Linking.openURL`, a routed path navigates, and anything else is flagged
+  as `ANCHOR_LINK` — `href` never survives.
+- A space between two elements (`<strong>bold</strong> text`) reached a
+  `<View>` as a bare string, which React Native throws on at runtime while tsc
+  and Metro pass. Inline runs are now one `<Text>`, and stray spaces are gone.
+- `<Link>` around a `<Button>` produced a Pressable inside a Pressable, whose
+  navigation never fired (the benchmark's "Shop products"). The button now
+  takes the `onPress` itself.
+- UI rendered around the routes — a nav bar, a header, the benchmark's
+  `<Navbar>` and `<Footer>` — was replaced by the navigator and rendered
+  nowhere, silently. `AppNavigator.tsx` now carries a `NAV_CHROME` TODO naming it.
+- `peer-*` and `columns-*` classes, which NativeWind drops silently, are
+  flagged as `TW_UNSUPPORTED`.
 
 ## [0.1.1] - 2026-09-26
 

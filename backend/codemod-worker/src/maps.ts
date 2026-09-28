@@ -47,9 +47,10 @@ export const WEB_ONLY_EVENTS = new Set([
  * they appear on (this runs before the rename, while tags are still lowercase).
  *
  * These carry no behaviour into RN — the mapped component simply has no such
- * prop — so leaving them on is a `tsc` error and nothing else. `href` is
- * deliberately absent: `<a>` already emits a Linking TODO that points the reader
- * at the href, so removing it would delete the very thing the TODO refers to.
+ * prop — so leaving them on is a `tsc` error and nothing else. `href` is not
+ * listed: it is not just dropped but converted — to `Linking.openURL` or a
+ * navigation call when its target is certain, and otherwise removed with an
+ * ANCHOR_LINK TODO that quotes it (see the navigation and elements passes).
  */
 export const WEB_ONLY_ATTRIBUTES: Record<string, ReadonlySet<string>> = {
   button: new Set(['type']),

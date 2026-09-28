@@ -7,12 +7,15 @@
  *   - any other unknown host tag → View (+ warning)
  */
 
-import { SyntaxKind, type SourceFile } from 'ts-morph';
+import { Node, SyntaxKind, type SourceFile } from 'ts-morph';
 import type { Ctx } from '../types';
 import { ELEMENT_MAP, RN_COMPONENTS, WEB_ONLY_ELEMENTS } from '../maps';
 import {
   applyUntilStable,
+  commentSafe,
+  getAttr,
   hasAttr,
+  requestNamedImport,
   isHostTag,
   openingOf,
   recordUnhandled,
@@ -64,12 +67,46 @@ function decideMapping(el: JsxTagLike, tag: string, ctx: Ctx): string | null {
   }
 
   if (tag === 'a') {
-    recordUnhandled(
-      ctx,
-      'ANCHOR_LINK',
-      `<a> → <Pressable>: wire Linking.openURL()/navigation for its href.`,
-      el.getText().slice(0, 120),
-    );
+    // The navigation pass already turned every href a rule could open into an
+    // onPress. What is left is an href whose target is not certain — a runtime
+    // value, an in-page `#anchor`, a path no route matches. `href` is not a
+    // Pressable prop (keeping it is a tsc error), so it goes, and the TODO
+    // carries its value.
+    const href = getAttr(opening, 'href');
+    if (href) {
+      const init = href.getInitializer();
+      const value = init && Node.isJsxExpression(init) ? init.getExpression() : init;
+      const valueText = value ? value.getText() : '';
+      const target = commentSafe(valueText);
+      const dynamic = value !== undefined && !Node.isStringLiteral(value)
+        && !Node.isNoSubstitutionTemplateLiteral(value);
+      href.remove(); // `value` lived inside it: only its text is used from here
+      if (dynamic && !hasAttr(opening, 'onPress')) {
+        // A runtime URL: open it, and ask a human to confirm it is external.
+        opening.addAttribute({ name: 'onPress', initializer: `{() => Linking.openURL(${valueText})}` });
+        requestNamedImport(ctx, 'react-native', 'Linking');
+        recordUnhandled(
+          ctx,
+          'ANCHOR_LINK',
+          `<a href={${target}}> → <Pressable onPress={() => Linking.openURL(…)}>: confirm it is an external URL; an in-app path needs navigation.navigate(…) instead.`,
+          target,
+        );
+      } else if (hasAttr(opening, 'onPress')) {
+        recordUnhandled(
+          ctx,
+          'ANCHOR_LINK',
+          `<a href=${target}> → <Pressable>: its press handler is kept, but on the web the link then also went to ${target} — add that navigation to the handler if it matters.`,
+          target,
+        );
+      } else {
+        recordUnhandled(
+          ctx,
+          'ANCHOR_LINK',
+          `<a href=${target}> → <Pressable>: no route or URL a rule can open (an in-page anchor, or a path with no route) — wire its onPress by hand.`,
+          target,
+        );
+      }
+    }
     mapped = 'Pressable';
   }
 

@@ -9,6 +9,7 @@ and asserted syntactically valid — this is non-negotiable.
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -659,6 +660,172 @@ def test_storage_is_left_to_the_storage_rule_not_double_reported(
     )
     assert _codes(r) == {"WEB_STORAGE"}  # not WEB_GLOBAL as well
     assert len(r.unhandled) == 1
+
+
+# --- Common web patterns that used to come out broken ---------------------------
+#
+# Each of these produced code tsc rejects, or code that type-checks and then
+# misbehaves on the device. The rule for all of them: convert what a rule can
+# prove, and leave everything else COMPILING, with a TODO naming it.
+
+
+def _flat(code: str) -> str:
+    """Statements only, whitespace collapsed — formatting is not the contract."""
+    return " ".join(_statements(code).split())
+
+
+def test_an_onchange_handler_that_reads_the_value_takes_the_string(options: dict) -> None:
+    r = _transform_source(
+        "import { useState } from 'react';\n"
+        "export function P() {\n"
+        "  const [q, setQ] = useState('');\n"
+        "  const [v, setV] = useState('');\n"
+        "  return <div>\n"
+        "    <input value={q} onChange={(e) => setQ(e.target.value)} />\n"
+        "    <input value={v} onChange={({ target: { value } }) => setV(value.trim())} />\n"
+        "  </div>;\n"
+        "}\n",
+        options,
+    )
+    code = _flat(r.code)
+    assert "onChangeText={(text) => setQ(text)}" in code
+    assert "onChangeText={(value) => setV(value.trim())}" in code
+    assert "e.target" not in code
+    assert "EVENT_ADAPTER" not in _codes(r)
+
+
+def test_a_named_onchange_handler_is_typed_and_its_event_import_dropped(options: dict) -> None:
+    r = _transform_source(
+        "import { useState, type ChangeEvent } from 'react';\n"
+        "export function P() {\n"
+        "  const [note, setNote] = useState('');\n"
+        "  function handleNote(e: ChangeEvent<HTMLTextAreaElement>) {\n"
+        "    setNote(e.currentTarget.value);\n"
+        "  }\n"
+        "  return <textarea value={note} onChange={handleNote} />;\n"
+        "}\n",
+        options,
+    )
+    code = _flat(r.code)
+    assert "function handleNote(text: string) { setNote(text); }" in code
+    assert "onChangeText={handleNote}" in code
+    assert "ChangeEvent" not in code
+    assert _codes(r) == set()
+
+
+def test_a_handler_that_reads_more_than_the_value_keeps_its_todo(options: dict) -> None:
+    """`e.target.name` has no string to come from: that reshape is a decision."""
+    r = _transform_source(
+        "export function P({ set }: { set: (k: string, v: string) => void }) {\n"
+        "  return <input name='a' onChange={(e) => set(e.target.name, e.target.value)} />;\n"
+        "}\n",
+        options,
+    )
+    assert "EVENT_ADAPTER" in _codes(r)
+    assert "e.target.name" in r.code  # untouched: never half-rewritten
+
+
+def test_a_select_keeps_its_onchange(options: dict) -> None:
+    """<select> stays web-only residue; renaming half of it would hide that."""
+    r = _transform_source(
+        "export function P({ f }: { f: (e: unknown) => void }) {\n"
+        "  return <select onChange={f}><option>a</option></select>;\n"
+        "}\n",
+        options,
+    )
+    assert "onChange={f}" in r.code
+    assert "WEB_ONLY_ELEMENT" in _codes(r)
+
+
+def test_usenavigate_becomes_react_navigation(options: dict) -> None:
+    r = _transform_source(
+        "import { useEffect } from 'react';\n"
+        "import { useNavigate } from 'react-router-dom';\n"
+        "export function P({ id, next }: { id: string; next: string }) {\n"
+        "  const navigate = useNavigate();\n"
+        "  useEffect(() => { if (!id) navigate(-1); }, [id, navigate]);\n"
+        "  return <div>\n"
+        "    <button onClick={() => navigate('/products')}>All</button>\n"
+        "    <button onClick={() => navigate(`/products/${id}`)}>This</button>\n"
+        "    <button onClick={() => navigate(next)}>Next</button>\n"
+        "  </div>;\n"
+        "}\n",
+        options,
+    )
+    code = _flat(r.code)
+    assert "useNavigate" not in code and "react-router" not in code
+    assert "const navigation = useNavigation<any>();" in code
+    assert "navigation.goBack()" in code
+    assert "[id, navigation]" in code
+    assert "navigation.navigate('Products')" in code
+    assert "navigation.navigate('ProductDetail', { id: id })" in code
+    # A runtime path: still compiles (same argument), and says so.
+    assert "navigation.navigate(next)" in code
+    assert _codes(r) == {"NAV_HOOK"}
+    assert "navigate(next)" in _snippets(r, "NAV_HOOK")
+
+
+def test_anchors_open_what_a_rule_can_prove_and_flag_the_rest(options: dict) -> None:
+    r = _transform_source(
+        "export function P({ url }: { url: string }) {\n"
+        "  return <div>\n"
+        "    <a href='https://example.com/help' target='_blank'>Help</a>\n"
+        "    <a href='/settings'>Settings</a>\n"
+        "    <a href='#top'>Top</a>\n"
+        "    <a href={url}>Out</a>\n"
+        "  </div>;\n"
+        "}\n",
+        options,
+    )
+    code = _flat(r.code)
+    assert "href" not in code  # never a prop Pressable lacks
+    assert 'onPress={() => Linking.openURL("https://example.com/help")}' in code
+    assert "onPress={() => navigation.navigate('Settings')}" in code
+    assert "onPress={() => Linking.openURL(url)}" in code
+    assert re.search(r"import \{[^}]*\bLinking\b[^}]*\} from 'react-native'", r.code)
+    # The in-page anchor and the runtime URL are the two left for a human.
+    assert len([u for u in r.unhandled if u.code == "ANCHOR_LINK"]) == 2
+
+
+def test_inline_text_stays_one_text_and_no_bare_space_reaches_a_view(options: dict) -> None:
+    """A " " between two elements is a string child of a View: a runtime crash."""
+    r = _transform_source(
+        "export function P({ a, b }: { a: string; b: string }) {\n"
+        "  return <div>\n"
+        "    <div><strong>Bold</strong> and plain</div>\n"
+        "    <div><span>{a}</span> <span>{b}</span></div>\n"
+        "    <div>{a} {b}</div>\n"
+        "    <div><img src='/x.png' /> caption</div>\n"
+        "  </div>;\n"
+        "}\n",
+        options,
+    )
+    code = _flat(r.code)
+    assert "<View><Text><Text>Bold</Text> and plain</Text></View>" in code
+    assert "<View><Text>{a}</Text><Text>{b}</Text></View>" in code
+    assert "<View><Text>{a} {b}</Text></View>" in code
+    assert "<Text> caption</Text>" in code
+    assert "</Text> <" not in code and "/> <Text>" not in code
+
+
+def test_a_link_around_a_button_gives_the_button_its_press(options: dict) -> None:
+    """A Pressable inside a Pressable: the inner one takes the touch, and the
+    outer navigation never fires. Hero's "Shop products" was exactly this."""
+    r = transform_component(SRC / "components" / "Hero.tsx", options)
+    code = _flat(r.code)
+    assert "<Pressable onPress={() => navigation.navigate('Products')}><Button" not in code
+    assert re.search(r"<Button [^>]*onPress=\{\(\) => navigation\.navigate\('Products'\)\}", code)
+
+
+def test_sibling_state_and_column_classes_are_flagged(options: dict) -> None:
+    r = _transform_source(
+        "export function P() {\n"
+        "  return <div className='p-4 peer-checked:bg-red-500 columns-2'>x</div>;\n"
+        "}\n",
+        options,
+    )
+    residue = _snippets(r, "TW_UNSUPPORTED")
+    assert "peer-checked:bg-red-500" in residue and "columns-2" in residue
 
 
 # --- The non-negotiable: every output is valid TS -------------------------------

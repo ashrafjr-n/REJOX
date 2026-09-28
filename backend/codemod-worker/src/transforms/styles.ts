@@ -40,6 +40,10 @@ const UNSUPPORTED: RegExp[] = [
   /^transition/, /^duration-/, /^ease-/, /^delay-/, /^animate-/,
   /^sticky$/, /^fixed$/,
   /^divide-/,
+  // Sibling-state and multi-column layout: NativeWind has neither, and would
+  // drop the class without a word.
+  /^peer$/, /^peer[-/]/,
+  /^columns-/,
 ];
 
 /** Mechanical renames: web-only spacing → RN flex gap. */

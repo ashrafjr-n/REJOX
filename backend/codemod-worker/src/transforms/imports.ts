@@ -145,15 +145,20 @@ export function transformImports(sf: SourceFile, ctx: Ctx): void {
     }
 
     if (mod === 'react') {
-      for (const named of imp.getNamedImports()) {
-        if (DOM_TYPE_RE.test(named.getName())) {
-          recordUnhandled(
-            ctx,
-            'PROPS_HTML_TYPE',
-            `Web DOM type '${named.getName()}' from 'react' is invalid in RN; reshape props (e.g. PressableProps).`,
-            named.getText(),
-          );
+      for (const named of [...imp.getNamedImports()]) {
+        if (!DOM_TYPE_RE.test(named.getName())) continue;
+        if (!referencedOutsideImports(sf, named.getName())) {
+          // Its last use was rewritten away (an adapted onChange handler's
+          // `ChangeEvent<…>`): nothing to reshape, only a dead import to drop.
+          named.remove();
+          continue;
         }
+        recordUnhandled(
+          ctx,
+          'PROPS_HTML_TYPE',
+          `Web DOM type '${named.getName()}' from 'react' is invalid in RN; reshape props (e.g. PressableProps).`,
+          named.getText(),
+        );
       }
     }
   }

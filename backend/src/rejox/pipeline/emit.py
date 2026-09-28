@@ -39,7 +39,7 @@ from rejox.models.analysis import AnalysisReport, ConfidenceSource, RouteMapping
 from rejox.models.emission import EmittedFile, EmittedProject, SkippedFile
 from rejox.models.knowledge_graph import EntryPoint, KnowledgeGraph, RootProvider
 from rejox.models.plan import MigrationPlan
-from rejox.models.transformation import TransformResult
+from rejox.models.transformation import TransformResult, UnhandledItem
 from rejox.ai.navigation import build_navigator_spec, generate_navigator, unhoistable_screens
 from rejox.pipeline.analyzer import analyze_graph
 from rejox.pipeline.resolve_apply import apply_resolutions
@@ -206,6 +206,51 @@ def _provenance(result: TransformResult) -> ConfidenceSource:
 
 def _todo_codes(code: str) -> list[str]:
     return sorted(set(_TODO_RE.findall(code)))
+
+
+# react-router's own components: never "chrome", whatever file renders them.
+_ROUTER_NAMES = {
+    "Routes", "Route", "Outlet", "Navigate", "BrowserRouter", "HashRouter",
+    "MemoryRouter", "RouterProvider", "Link", "NavLink",
+}
+# Host tags that are page chrome rather than a mere wrapper around the routes.
+_CHROME_TAGS = ("nav", "header", "footer", "aside")
+
+
+def _navigator_chrome(
+    kg: KnowledgeGraph, report: AnalysisReport, structure_files: list[str],
+) -> list[UnhandledItem]:
+    """What the router-structure files rendered AROUND the routes.
+
+    The generated navigator replaces ``src/App`` and every layout route (the
+    ``<Outlet>`` component) wholesale, so a nav bar, a header or a ``<Navbar/>``
+    they wrapped around the routes is not in the output at all — the app runs,
+    with its navigation UI missing. Each file that had some gets a NAV_CHROME
+    item naming what was lost, so it is re-added on purpose rather than never.
+    """
+    screens = {r.componentName for r in report.routing.routes if r.componentName}
+    structure = set(structure_files)
+    structure_names = {c.name for c in kg.components if c.file in structure}
+    items: list[UnhandledItem] = []
+    for file in structure_files:
+        for c in (c for c in kg.components if c.file == file):
+            parts = [
+                f"<{name}>" for name in sorted(c.childComponents)
+                if name not in screens | structure_names | _ROUTER_NAMES
+            ]
+            parts += [f"<{tag}>" for tag in _CHROME_TAGS if c.jsxElements.get(tag)]
+            if {"Link", "NavLink"} & set(c.childComponents):
+                parts.append("its <Link>s")
+            if parts:
+                items.append(UnhandledItem(
+                    code="NAV_CHROME",
+                    snippet=(
+                        f"{file} rendered {', '.join(parts)} around the routes. The "
+                        "generated navigator does not render it: put it in the "
+                        "navigator's `header` / tab bar, or in each screen that needs it."
+                    ),
+                ))
+    return items
 
 
 # --- Navigator generation (deterministic, from the route table) --------------
@@ -573,6 +618,8 @@ def emit_project(
     options = build_transform_options(kg, report, worker_answers)
 
     skipped: list[SkippedFile] = []
+    # Source files the generated navigator replaces: their chrome is checked below.
+    router_structure: list[str] = []
 
     # 2. transform every source .ts/.tsx/.js/.jsx (except regenerated entry files).
     source_ts = sorted(
@@ -608,6 +655,7 @@ def emit_project(
         # rather than emit a dead <Outlet/> + a TODO — the shared chrome
         # (Navbar/Footer) becomes the navigator-shape decision (Planner question).
         if any(u.code == "NAV_CONTAINER" for u in result.unhandled):
+            router_structure.append(src_rel)
             skipped.append(SkippedFile(
                 path=src_rel,
                 reason=(
@@ -701,6 +749,11 @@ def emit_project(
             nav_shape,
             _screen_import_paths(kg, {f.path for f in files}),
         )
+        chrome = _navigator_chrome(kg, report, [app_source_file, *router_structure])
+        if chrome:
+            header = [f"// ===== REJOX-TODO: {len(chrome)} item(s) need attention ====="]
+            header += [f"// REJOX-TODO({c.code}): {c.snippet}" for c in chrome]
+            nav_src = "\n".join(header) + "\n\n" + nav_src
         nav_rel = "src/navigation/AppNavigator.tsx"
         nav_path = out_dir / nav_rel
         nav_path.parent.mkdir(parents=True, exist_ok=True)
@@ -711,9 +764,13 @@ def emit_project(
                 sourceFile=app_source_file,
                 # Navigator wiring is a rule (generated from the route table);
                 # the SHAPE decision lives in the Planner question, not here.
-                provenance=ConfidenceSource.DETERMINISTIC_WARNING,
-                unhandled=[],
-                todoCodes=nav_todos,  # [] — no NAV_CONTAINER TODO survives
+                # What the navigator replaced but does not render is residue.
+                provenance=(
+                    ConfidenceSource.UNHANDLED if chrome
+                    else ConfidenceSource.DETERMINISTIC_WARNING
+                ),
+                unhandled=chrome,
+                todoCodes=_todo_codes(nav_src),  # no NAV_CONTAINER TODO survives
             )
         )
 
