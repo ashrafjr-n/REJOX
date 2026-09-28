@@ -205,7 +205,9 @@ def run_migration(
         navigator_shape = answers.get("navigator-shape") or shape
 
         emission = emit_project(
-            plan, answers, kg, out_dir, report=report, source_root=source_root
+            plan, answers, kg, out_dir, report=report, source_root=source_root,
+            # Every styling-residue LLM call goes through the same counter.
+            provider=counter,
         )
         files_converted = sum(1 for f in emission.files if f.sourceFile)
         emit(

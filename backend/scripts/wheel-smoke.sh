@@ -58,3 +58,16 @@ unset REJOX_WORKSPACE_ROOT REJOX_AI_CACHE GEMINI_API_KEY REJOX_AI_PROVIDER
 "$WORK/venv/bin/rejox" migrate "$SAMPLE" --no-input --out "$WORK/out" \
   || { echo "FAIL: rejox migrate exited $?"; exit 1; }
 echo "==> PASS: the installed wheel migrated sample-app (tsc + Metro)"
+
+# sample-app holds no class the rules miss, so the run above never reaches the
+# LLM tier. This one does — with no key, which is how most people run Rejox:
+# the classes must stay residue (exit 0), never crash the run (exit 70).
+echo "==> rejox migrate residue-app with AI disabled"
+"$WORK/venv/bin/rejox" migrate "$BACKEND/tests/fixtures/residue-app" --no-input --no-validate \
+  --out "$WORK/residue-out" \
+  || { echo "FAIL: rejox migrate exited $? on residue-app with no key"; exit 1; }
+grep -q "REJOX-TODO(TW_UNSUPPORTED)" "$WORK/residue-out/src/App.tsx" \
+  || { echo "FAIL: residue-app lost its TW_UNSUPPORTED TODO"; exit 1; }
+grep -q "REJOX-TODO(TW_STRUCTURAL)" "$WORK/residue-out/src/App.tsx" \
+  || { echo "FAIL: residue-app lost its TW_STRUCTURAL TODO"; exit 1; }
+echo "==> PASS: the zero-AI path keeps unmapped classes as residue"

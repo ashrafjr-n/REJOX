@@ -271,44 +271,12 @@ def _render_plan(plan: MigrationPlan) -> None:
 # --- 4. migrate + resolver tier breakdown ------------------------------------
 
 
-def _resolve_residue(emission, report, kg, src, provider, cache, proposal):
-    """Run the AI Resolution Engine over the emitted residue to show HOW it is
-    resolved — the tier breakdown. The point: almost everything is a rule; the
-    LLM is touched at most once (the navigator shape)."""
-    from rejox.ai.css import resolve_css_module
-    from rejox.ai.navigation import resolve_nav_active
-    from rejox.ai.styling import MappedResidue, resolve_styling
-    from rejox.pipeline.transformer import check_syntax
-
-    tiers: Counter = Counter()
-
-    # Styling residue (TW_UNSUPPORTED) → static_map / pattern / (rarely) llm.
-    styling_residue = [
-        MappedResidue(snippet=u.snippet, sourceFile=f.sourceFile,
-                      componentName=Path(f.path).stem)
-        for f in emission.files for u in f.unhandled if u.code == "TW_UNSUPPORTED"
-    ]
-    if styling_residue:
-        for r in resolve_styling(
-            styling_residue, {"stylingEngine": "nativewind"},
-            provider=provider, cache=cache, syntax_check=check_syntax,
-        ):
-            tiers[r.tier.value] += 1
-
-    # CSS Modules → static_map / pattern (pure parsing; no LLM on real input).
-    for css in sorted(src.rglob("*.module.css")):
-        res = resolve_css_module(css, module=f"./{css.name}", provider=provider, cache=cache)
-        for tier, n in res.tiers.items():
-            if n:
-                tiers[tier] += n
-
-    # NAV_ACTIVE → rule (one per residue instance).
-    nav_active = [
-        u for f in emission.files for u in f.unhandled if u.code == "NAV_ACTIVE"
-    ]
-    for _ in nav_active:
-        resolve_nav_active()
-        tiers["rule"] += 1
+def _residue_tiers(emitted_tiers: Counter, report, proposal) -> Counter:
+    """How the residue was ACTUALLY resolved: the tiers the emit step recorded
+    while applying each resolution, plus the two navigation decisions that live
+    outside it. Never a re-run of the resolvers — a re-run would count what is
+    left rather than what was done, and could call the LLM a second time."""
+    tiers: Counter = Counter(emitted_tiers)
 
     # NAV_CONTAINER wiring → rule (the navigator emit generated from the route table).
     if report.routing.routes:
@@ -325,15 +293,16 @@ def _render_tier_breakdown(tiers: Counter, counter) -> None:
     t = Table(title="Residue resolution — by tier", title_style="bold", show_edge=False, box=None)
     t.add_column("Tier"); t.add_column("Units", justify="right")
     labels = [("static_map", "Static map (rule)"), ("pattern", "Pattern (rule)"),
-              ("rule", "Direct rule"), ("llm", "LLM (reasoning)")]
+              ("rule", "Direct rule"), ("llm", "LLM (reasoning)"),
+              ("unresolved", "Unresolved (left as TODO)")]
     total = 0
     for key, label in labels:
         n = tiers.get(key, 0)
         total += n
-        style = "magenta" if key == "llm" else "green"
+        style = {"llm": "magenta", "unresolved": "yellow"}.get(key, "green")
         t.add_row(Text(label, style=style), Text(str(n), style=style))
     console.print(t)
-    resolved_by_rule = total - tiers.get("llm", 0)
+    resolved_by_rule = total - tiers.get("llm", 0) - tiers.get("unresolved", 0)
     console.print(
         f"[bold green]{resolved_by_rule}/{total}[/] residue units resolved by rule.  "
         f"[bold magenta]Actual LLM calls: {counter.calls}[/]  "
@@ -665,14 +634,19 @@ def _migrate(src: Path, out_dir: Path, auto: bool, no_validate: bool, as_json: b
 
     # 4. Migrate.
     _stage("Migrate — emitting the React Native project")
+    cache = ResolutionCache()
+    emitted_tiers: Counter = Counter()
     with console.status("[cyan]Transforming files…[/]", spinner="dots"):
-        emission = emit_project(plan, answers, kg, out_dir, report=report, source_root=src)
+        # The counter, not the bare provider: an LLM call made while resolving
+        # styling residue is a call like any other, and the summary counts it.
+        emission = emit_project(
+            plan, answers, kg, out_dir, report=report, source_root=src,
+            provider=counter if inner is not None else None,
+            cache=cache, resolution_tiers=emitted_tiers,
+        )
     console.print(f"Emitted [bold]{len([f for f in emission.files if f.sourceFile])}[/] files → [dim]{out_dir}[/]")
 
-    cache = ResolutionCache()
-    with console.status("[cyan]Resolving residue by rule…[/]", spinner="dots"):
-        tiers = _resolve_residue(emission, report, kg, src, counter, cache, proposal)
-    _render_tier_breakdown(tiers, counter)
+    _render_tier_breakdown(_residue_tiers(emitted_tiers, report, proposal), counter)
 
     # 5. Validate (+ repair loop if needed). A ValidatorError (a missing tool)
     # propagates: the project is on disk, but its migration is unproven (exit 3).
@@ -902,7 +876,9 @@ def export_showcase(
 
     out_dir = workspace.new_run().output_dir
     with console.status("[cyan]Transforming files…[/]", spinner="dots"):
-        emission = emit_project(plan, answers, kg, out_dir, report=report, source_root=src)
+        emission = emit_project(
+            plan, answers, kg, out_dir, report=report, source_root=src, provider=counter,
+        )
     console.print(f"Emitted [bold]{len([f for f in emission.files if f.sourceFile])}[/] files → [dim]{out_dir}[/]")
     # The navigator-shape reasoning call (made in the Ask step above) and any
     # emit-time provider calls fall in the "migrate" window.

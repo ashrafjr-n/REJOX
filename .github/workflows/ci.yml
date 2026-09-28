@@ -20,7 +20,10 @@ env:
   REJOX_ALLOW_ANONYMOUS: "1"
   REJOX_ALLOW_UNSANDBOXED: "1"
   # No network, no key, deterministic: the offline provider makes the one
-  # navigator-shape call so a run is byte-reproducible.
+  # navigator-shape call so a run is byte-reproducible. It is NOT how most
+  # people run Rejox — they have no key and no fake — so that path is gated
+  # separately: tests/test_residue_honesty.py clears this per test, and the
+  # package job's wheel-smoke.sh unsets it before migrating.
   REJOX_AI_PROVIDER: fake
 
 jobs:

@@ -73,6 +73,12 @@ class Resolution(AIBase):
     # Side-effects the emit pipeline must apply alongside ``response.code`` —
     # e.g. an import to add, or a style to push onto children. Advisory text.
     note: str = ""
+    # True when applying this resolution takes a human: the class is removed
+    # from the className, but the RN structure it stands for (a gradient
+    # wrapper, a blur layer, per-child widths …) is not written into the file.
+    # The emit step turns every such resolution into a TW_STRUCTURAL TODO, so
+    # nothing is dropped silently.
+    needsReview: bool = False
     componentName: Optional[str] = None
     sourceFile: Optional[str] = None
 
@@ -89,6 +95,7 @@ class LadderResult:
     tier: ResolutionTier
     response: ResolutionResponse
     note: str = ""
+    needsReview: bool = False  # see Resolution.needsReview
 
 
 def confidence_source_for(resolution: Resolution) -> ConfidenceSource:

@@ -512,6 +512,7 @@ def emit_project(
     source_root: Optional[Path | str] = None,
     provider: Optional[LLMProvider] = None,
     cache: Optional[ResolutionCache] = None,
+    resolution_tiers: Optional[Counter] = None,
 ) -> EmittedProject:
     """Assemble the migrated React Native project into ``out_dir``.
 
@@ -526,15 +527,21 @@ def emit_project(
         source_root: root of the source project on disk; defaults to
             ``kg.project.root``.
         provider: LLM provider for the AI Resolution Engine's rare LLM tier
-            (styling novel classes). ``None`` → constructed lazily only if reached.
+            (styling novel classes). ``None`` → AI disabled: what no rule
+            covers stays residue with its TODO. Callers pass the same provider
+            (and call counter) they use everywhere else, so every call counts.
         cache: shared resolution cache across the batch.
+        resolution_tiers: when given, updated with how many residue units each
+            tier (static_map / pattern / rule / llm) actually resolved, and
+            how many stayed ``unresolved``.
     """
     report = report or analyze_graph(kg)
     src_root = Path(source_root or kg.project.root)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     cache = cache or ResolutionCache()
-    resolution_tiers: Counter = Counter()
+    if resolution_tiers is None:
+        resolution_tiers = Counter()
     styling_options = {"stylingEngine": answers.get("styling-engine", "nativewind")}
 
     styling = answers.get("styling-engine", "stylesheet")
@@ -635,7 +642,10 @@ def emit_project(
                 cache=cache,
             )
             resolution_tiers.update(outcome.tiers)
-            remaining_unhandled = [u for u in result.unhandled if u.code in outcome.remainingCodes]
+            remaining_unhandled = [
+                *outcome.remaining,
+                *outcome.review,  # resolved, but a human still owes the RN structure
+            ]
             if remaining_unhandled:
                 provenance = ConfidenceSource.UNHANDLED
             elif result.warnings:

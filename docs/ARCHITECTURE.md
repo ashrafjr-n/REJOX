@@ -218,6 +218,16 @@ almost all of it to rules:
 | `NAV_CONTAINER` wiring | `navigation/generator` | **rule** — route table → navigator | 0 |
 | Navigator **shape** | `navigation/resolver` | **reasoning** — topology is design | **1** |
 
+A rule's answer is not always something the emitter can write into the file. A
+gradient becomes a `<LinearGradient>` wrapper, a blur a `<BlurView>` layer, a grid
+a flex row whose children each need a width, a dropped CSS declaration a prop
+somewhere else. The class is removed from the className, and the React Native
+code it stands for is left as a `TW_STRUCTURAL` (or, for CSS Modules,
+`CSS_STRUCTURAL`) TODO in the file's header, ready to paste. Those files count as
+residue in strict coverage: resolved by a rule, but not finished. With AI disabled,
+a class no rule covers stays `TW_UNSUPPORTED`, with its tokens kept in the
+className; it never becomes an error.
+
 #### CSS Module resolver — a parsing pipeline, not a prompt
 
 `.module.css` never touches the LLM, because it is deterministic end to end:
