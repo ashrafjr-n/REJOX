@@ -142,27 +142,34 @@ def test_resolvers_run_in_emit_and_clear_resolvable_residue(emitted: EmittedProj
     by_path = {f.path: f for f in emitted.files}
     out = _out(emitted)
 
-    # ProductCard's CSS Module + hover are now RESOLVED by the AI Resolution
-    # Engine in emit: no CSS_MODULE/TW_UNSUPPORTED residue, the .module.css import
-    # is gone (inlined as a StyleSheet), and provenance is rule-resolved.
+    # ProductCard's CSS Module + hover are RESOLVED by the AI Resolution Engine
+    # in emit: no CSS_MODULE/TW_UNSUPPORTED residue, and the .module.css import
+    # is gone (inlined as a StyleSheet). What the StyleSheet could not carry — a
+    # transition, object-fit, the unapplied :hover variant — is still owed by a
+    # human, so it stays residue as CSS_STRUCTURAL rather than vanishing.
     pc = by_path["src/components/ProductCard.tsx"]
     pc_codes = {u.code for u in pc.unhandled}
     assert "CSS_MODULE" not in pc_codes
     assert "TW_UNSUPPORTED" not in pc_codes
-    assert pc.provenance != ConfidenceSource.UNHANDLED
+    assert pc_codes == {"CSS_STRUCTURAL"}
+    assert pc.provenance == ConfidenceSource.UNHANDLED
     pc_text = (out / "src" / "components" / "ProductCard.tsx").read_text()
-    assert ".module.css" not in pc_text
+    # The import is gone; the file name survives only in the TODOs that cite it.
+    assert not [ln for ln in pc_text.splitlines() if ".module.css" in ln and not ln.startswith("//")]
     assert "StyleSheet.create(" in pc_text
 
     # No .module.css file is emitted anywhere (that is what broke Metro).
     assert list(out.rglob("*.module.css")) == []
 
-    # Navbar keeps ONLY genuinely-unresolvable residue: a runtime <Link to>.
+    # Navbar keeps the runtime <Link to>, plus what its resolved classes still
+    # owe: backdrop-blur needs a <BlurView>, sticky needs stickyHeaderIndices.
     nav = by_path["src/components/Navbar.tsx"]
     nav_codes = {u.code for u in nav.unhandled}
     assert "NAV_ACTIVE" not in nav_codes      # resolved to a static className
     assert "TW_UNSUPPORTED" not in nav_codes  # hover/backdrop/… resolved
-    assert nav_codes == {"NAV_LINK"}          # only the runtime link remains
+    assert nav_codes == {"NAV_LINK", "TW_STRUCTURAL"}
+    owed = " ".join(u.snippet for u in nav.unhandled if u.code == "TW_STRUCTURAL")
+    assert "backdrop-blur" in owed and "sticky" in owed
 
     # A supported-only component (Footer) is clean deterministic.
     footer = by_path["src/components/Footer.tsx"]
