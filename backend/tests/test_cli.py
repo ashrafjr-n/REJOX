@@ -248,3 +248,118 @@ def test_internal_commands_are_hidden_but_still_run() -> None:
     for name in ("export-showcase", "export-graph", "sweep"):
         assert name not in listed
     assert runner.invoke(app, ["sweep", "--help"]).exit_code == 0
+
+
+# --- What the summary says has to be what is true -------------------------------
+
+
+def _web_only_project(root: Path) -> Path:
+    """A router-less app with the residue tsc and Metro both accept."""
+    (root / "src").mkdir(parents=True)
+    (root / "package.json").write_text(json.dumps({
+        "name": "web-only", "dependencies": {"react": "^18.2.0", "react-dom": "^18.2.0"},
+    }))
+    (root / "src" / "main.tsx").write_text(
+        'import { createRoot } from "react-dom/client";\nimport App from "./App";\n'
+        'createRoot(document.getElementById("root")!).render(<App />);\n'
+    )
+    (root / "src" / "App.tsx").write_text(
+        "export default function App() {\n"
+        "  document.title = 'Home';\n"
+        "  return <table><tbody><tr><td>cell</td></tr></tbody></table>;\n"
+        "}\n"
+    )
+    return root
+
+
+def test_runtime_risks_are_named_next_to_a_green_run(tmp_path, monkeypatch) -> None:
+    """`<table>` and `document` type-check (Expo's tsconfig carries the DOM lib)
+    and bundle; they throw on the device. Exit 0 must not read as "it works"."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    src = _web_only_project(tmp_path / "web-only")
+
+    result = runner.invoke(
+        app, ["migrate", str(src), "--json", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.stderr
+    summary = MigrationSummary.model_validate_json(result.stdout)
+    assert {(r.file, r.code) for r in summary.runtimeRisks} == {
+        ("src/App.tsx", "WEB_GLOBAL"), ("src/App.tsx", "WEB_ONLY_ELEMENT"),
+    }
+    assert "Runtime risks" in result.stderr
+
+
+def test_the_todo_count_is_the_files_own_count(tmp_path, monkeypatch) -> None:
+    """The summary, REJOX-REPORT.md and every file's banner state one number."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    out = tmp_path / "rn"
+
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--json", "--no-validate", "--out", str(out)])
+    assert result.exit_code == 0, result.stderr
+    summary = MigrationSummary.model_validate_json(result.stdout)
+
+    banners = [
+        int(m.group(1))
+        for f in out.rglob("*.ts*") if "node_modules" not in f.parts
+        for m in [re.search(r"===== REJOX-TODO: (\d+) item", f.read_text())] if m
+    ]
+    assert summary.todoCount == sum(banners) > 0
+    assert f"- REJOX-TODO items: **{summary.todoCount}**" in (out / "REJOX-REPORT.md").read_text()
+    assert "will resolve" not in (out / "REJOX-REPORT.md").read_text()
+
+
+def test_no_cache_lookup_is_not_a_zero_hit_rate(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    assert "0 lookup (n/a)" in _unrendered(result.output)
+    assert "(0%)" not in result.output
+
+
+def test_a_key_whose_provider_fails_is_not_reported_as_no_key(tmp_path, monkeypatch) -> None:
+    import rejox.ai.config as ai_config
+
+    monkeypatch.setenv("GEMINI_API_KEY", "set-but-broken")
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+
+    def broken(*_a, **_k):
+        raise RuntimeError("SDK missing")
+
+    monkeypatch.setattr(ai_config, "get_provider", broken)
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    said = _unrendered(result.output)
+    assert "GEMINI_API_KEY is set, but the Gemini provider could not start: SDK missing" in said
+    assert "no GEMINI_API_KEY" not in said
+
+
+def test_an_error_in_a_file_with_no_todo_is_called_a_bug(tmp_path, monkeypatch) -> None:
+    """"All map to known residue" used to be printed, never checked."""
+    from rejox.models.validation import Diagnostic
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    failed = ValidationResult(
+        passed=False, installed=True,
+        typecheck=StageResult(
+            ran=True, passed=False, errorCount=1,
+            diagnostics=[Diagnostic(source="typecheck", file="src/nowhere.tsx", line=1,
+                                    code="TS2304", message="Cannot find name 'x'.")],
+        ),
+        bundle=StageResult(),
+    )
+    monkeypatch.setattr(cli, "validate_project", lambda *a, **k: failed)
+
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--yes", "--out", str(tmp_path / "rn")])
+    assert result.exit_code == 1, result.output
+    said = _unrendered(result.output)
+    assert "0 of 1 in files with a REJOX-TODO" in said
+    assert "a Rejox bug" in said
+    assert "all map to known residue" not in said

@@ -48,6 +48,25 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
   nowhere, silently. `AppNavigator.tsx` now carries a `NAV_CHROME` TODO naming it.
 - `peer-*` and `columns-*` classes, which NativeWind drops silently, are
   flagged as `TW_UNSUPPORTED`.
+- A green tsc + Metro run said nothing about `<table>`, `document` or an
+  untouched `localStorage` — all of which type-check, bundle and throw on the
+  device. They are now listed as "runtime risks" next to the validation result,
+  in the summary, and in `--json` (`runtimeRisks`).
+- "Remaining diagnostics (all map to known residue)" was printed, never
+  checked. The CLI now counts how many errors fall in files with a REJOX-TODO,
+  and calls an error in a file with none what it is: a Rejox bug.
+- The TODO count disagreed with itself (13 in the summary, 15 in the report,
+  19 in a file's own banner). Every place now counts items the way the banner
+  does, the summary table lists every flagged code, and a truncated table says
+  how many it left out.
+- `REJOX-REPORT.md` no longer says the AI engine "will resolve" the TODOs (no
+  later step does), and counts files with any TODO, not only those with residue.
+- An unused cache reads `n/a`, not `0%`.
+- With a `GEMINI_API_KEY` whose provider fails to start, the CLI said "no
+  GEMINI_API_KEY"; it now gives the real reason.
+- The offline `fake` provider answered unknown prompts with a placeholder that
+  parsed as a className, so a fake-mode run could write `FAKE_RESPONSE[…]` into
+  the app. It now declines (`UNRESOLVABLE`), and the class stays residue.
 
 ## [0.1.1] - 2026-09-26
 

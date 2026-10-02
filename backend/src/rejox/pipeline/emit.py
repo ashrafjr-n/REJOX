@@ -208,6 +208,20 @@ def _todo_codes(code: str) -> list[str]:
     return sorted(set(_TODO_RE.findall(code)))
 
 
+_TODO_HEADER_LINE_RE = re.compile(r"^\s*//\s*REJOX-TODO\(([A-Z_]+)\)", re.MULTILINE)
+_TODO_INLINE_RE = re.compile(r"\{\s*/\*\s*REJOX-TODO\(([A-Z_]+)\)")
+
+
+def _todo_items(code: str) -> int:
+    """How many things a person has to look at in this file — the same number
+    its `===== REJOX-TODO: N item(s)` banner states. One header line per item;
+    an inline marker counts only when no header line already names its code
+    (a NAV_LINK has both, and is still one item)."""
+    header = _TODO_HEADER_LINE_RE.findall(code)
+    inline = [c for c in _TODO_INLINE_RE.findall(code) if c not in set(header)]
+    return len(header) + len(inline)
+
+
 # react-router's own components: never "chrome", whatever file renders them.
 _ROUTER_NAMES = {
     "Routes", "Route", "Outlet", "Navigate", "BrowserRouter", "HashRouter",
@@ -853,12 +867,13 @@ def emit_project(
         if never is not None:
             skipped.append(SkippedFile(path=f.path, reason=never))
 
-    todo_count = sum(len(f.todoCodes) for f in files) + sum(
-        len(f.unhandled) for f in files
+    # Counted from the emitted files themselves, item by item, so the summary,
+    # the report and each file's own TODO banner always state the same number.
+    todo_count = sum(
+        _todo_items((out_dir / f.path).read_text())
+        for f in files
+        if f.todoCodes and (out_dir / f.path).is_file()
     )
-    # todoCodes and unhandled overlap (each unhandled leaves a TODO); count
-    # residue by the emitted TODO comments, which is the ground truth.
-    todo_count = sum(len(f.todoCodes) for f in files)
 
     project = EmittedProject(
         outDir=str(out_dir),
@@ -887,27 +902,27 @@ def _render_report(project: EmittedProject, kg: KnowledgeGraph) -> str:
     lines: list[str] = []
     lines.append(f"# Rejox Migration Report — {kg.project.name}\n")
     lines.append(
-        "Deterministic emission of the React Native project. Every file below "
-        "was produced by rules (no AI). `unhandled` items are the residue the "
-        "AI Resolution Engine will resolve; each also leaves a "
-        "`// REJOX-TODO(<CODE>)` marker in the code.\n"
+        "The React Native project as emitted. Every `// REJOX-TODO(<CODE>)` "
+        "marker in the code is something no rule could finish — or a change a "
+        "rule made that a person should check — and is listed per file below. "
+        "They are for you: the only later step that touches code is the "
+        "validation repair loop (AI on, validation failed), and the run summary "
+        "lists every line it changed.\n"
     )
 
-    residue = [f for f in project.files if f.unhandled]
+    flagged = [f for f in project.files if f.todoCodes]
 
     lines.append("\n## Summary\n")
     lines.append(f"- Files emitted: **{len(project.files)}**")
-    lines.append(f"- Files with residue (TODOs): **{len(residue)}**")
-    lines.append(f"- Total REJOX-TODO items: **{project.todoCount}**")
+    lines.append(f"- Files with a REJOX-TODO: **{len(flagged)}**")
+    lines.append(f"- REJOX-TODO items: **{project.todoCount}**")
     lines.append(f"- Files skipped (web-only / not found): **{len(project.skipped)}**\n")
 
     lines.append("\n## Provenance (per file)\n")
-    lines.append("| File | From | Provenance | Residue |")
+    lines.append("| File | From | Provenance | REJOX-TODO codes |")
     lines.append("| ---- | ---- | ---------- | ------- |")
     for f in project.files:
-        codes = ", ".join(u.code for u in f.unhandled) or (
-            ", ".join(f.todoCodes) if f.todoCodes else "—"
-        )
+        codes = ", ".join(f.todoCodes) or "—"
         lines.append(
             f"| `{f.path}` | {f.sourceFile or '_(generated)_'} | "
             f"{f.provenance.value} | {codes} |"

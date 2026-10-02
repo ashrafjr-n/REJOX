@@ -197,7 +197,7 @@ def _nav_ui_summary(report: AnalysisReport, kg: KnowledgeGraph):
     return NavUiSummary(component=nav_name, links=links, persistent=bool(routes), hasSidebar=False)
 
 
-def _ask_navigator_shape(report, kg, provider, counter, auto):
+def _ask_navigator_shape(report, kg, provider, counter, auto, why_disabled="no GEMINI_API_KEY"):
     """The tier-3 question. With AI: the LLM proposes a shape (1 call). Without a
     key: degrade to the deterministic stack, clearly noticed. Returns
     (answer_id, proposal_or_None, llm_used: bool)."""
@@ -214,7 +214,7 @@ def _ask_navigator_shape(report, kg, provider, counter, auto):
 
     if provider is None:
         console.print(
-            "\n[yellow]AI disabled[/] (no GEMINI_API_KEY) — navigator shape defaults "
+            f"\n[yellow]AI disabled[/] ({why_disabled}) — navigator shape defaults "
             "to the deterministic [cyan]stack[/]."
         )
         spec = stack_spec_from_routes(routes)
@@ -238,7 +238,7 @@ def _ask_navigator_shape(report, kg, provider, counter, auto):
     return _ask_question(proposal.question, auto), proposal, True
 
 
-def _ask(report, kg, plan: MigrationPlan, provider, counter, auto):
+def _ask(report, kg, plan: MigrationPlan, provider, counter, auto, why_disabled="no GEMINI_API_KEY"):
     _stage("Ask — migration decisions")
     answers: dict[str, str] = {}
     by_id = {q.id: q for q in plan.questions}
@@ -247,7 +247,9 @@ def _ask(report, kg, plan: MigrationPlan, provider, counter, auto):
         if q is not None:
             answers[qid] = _ask_question(q, auto)
 
-    shape_answer, proposal, _ = _ask_navigator_shape(report, kg, provider, counter, auto)
+    shape_answer, proposal, _ = _ask_navigator_shape(
+        report, kg, provider, counter, auto, why_disabled=why_disabled,
+    )
     if shape_answer:
         answers["navigator-shape"] = shape_answer
     return answers, proposal
@@ -313,7 +315,35 @@ def _render_tier_breakdown(tiers: Counter, counter) -> None:
 # --- 5/6. validate + final ---------------------------------------------------
 
 
-def _render_validation(validation, scores, repair=None) -> None:
+# Residue that tsc and Metro both accept and the device does not: a web-only
+# element (`<table>`), a browser global with no RN equivalent, a storage call
+# left untouched. A green validation says nothing about these — so they are
+# listed next to it, every time, rather than discovered on first launch.
+_RUNTIME_RISK_CODES = ("WEB_ONLY_ELEMENT", "WEB_GLOBAL", "WEB_STORAGE")
+
+
+def _runtime_risks(emission) -> list[tuple[str, str]]:
+    return sorted({
+        (f.path, u.code)
+        for f in emission.files for u in f.unhandled
+        if u.code in _RUNTIME_RISK_CODES
+    })
+
+
+def _render_runtime_risks(risks: list[tuple[str, str]]) -> None:
+    if not risks:
+        return
+    console.print(
+        f"[yellow]Runtime risks tsc and Metro cannot see:[/] {len(risks)} — these "
+        "type-check and bundle, and throw on the device:"
+    )
+    for path, code in risks[:8]:
+        console.print(f"  [dim]{path}[/] {code}")
+    if len(risks) > 8:
+        console.print(f"  [dim]… and {len(risks) - 8} more in REJOX-REPORT.md[/]")
+
+
+def _render_validation(validation, scores, emission, repair=None) -> None:
     _stage("Review — validation (tsc + Metro)")
     tc, bd = validation.typecheck, validation.bundle
     ok = lambda passed: Text("PASS", style="bold green") if passed else Text("FAIL", style="bold red")
@@ -336,11 +366,22 @@ def _render_validation(validation, scores, repair=None) -> None:
             mark = "[green]fixed[/]" if a.fixed else "[yellow]no change[/]"
             console.print(f"  [dim]{a.file}:{a.line}[/] {a.residueCode} → {mark}")
 
-    diags = [d for d in tc.diagnostics if d.severity == "error"][:8]
-    if diags:
-        console.print("[dim]Remaining diagnostics (all map to known residue):[/]")
-        for d in diags:
+    errors = [d for d in tc.diagnostics if d.severity == "error"]
+    if errors:
+        # Measured, not asserted: an error in a file that carries a REJOX-TODO
+        # is that residue showing up; one in a file with none is a Rejox bug.
+        flagged = {f.path for f in emission.files if f.todoCodes}
+        unexplained = [d for d in errors if d.file not in flagged]
+        console.print(
+            f"[dim]Remaining diagnostics: {len(errors) - len(unexplained)} of {len(errors)} "
+            "in files with a REJOX-TODO[/]"
+            + (f" · [red]{len(unexplained)} in files with none — a Rejox bug, please report it[/]"
+               if unexplained else "")
+        )
+        for d in (unexplained + [d for d in errors if d not in unexplained])[:8]:
             console.print(f"  [dim]{d.file}:{d.line}[/] {d.code} {d.message[:80]}")
+
+    _render_runtime_risks(_runtime_risks(emission))
 
     if scores is not None:
         console.print(
@@ -376,16 +417,17 @@ def _project_panel(out_dir: Path) -> Panel:
 def _render_final(emission, validation, scores, out_dir, counter, cache, proposal, nav_shape) -> None:
     _stage("Done — migration summary")
     converted = [f for f in emission.files if f.sourceFile]
-    todos = [
-        (f.path, u.code)
-        for f in emission.files for u in f.unhandled
-    ]
+    # The same codes each file's TODO banner lists, so this table, the count
+    # above it and the files themselves never disagree.
+    todos = sorted({(f.path, code) for f in emission.files for code in f.todoCodes})
+    risks = _runtime_risks(emission)
 
     t = Table.grid(padding=(0, 3))
     t.add_column(style="dim"); t.add_column()
     t.add_row("Files converted", f"[bold]{len(converted)}[/]")
     t.add_row("Files skipped", str(len(emission.skipped)))
-    t.add_row("Residue TODOs", f"[bold]{emission.todoCount}[/]")
+    t.add_row("REJOX-TODO items", f"[bold]{emission.todoCount}[/] [dim]in {len({p for p, _ in todos})} file(s)[/]")
+    t.add_row("Runtime risks", f"[yellow]{len(risks)}[/] [dim](tsc + Metro cannot see them)[/]" if risks else "0")
     if validation is not None and scores is not None:
         t.add_row("Validated coverage (strict)", f"[bold]{_pct(scores.coverage)}[/]")
         t.add_row("  … compiles + bundles", _pct(scores.workingCoverage))
@@ -394,18 +436,22 @@ def _render_final(emission, validation, scores, out_dir, counter, cache, proposa
         t.add_row("Validation", "[green]PASS[/]" if validation.passed else "[yellow]see diagnostics[/]")
     stats = cache.stats()
     t.add_row("LLM calls", f"[bold magenta]{counter.calls}[/] [dim](tokens {counter.tokensIn}→{counter.tokensOut})[/]")
-    t.add_row("Cache", f"{stats.hits} hit / {stats.lookups} lookup ({_pct(stats.hitRate * 100)})")
+    # No lookup at all is "not measured", not a 0% hit rate.
+    t.add_row("Cache", f"{stats.hits} hit / {stats.lookups} lookup "
+                       f"({_pct(stats.hitRate * 100 if stats.lookups else None)})")
     if nav_shape:
         proposed = proposal.resolution.spec.type.value if proposal is not None else nav_shape
         t.add_row("Navigator shape", f"proposed [cyan]{proposed}[/] · emitted [cyan]{nav_shape}[/]")
     console.print(t)
 
     if todos:
-        tt = Table(title="Residue — needs attention", title_style="bold", show_edge=False, box=None)
+        tt = Table(title="REJOX-TODO — needs attention", title_style="bold", show_edge=False, box=None)
         tt.add_column("File"); tt.add_column("Code", style="yellow")
-        for path, code in sorted(set(todos))[:14]:
+        for path, code in todos[:14]:
             tt.add_row(path, code)
         console.print(tt)
+        if len(todos) > 14:
+            console.print(f"[dim]… and {len(todos) - 14} more — every one is listed in REJOX-REPORT.md[/]")
 
     console.print()
     console.print(_project_panel(out_dir))
@@ -432,7 +478,7 @@ class _CountingProvider:
         return resp
 
 
-def _make_provider() -> tuple[object, str]:
+def _make_provider() -> tuple[object, str, str]:
     """Pick the LLM provider for the one reasoning step (navigator shape):
 
     - ``GEMINI_API_KEY`` set → the real Gemini provider.
@@ -441,21 +487,24 @@ def _make_provider() -> tuple[object, str]:
       without network. Transparently labeled as offline.
     - otherwise → AI disabled; the shape step uses the deterministic default.
 
-    Returns ``(provider_or_None, label)``.
+    Returns ``(provider_or_None, label, why_disabled)``. ``label`` is what
+    ``--json`` reports (``"none"`` when AI is off, a stable value for scripts);
+    ``why_disabled`` is what a person reads — a key that IS set but whose
+    provider could not start says so, rather than claiming there is no key.
     """
     if os.environ.get("GEMINI_API_KEY"):
         try:
             from rejox.ai.config import get_provider
 
             provider = get_provider()
-            return provider, getattr(provider, "model", "gemini")
-        except Exception:
-            return None, "none"
+            return provider, getattr(provider, "model", "gemini"), ""
+        except Exception as exc:
+            return None, "none", f"GEMINI_API_KEY is set, but the Gemini provider could not start: {exc}"
     if os.environ.get("REJOX_AI_PROVIDER", "").strip().lower() == "fake":
         from rejox.ai.provider import FakeProvider
 
-        return FakeProvider(), "fake (offline)"
-    return None, "none"
+        return FakeProvider(), "fake (offline)", ""
+    return None, "none", "no GEMINI_API_KEY"
 
 
 def _seed_offline_shape(provider, routes, nav_ui) -> None:
@@ -624,10 +673,10 @@ def _migrate(src: Path, out_dir: Path, auto: bool, no_validate: bool, as_json: b
     plan = plan_migration(report, kg)
 
     # 2. Ask.
-    inner, ai_label = _make_provider()
-    console.print(f"[dim]AI provider:[/] {ai_label}")
+    inner, ai_label, why_disabled = _make_provider()
+    console.print(f"[dim]AI provider:[/] {ai_label}" + (f" [dim]({why_disabled})[/]" if why_disabled else ""))
     counter = _CountingProvider(inner) if inner is not None else _CountingProvider(_NullProvider())
-    answers, proposal = _ask(report, kg, plan, inner, counter, auto)
+    answers, proposal = _ask(report, kg, plan, inner, counter, auto, why_disabled=why_disabled)
 
     # 3. Plan.
     _render_plan(plan)
@@ -668,7 +717,7 @@ def _migrate(src: Path, out_dir: Path, auto: bool, no_validate: bool, as_json: b
             emission, validation,
             predicted_coverage=report.coverage, predicted_confidence=report.confidence,
         )
-        _render_validation(validation, scores, repair)
+        _render_validation(validation, scores, emission, repair)
 
     # 6. Final report.
     _render_final(
@@ -693,6 +742,7 @@ def _migrate(src: Path, out_dir: Path, auto: bool, no_validate: bool, as_json: b
                 ResidueItem(file=f.path, code=u.code)
                 for f in emission.files for u in f.unhandled
             ],
+            runtimeRisks=[ResidueItem(file=path, code=code) for path, code in _runtime_risks(emission)],
             validation=validation,
             scores=scores,
             llm=LlmUsage(
@@ -829,7 +879,7 @@ def export_showcase(
     # boundary. Every per-phase figure below is an observed delta — never derived,
     # assumed, or hard-coded (including the zeros: a phase that made no call is
     # confirmed by counter-before == counter-after, not by writing 0).
-    inner, ai_label = _make_provider()
+    inner, ai_label, _ = _make_provider()
     if inner is None:
         console.print("[red]Fake provider unavailable — cannot produce a deterministic export.[/]")
         raise typer.Exit(code=1)

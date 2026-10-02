@@ -124,9 +124,11 @@ def prompt_hash(system: str, user: str) -> str:
 class FakeProvider(LLMProvider):
     """Deterministic, offline provider. NEVER touches the network.
 
-    Returns canned responses keyed by :func:`prompt_hash`. Unknown prompts get a
-    stable, reproducible synthetic response derived from the prompt hash, so
-    tests are fully deterministic without registering every prompt.
+    Returns canned responses keyed by :func:`prompt_hash`. An unknown prompt is
+    answered with the ``UNRESOLVABLE`` sentinel every resolver already honours
+    (stable, and naming the prompt hash), so an offline run leaves that residue
+    in place. It used to return a placeholder token that parsed as a valid
+    className, and an offline demo wrote ``FAKE_RESPONSE[…]`` into the code.
     """
 
     model_name = "fake-1"
@@ -144,8 +146,8 @@ class FakeProvider(LLMProvider):
         key = prompt_hash(system, user)
         text = self._responses.get(key)
         if text is None:
-            # Deterministic synthetic answer — reproducible across runs.
-            text = f"FAKE_RESPONSE[{key[:12]}]"
+            # Deterministic, and declines rather than invents an answer.
+            text = f"UNRESOLVABLE: the offline fake provider has no answer for prompt {key[:12]}"
         return LLMResponse(
             text=text,
             tokensIn=len(system.split()) + len(user.split()),
