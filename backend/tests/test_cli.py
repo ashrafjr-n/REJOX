@@ -446,3 +446,15 @@ def test_a_file_that_failed_to_convert_is_shown_not_just_counted(tmp_path, monke
     report = (tmp_path / "rn" / "REJOX-REPORT.md").read_text()
     [line] = [l for l in report.splitlines() if l.startswith("- `src/util.ts`")]
     assert "syntactic error" in line  # the whole reason, on its one list line
+
+
+def test_a_one_option_question_is_stated_not_asked(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    said = _unrendered(result.output)
+    assert "Expo — the one option this version supports" in said
+    assert "Bare React Native" not in said and "Expo Router" not in said

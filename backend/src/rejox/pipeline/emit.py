@@ -42,6 +42,7 @@ from rejox.models.plan import MigrationPlan
 from rejox.models.transformation import TransformResult, UnhandledItem
 from rejox.ai.navigation import build_navigator_spec, generate_navigator, unhoistable_screens
 from rejox.pipeline.analyzer import analyze_graph
+from rejox.pipeline.planner import check_answers
 from rejox.pipeline.resolve_apply import apply_resolutions
 from rejox.pipeline.rules.libraries import KNOWN_LIBRARIES
 from rejox.pipeline.scaffold import generate_scaffold
@@ -598,6 +599,7 @@ def emit_project(
             tier (static_map / pattern / rule / llm) actually resolved, and
             how many stayed ``unresolved``.
     """
+    check_answers(plan, answers)  # an option the plan never offered is refused
     report = report or analyze_graph(kg)
     src_root = Path(source_root or kg.project.root)
     out_dir = Path(out_dir)

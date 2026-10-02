@@ -79,6 +79,15 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
   the `REJOX-REPORT.md` list.
 - A source file with syntax errors is said to have them (`SOURCE_SYNTAX`): the
   compiler's recovery can be valid code, so nothing else could tell.
+- The Ask stage offered choices the emitter never implemented: "Bare React
+  Native" produced the same Expo project; "RN StyleSheet" kept every
+  `className` with no NativeWind, so all styling was lost on the device; "Expo
+  Router" failed Metro around a placeholder `app/`; the icons question was read
+  by nothing. Only implemented options are offered now (Expo, NativeWind, React
+  Navigation; AsyncStorage or MMKV), a one-option question is stated rather than
+  asked, and `emit_project` refuses an answer the plan did not offer — so an API
+  client cannot request one of them either. Icon libraries are reported as
+  `needs-conversion` with their React Native counterpart, not as `unknown`.
 
 ## [0.1.1] - 2026-09-26
 

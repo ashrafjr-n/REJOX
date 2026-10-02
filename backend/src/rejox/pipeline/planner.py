@@ -44,13 +44,6 @@ from rejox.models.plan import (
     UnsupportedItem,
 )
 
-# Icon libraries whose presence justifies an icons question.
-ICON_LIBS = frozenset({
-    "lucide-react", "react-icons", "@heroicons/react",
-    "@mui/icons-material", "react-feather", "@fortawesome/react-fontawesome",
-    "@radix-ui/react-icons",
-})
-
 # Browser storage APIs that map to AsyncStorage/MMKV.
 STORAGE_WEB_APIS = frozenset({"localStorage", "sessionStorage"})
 
@@ -117,19 +110,45 @@ def _package_target(kg: KnowledgeGraph) -> str:
 # --- Questions --------------------------------------------------------------
 
 
+class UnsupportedAnswer(ValueError):
+    """An Ask answer that is not one of its question's options."""
+
+
+def check_answers(plan: MigrationPlan, answers: dict[str, str]) -> None:
+    """Refuse an answer the plan never offered.
+
+    The CLI only ever picks a listed option, but an API client sends whatever
+    it likes — and a value the emitter does not implement (an old client's
+    `expo-router`) produced a project that was broken or simply not what was
+    asked for. Better an error that names the supported values.
+    """
+    for q in plan.questions:
+        value = answers.get(q.id)
+        allowed = [o.id for o in q.options]
+        if value is not None and value not in allowed:
+            raise UnsupportedAnswer(
+                f"{q.id}={value!r} is not supported by this version of Rejox "
+                f"(supported: {', '.join(allowed)})."
+            )
+
+
+
 def _questions(report: AnalysisReport, kg: KnowledgeGraph) -> list[Question]:
     questions: list[Question] = []
     s = report.summary
 
-    # project-type — always. Recommend Expo for the MVP (fastest path to a
-    # runnable app; Metro/OTA/library coverage).
+    # project-type — always, with the one target this version emits. A bare
+    # React Native option used to be offered and silently produced the same
+    # Expo project; an option is listed only once the emitter implements it.
     questions.append(
         Question(
             id="project-type",
             title="Which React Native scaffold should we target?",
             context=(
                 f"{s.componentCount} components and {s.routeCount} routes will be "
-                "scaffolded into a fresh React Native project."
+                "scaffolded into a fresh Expo project — the one target this version "
+                "emits (a bare React Native project can be made from it with "
+                "`npx expo prebuild`)."
             ),
             options=[
                 QuestionOption(
@@ -141,15 +160,6 @@ def _questions(report: AnalysisReport, kg: KnowledgeGraph) -> list[Question]:
                         "Some native modules need config plugins."
                     ),
                     isRecommended=True,
-                ),
-                QuestionOption(
-                    id="bare-rn",
-                    label="Bare React Native",
-                    description="A `react-native` CLI project.",
-                    tradeoffs=(
-                        "Full native control from day one. "
-                        "More native tooling to set up and maintain."
-                    ),
                 ),
             ],
             required=True,
@@ -164,11 +174,15 @@ def _questions(report: AnalysisReport, kg: KnowledgeGraph) -> list[Question]:
             Question(
                 id="styling-engine",
                 title="How should Tailwind styling be migrated?",
+                # A StyleSheet target used to be offered: it kept every
+                # className and installed no NativeWind, so all styling was
+                # silently lost on the device. NativeWind is the one target.
                 context=(
                     f"{report.styling.tailwindClassCount} Tailwind classes across "
                     f"{tw_components} components "
                     f"({len(report.styling.unmappableClasses)} unmappable), "
-                    f"{report.styling.cssModuleCount} CSS Module(s)."
+                    f"{report.styling.cssModuleCount} CSS Module(s). They are carried "
+                    "over as NativeWind classes — the one styling target this version emits."
                 ),
                 options=[
                     QuestionOption(
@@ -181,16 +195,7 @@ def _questions(report: AnalysisReport, kg: KnowledgeGraph) -> list[Question]:
                         ),
                         isRecommended=True,
                     ),
-                    QuestionOption(
-                        id="stylesheet",
-                        label="RN StyleSheet",
-                        description="Rewrite styles as StyleSheet.create objects.",
-                        tradeoffs=(
-                            "Idiomatic, dependency-free RN styling. "
-                            "Every className must be rewritten by hand."
-                        ),
-                    ),
-                ],
+    ],
                 required=True,
             )
         )
@@ -203,9 +208,12 @@ def _questions(report: AnalysisReport, kg: KnowledgeGraph) -> list[Question]:
             Question(
                 id="navigation-library",
                 title="Which navigation library should replace react-router?",
+                # Expo Router used to be offered: it scaffolded a placeholder
+                # app/ the routes never reached, and failed Metro.
                 context=(
                     f"{report.routing.library} with {s.routeCount} routes "
-                    f"({param_routes} parameterized)."
+                    f"({param_routes} parameterized), replaced by a generated React "
+                    "Navigation navigator — the one router this version emits."
                 ),
                 options=[
                     QuestionOption(
@@ -218,52 +226,14 @@ def _questions(report: AnalysisReport, kg: KnowledgeGraph) -> list[Question]:
                         ),
                         isRecommended=True,
                     ),
-                    QuestionOption(
-                        id="expo-router",
-                        label="Expo Router",
-                        description="File-based routing, Next.js-like.",
-                        tradeoffs=(
-                            "Familiar file-based model, deep linking built in. "
-                            "Newer and tied to Expo conventions."
-                        ),
-                    ),
-                ],
+],
                 required=True,
             )
         )
 
-    # icons — only if an icon library is actually a dependency.
-    icon_libs = sorted(d for d in kg.project.dependencies if d in ICON_LIBS)
-    if icon_libs:
-        questions.append(
-            Question(
-                id="icons",
-                title="How should web icons be replaced?",
-                context=f"{', '.join(icon_libs)} detected in dependencies.",
-                options=[
-                    QuestionOption(
-                        id="expo-vector-icons",
-                        label="@expo/vector-icons",
-                        description="Bundled icon sets for Expo.",
-                        tradeoffs=(
-                            "Zero-config in Expo, large icon coverage. "
-                            "Icon names differ from the web set."
-                        ),
-                        isRecommended=True,
-                    ),
-                    QuestionOption(
-                        id="lucide-rn",
-                        label="lucide-react-native",
-                        description="Lucide icons for React Native.",
-                        tradeoffs=(
-                            "Same icon set as lucide-react on web. "
-                            "Needs react-native-svg."
-                        ),
-                    ),
-                ],
-                required=False,
-            )
-        )
+    # No icons question: nothing converts web icon components yet, so asking
+    # which RN icon set to use would collect an answer and do nothing with it.
+    # Icon libraries are reported per library instead (rules/libraries.py).
 
     # storage — only if browser storage is used in a component.
     storage_users = sorted(

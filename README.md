@@ -66,8 +66,9 @@ population reports `n/a`, never a flattering `100%`.
 <td valign="top">
 
 **You stay in charge**<br>
-Real design questions — Expo or bare, NativeWind or StyleSheet, tabs or stack —
-are asked, with the finding that raised each one shown next to it.
+Real design questions — tabs or stack, AsyncStorage or MMKV — are asked, with
+the finding that raised each one shown next to it. Only options Rejox actually
+implements are offered.
 
 </td>
 </tr>
@@ -128,7 +129,7 @@ flowchart LR
 | **Intelligence** | A parser worker (ts-morph) builds a deterministic knowledge graph: components, pages, routes, stores, endpoints, styling, and how they depend on each other. |
 | **Report** | The Analyzer scores **Coverage**, **Confidence** and **Risk**, and explains every point of the score. |
 | **Plan** | Work is ordered into dependency waves — leaves first, then the components built from them, then pages. |
-| **Ask** | Only genuine decisions reach you: scaffold, styling strategy, router replacement, navigator shape, storage. |
+| **Ask** | Only genuine decisions reach you: navigator shape and storage. The target itself — Expo, NativeWind, React Navigation — is stated, not asked: it is the one this version emits. |
 | **Migrate** | AST codemods convert elements, events, routing, styling, storage and env; the residue goes up a ladder: **static map → pattern → LLM**. |
 | **Review** | The emitted project is installed, type-checked and bundled. Anything left is listed by file and residue code. |
 

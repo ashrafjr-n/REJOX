@@ -163,6 +163,11 @@ def _recommended(q: Question) -> Optional[str]:
 
 def _ask_question(q: Question, auto: bool) -> str:
     rec = _recommended(q)
+    if len(q.options) == 1:
+        # One supported option is not a decision: say what it is, ask nothing.
+        o = q.options[0]
+        console.print(f"\n[bold]{q.title}[/] [cyan]{o.label}[/] [dim]— the one option this version supports[/]")
+        return o.id
     console.print()
     console.print(f"[bold]{q.title}[/]")
     if q.context:

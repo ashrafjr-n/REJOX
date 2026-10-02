@@ -657,15 +657,21 @@ Schema in `rejox/models/plan.py`: `Question` / `QuestionOption` / `PlanStep`
 ### Question-generation rules
 
 A question is emitted **only** when a finding justifies it, and exactly one
-option per question is recommended (rule in parentheses):
+option per question is recommended (rule in parentheses). An option is offered
+only once the emitter implements it — `emit_project` refuses any other answer
+(`check_answers`), so an API client cannot ask for an output that does not
+exist. A question left with one option is stated by the CLI, not asked:
 
-| Question | Emitted when | Recommended (why) |
-| -------- | ------------ | ----------------- |
-| `project-type` | always | **Expo** — fastest path to a runnable MVP app |
-| `styling-engine` | `styling.tailwindClassCount > 0` | **NativeWind** — Tailwind is the dominant approach; preserves the most classes |
-| `navigation-library` | `routing.library` set (react-router) | **React Navigation** — mature, works with Expo *and* bare RN |
-| `icons` | an icon library is in `dependencies` | **@expo/vector-icons** — zero-config in Expo |
-| `storage` | `localStorage`/`sessionStorage` in a component's `webApis` | **AsyncStorage** — the standard RN key-value store |
+| Question | Emitted when | Options (recommended first) |
+| -------- | ------------ | --------------------------- |
+| `project-type` | always | **Expo** only — a bare project is `npx expo prebuild` away |
+| `styling-engine` | `styling.tailwindClassCount > 0` | **NativeWind** only — the classes carry over |
+| `navigation-library` | `routing.library` set (react-router) | **React Navigation** only — the navigator is generated from the route table |
+| `storage` | `localStorage`/`sessionStorage` in a component's `webApis` | **AsyncStorage** (standard, async) · MMKV (synchronous) |
+
+There is no `icons` question: nothing converts web icon components yet, so an
+answer would be collected and ignored. Icon libraries are reported per library
+instead (`needs-conversion`, with the React Native counterpart named).
 
 Every `context` string cites real numbers from the report (e.g. *"138 Tailwind
 classes across 20 components (18 unmappable), 1 CSS Module"*).
