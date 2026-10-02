@@ -228,7 +228,7 @@ rejox migrate <project-path> [--out <dir>] [--force] [--yes] [--no-validate] [--
 | `--force` | Write into `--out` even if it is not empty (files already there are kept). |
 | `--yes`, `-y`, `--no-input` | Accept every recommended answer without prompting. Implied when stdin is not a terminal. |
 | `--no-validate` | Skip the `tsc` + Metro validation stage (fast). |
-| `--json` | Print a machine-readable summary on stdout (progress goes to stderr). Implies `--no-input`. |
+| `--json` | Print a machine-readable summary on stdout (progress goes to stderr). On a failure, stdout is still JSON: `{"exitCode", "error"}`. Implies `--no-input`. |
 
 `rejox --version` prints the version; `rejox --debug migrate …` shows the full
 traceback if Rejox itself fails. `rejox doctor` checks the environment.
@@ -245,7 +245,7 @@ traceback if Rejox itself fails. `rejox doctor` checks the environment.
 | `2` | Usage error (bad flag, missing project, non-empty `--out` without `--force`). |
 | `3` | Environment: Node 20+, `npm` or a worker bundle is missing — run `rejox doctor`. |
 | `4` | Input refused: the project has no React components to migrate. |
-| `70` | Internal error in Rejox; re-run with `--debug` for the traceback. |
+| `70` | Internal error in Rejox; re-run with `--debug` for the traceback. A half-written `--out` this run created is removed; an existing one is marked `REJOX-INCOMPLETE.md`. |
 
 </details>
 

@@ -20,6 +20,7 @@ import contextlib
 import importlib.metadata
 import os
 import re
+import shutil
 import sys
 from collections import Counter
 from pathlib import Path
@@ -37,7 +38,7 @@ from rejox import workers
 from rejox.models.analysis import AnalysisReport
 from rejox.models.knowledge_graph import KnowledgeGraph
 from rejox.models.plan import MigrationPlan, Question
-from rejox.models.summary import LlmUsage, MigrationSummary, ResidueItem
+from rejox.models.summary import LlmUsage, MigrationFailure, MigrationSummary, ResidueItem
 from rejox.pipeline.analyzer import AnalyzerError, NothingToMigrate, analyze_graph
 from rejox.pipeline.emit import emit_project
 from rejox.pipeline.intelligence import IntelligenceError, build_knowledge_graph
@@ -291,6 +292,27 @@ def _residue_tiers(emitted_tiers: Counter, report, proposal) -> Counter:
     return tiers
 
 
+def _failed_files(emission) -> list:
+    from rejox.pipeline.emit import TRANSFORM_FAILED_REASON
+
+    return [s for s in emission.skipped if s.reason.startswith(TRANSFORM_FAILED_REASON)]
+
+
+def _render_failed_files(emission) -> None:
+    """A source file the codemod could not convert is NOT in the output at all.
+    That is a failure, not a choice, so it is shown here — not only as one more
+    "skipped" in a count and a line of REJOX-REPORT.md."""
+    failed = _failed_files(emission)
+    if not failed:
+        return
+    console.print(
+        f"[red]{len(failed)} file(s) could not be converted and are missing from the output[/] "
+        "[dim](usually a syntax error in the source; anything importing them will not resolve):[/]"
+    )
+    for s in failed[:8]:
+        console.print(f"  [dim]{s.path}[/] {s.reason[:160]}")
+
+
 def _render_tier_breakdown(tiers: Counter, counter) -> None:
     t = Table(title="Residue resolution — by tier", title_style="bold", show_edge=False, box=None)
     t.add_column("Tier"); t.add_column("Units", justify="right")
@@ -425,7 +447,9 @@ def _render_final(emission, validation, scores, out_dir, counter, cache, proposa
     t = Table.grid(padding=(0, 3))
     t.add_column(style="dim"); t.add_column()
     t.add_row("Files converted", f"[bold]{len(converted)}[/]")
-    t.add_row("Files skipped", str(len(emission.skipped)))
+    failed = _failed_files(emission)
+    t.add_row("Files skipped", str(len(emission.skipped))
+              + (f" [red]({len(failed)} failed to convert)[/]" if failed else ""))
     t.add_row("REJOX-TODO items", f"[bold]{emission.todoCount}[/] [dim]in {len({p for p, _ in todos})} file(s)[/]")
     t.add_row("Runtime risks", f"[yellow]{len(risks)}[/] [dim](tsc + Metro cannot see them)[/]" if risks else "0")
     if validation is not None and scores is not None:
@@ -563,13 +587,43 @@ _EXIT_CODES_HELP = (
 )
 
 
-def _fail(code: int, message: str) -> typer.Exit:
+def _fail(code: int, message: str, *, as_json: bool = False) -> typer.Exit:
     console.print(f"[red]{message}[/]")
+    if as_json:
+        # stdout carries JSON on every exit — a script never parses an empty stream.
+        failure = MigrationFailure(
+            rejoxVersion=importlib.metadata.version("rejox"), exitCode=code, error=message,
+        )
+        sys.stdout.write(failure.model_dump_json(indent=2) + "\n")
     return typer.Exit(code=code)
 
 
+_INCOMPLETE_MARKER = "REJOX-INCOMPLETE.md"
+
+
+def _discard_partial_output(out_dir: Path, created: bool, keep: bool) -> str:
+    """After an internal error mid-run, the output is a half-written project
+    that looks like a whole one. A directory this run created (and that
+    --debug does not ask to keep) is removed; one that already existed —
+    --force, the user's files beside ours — is never deleted, only marked.
+    Returns the sentence that tells the user which it was."""
+    if not out_dir.exists():
+        return ""
+    if created and not keep:
+        shutil.rmtree(out_dir, ignore_errors=True)
+        return f"The partial output at {out_dir} was removed."
+    (out_dir / _INCOMPLETE_MARKER).write_text(
+        "# This migration did not finish\n\n"
+        "Rejox stopped with an internal error part-way through writing this "
+        "project, so it is incomplete. Re-run `rejox migrate` (with `--debug` "
+        "for the traceback) rather than starting from these files.\n"
+    )
+    return f"The partial output at {out_dir} is incomplete — see {_INCOMPLETE_MARKER} there."
+
+
 @contextlib.contextmanager
-def _exit_codes(debug: bool):
+def _exit_codes(debug: bool, *, as_json: bool = False,
+                out_dir: Optional[Path] = None, out_created: bool = False):
     """Turn the failures a user can act on into a message and an exit code.
 
     Anything else is a bug in Rejox: one line and exit 70, or the traceback with
@@ -580,17 +634,25 @@ def _exit_codes(debug: bool):
     except (click.exceptions.Exit, click.exceptions.Abort, click.ClickException):
         raise
     except WorkerUnavailable as exc:
-        raise _fail(EXIT_ENVIRONMENT, str(exc)) from exc
+        raise _fail(EXIT_ENVIRONMENT, str(exc), as_json=as_json) from exc
     except ValidatorError as exc:
-        raise _fail(EXIT_ENVIRONMENT, f"Validation could not run: {exc}") from exc
+        # The project itself is complete here — only its proof is missing.
+        raise _fail(EXIT_ENVIRONMENT, f"Validation could not run: {exc}", as_json=as_json) from exc
     except NothingToMigrate as exc:
-        raise _fail(EXIT_REFUSED, f"Nothing to migrate: {exc}") from exc
+        raise _fail(EXIT_REFUSED, f"Nothing to migrate: {exc}", as_json=as_json) from exc
     except Exception as exc:
+        partial = (
+            _discard_partial_output(out_dir, out_created, keep=debug) if out_dir is not None else ""
+        )
         if debug:
+            if partial:
+                console.print(f"[yellow]{partial}[/]")
             raise
         raise _fail(
             EXIT_INTERNAL,
-            f"Internal error ({type(exc).__name__}): {exc}\nRe-run with --debug for the traceback.",
+            f"Internal error ({type(exc).__name__}): {exc}\nRe-run with --debug for the traceback."
+            + (f"\n{partial}" if partial else ""),
+            as_json=as_json,
         ) from exc
 
 
@@ -633,7 +695,7 @@ def migrate(
     no_validate: bool = typer.Option(False, "--no-validate", help="Skip the tsc + Metro validation stage."),
     as_json: bool = typer.Option(
         False, "--json",
-        help="Print a machine-readable summary on stdout; progress goes to stderr. Implies --no-input.",
+        help="Print a machine-readable summary on stdout (on a failure, {exitCode, error}); progress goes to stderr. Implies --no-input.",
     ),
 ) -> None:
     """Migrate a React project to React Native, end to end."""
@@ -644,14 +706,17 @@ def migrate(
 
     src = project_path.expanduser().resolve()
     if not src.is_dir():
-        raise _fail(EXIT_USAGE, f"Not a directory: {src}")
+        raise _fail(EXIT_USAGE, f"Not a directory: {src}", as_json=as_json)
     out_dir = (out.expanduser().resolve() if out else _default_out(src))
     if out_dir.exists() and not out_dir.is_dir():
-        raise _fail(EXIT_USAGE, f"--out is a file, not a directory: {out_dir}")
+        raise _fail(EXIT_USAGE, f"--out is a file, not a directory: {out_dir}", as_json=as_json)
     if out_dir.is_dir() and any(out_dir.iterdir()) and not force:
-        raise _fail(EXIT_USAGE, f"{out_dir} is not empty. Choose another --out, or pass --force.")
+        raise _fail(
+            EXIT_USAGE, f"{out_dir} is not empty. Choose another --out, or pass --force.",
+            as_json=as_json,
+        )
 
-    with _exit_codes(debug):
+    with _exit_codes(debug, as_json=as_json, out_dir=out_dir, out_created=not out_dir.exists()):
         # Fail in the first second, not after the analysis: every stage needs these.
         workers.preflight()
         code = _migrate(src, out_dir, auto, no_validate, as_json)
@@ -694,6 +759,7 @@ def _migrate(src: Path, out_dir: Path, auto: bool, no_validate: bool, as_json: b
             cache=cache, resolution_tiers=emitted_tiers,
         )
     console.print(f"Emitted [bold]{len([f for f in emission.files if f.sourceFile])}[/] files → [dim]{out_dir}[/]")
+    _render_failed_files(emission)
 
     _render_tier_breakdown(_residue_tiers(emitted_tiers, report, proposal), counter)
 

@@ -828,6 +828,21 @@ def test_sibling_state_and_column_classes_are_flagged(options: dict) -> None:
     assert "peer-checked:bg-red-500" in residue and "columns-2" in residue
 
 
+def test_a_broken_source_is_said_to_be_broken(options: dict) -> None:
+    """The compiler recovers `<div>…</span>` into matched tags, so the output
+    is valid and nothing downstream could tell the original was not."""
+    r = _transform_source(
+        "export function P() {\n  return <div className='p-2'>oops</span>;\n}\n", options
+    )
+    assert check_syntax(r.code) == 0
+    assert "SOURCE_SYNTAX" in {w.code for w in r.warnings}
+
+
+def test_a_valid_source_is_not_said_to_be_broken(options: dict) -> None:
+    r = transform_component(SRC / "components" / "Hero.tsx", options)
+    assert "SOURCE_SYNTAX" not in {w.code for w in r.warnings}
+
+
 # --- The non-negotiable: every output is valid TS -------------------------------
 
 

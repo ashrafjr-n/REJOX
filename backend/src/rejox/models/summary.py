@@ -49,3 +49,16 @@ class MigrationSummary(BaseModel):
     validation: Optional[ValidationResult]
     scores: Optional[ValidatedScores]
     llm: LlmUsage
+
+
+class MigrationFailure(BaseModel):
+    """What ``--json`` prints when ``rejox migrate`` stops without a summary.
+
+    A script reading stdout gets JSON on every exit, never an empty stream:
+    ``exitCode`` is the same code the process exits with, ``error`` the message
+    a person would read on stderr.
+    """
+
+    rejoxVersion: str
+    exitCode: int
+    error: str

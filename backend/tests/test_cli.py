@@ -363,3 +363,86 @@ def test_an_error_in_a_file_with_no_todo_is_called_a_bug(tmp_path, monkeypatch) 
     assert "0 of 1 in files with a REJOX-TODO" in said
     assert "a Rejox bug" in said
     assert "all map to known residue" not in said
+
+
+# --- Failing well: --json, partial output, files that did not convert ----------
+
+
+def test_json_reports_a_usage_error_as_json() -> None:
+    from rejox.models.summary import MigrationFailure
+
+    result = runner.invoke(app, ["migrate", "/does/not/exist", "--json"])
+    assert result.exit_code == 2
+    failure = MigrationFailure.model_validate_json(result.stdout)  # nothing but JSON
+    assert failure.exitCode == 2 and "Not a directory" in failure.error
+
+
+def test_json_reports_an_internal_error_as_json(tmp_path, monkeypatch) -> None:
+    from rejox.models.summary import MigrationFailure
+
+    def boom(_path):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli, "build_knowledge_graph", boom)
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--json", "--out", str(tmp_path / "rn")])
+    assert result.exit_code == 70
+    failure = MigrationFailure.model_validate_json(result.stdout)
+    assert failure.exitCode == 70 and "boom" in failure.error
+
+
+def _emit_then_crash(monkeypatch) -> None:
+    def half_written(plan, answers, kg, out_dir, **kwargs):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "App.tsx").write_text("// half of a project\n")
+        raise RuntimeError("crashed mid-emit")
+
+    monkeypatch.setattr(cli, "emit_project", half_written)
+
+
+def test_an_internal_error_removes_the_half_written_output_it_created(tmp_path, monkeypatch) -> None:
+    """A half-written project looks like a whole one. One this run created goes."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    _emit_then_crash(monkeypatch)
+    out = tmp_path / "rn"
+
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(out)])
+    assert result.exit_code == 70
+    assert not out.exists()
+    assert "was removed" in _unrendered(result.output)
+
+
+def test_an_internal_error_never_deletes_a_directory_it_did_not_create(tmp_path, monkeypatch) -> None:
+    """--force writes beside the user's own files; those are never deleted."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    _emit_then_crash(monkeypatch)
+    out = tmp_path / "rn"
+    out.mkdir()
+    (out / "keep.txt").write_text("mine")
+
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--force", "--out", str(out)]
+    )
+    assert result.exit_code == 70
+    assert (out / "keep.txt").read_text() == "mine"
+    assert (out / "REJOX-INCOMPLETE.md").is_file()
+
+
+def test_a_file_that_failed_to_convert_is_shown_not_just_counted(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    src = _web_only_project(tmp_path / "app")
+    (src / "src" / "util.ts").write_text("export const x = (;\n")  # a syntax error
+
+    result = runner.invoke(
+        app, ["migrate", str(src), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    said = _unrendered(result.output)
+    assert "1 file(s) could not be converted" in said
+    assert "src/util.ts" in said
+    assert "(1 failed to convert)" in said
+    report = (tmp_path / "rn" / "REJOX-REPORT.md").read_text()
+    [line] = [l for l in report.splitlines() if l.startswith("- `src/util.ts`")]
+    assert "syntactic error" in line  # the whole reason, on its one list line

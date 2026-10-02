@@ -125,6 +125,10 @@ def _never_migrate(rel_path: str) -> Optional[str]:
 
 _TODO_RE = re.compile(r"REJOX-TODO\(([A-Z_]+)\)")
 
+# The skip reason of a source file the codemod could not convert — the one
+# kind of skip that is a failure rather than a decision, so callers look for it.
+TRANSFORM_FAILED_REASON = "transform failed, left out of the migration"
+
 # The provider chain and the declarations it reads are carried over as the entry
 # file's own SOURCE TEXT — the one thing in the output that never passes through
 # the codemod-worker. `import.meta` is the one construct where that matters: it
@@ -659,9 +663,11 @@ def emit_project(
         try:
             result = transform_component(abs_src, options)
         except TransformerError as exc:
-            skipped.append(
-                SkippedFile(path=src_rel, reason=f"transform failed, left out of the migration: {exc}")
-            )
+            # One line: the reason lands in a Markdown list and a terminal row.
+            skipped.append(SkippedFile(
+                path=src_rel,
+                reason=f"{TRANSFORM_FAILED_REASON}: {' '.join(str(exc).split())}",
+            ))
             continue
 
         # NAV_CONTAINER (tier 2): a shared <Layout>/<Outlet>/<Routes> component

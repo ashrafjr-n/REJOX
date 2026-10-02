@@ -67,6 +67,18 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
 - The offline `fake` provider answered unknown prompts with a placeholder that
   parsed as a className, so a fake-mode run could write `FAKE_RESPONSE[…]` into
   the app. It now declines (`UNRESOLVABLE`), and the class stays residue.
+- `--json` printed nothing on stdout when the run failed (a usage error, a
+  missing tool, an internal error). It now prints `{"exitCode", "error"}`, so
+  a script reading stdout always gets JSON.
+- An internal error part-way through writing the project left a half-written
+  `--out` that looked complete. A directory the run created is now removed; one
+  that already existed (`--force`) is never deleted, and gets a
+  `REJOX-INCOMPLETE.md` instead.
+- A source file the codemod could not convert was only a "skipped" count; the
+  CLI now names it as missing from the output, and its reason no longer breaks
+  the `REJOX-REPORT.md` list.
+- A source file with syntax errors is said to have them (`SOURCE_SYNTAX`): the
+  compiler's recovery can be valid code, so nothing else could tell.
 
 ## [0.1.1] - 2026-09-26
 
