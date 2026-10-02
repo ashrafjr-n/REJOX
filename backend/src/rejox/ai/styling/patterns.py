@@ -43,6 +43,7 @@ def _result(
     *,
     confidence: str = "medium",
     note: str = "",
+    needs_review: bool = False,
 ) -> LadderResult:
     return LadderResult(
         tier=ResolutionTier.PATTERN,
@@ -52,6 +53,7 @@ def _result(
             confidence=confidence,  # type: ignore[arg-type]
         ),
         note=note,
+        needsReview=needs_review,
     )
 
 
@@ -119,6 +121,7 @@ def _resolve_grid(classes: list[str]) -> Optional[LadderResult]:
             f"Parent: replace grid with `flex-row flex-wrap`. Each child gets "
             f"width {width} (NativeWind `w-[{width}]`). Existing `gap-*` is kept."
         ),
+        needs_review=True,
     )
 
 
@@ -185,6 +188,7 @@ def _resolve_gradient(classes: list[str]) -> Optional[LadderResult]:
             "import { LinearGradient } from 'expo-linear-gradient'; replace the "
             "gradient-backed element with this wrapper around its children."
         ),
+        needs_review=True,
     )
 
 

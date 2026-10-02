@@ -20,7 +20,6 @@ import re
 from typing import Any, Callable, Optional
 
 from rejox.ai.cache import ResolutionCache
-from rejox.ai.config import AIConfig, get_provider
 from rejox.ai.provider import LLMProvider
 from rejox.ai.schemas import ResolutionResponse
 from rejox.ai.styling import known_map, patterns
@@ -141,22 +140,18 @@ class StylingResolver:
         provider: Optional[LLMProvider] = None,
         cache: Optional[ResolutionCache] = None,
         syntax_check: Optional[Callable[[str], int]] = None,
-        config: Optional[AIConfig] = None,
     ) -> None:
         self.options: dict[str, Any] = dict(options or {})
-        self._provider = provider
-        self._config = config
+        # ``None`` means AI is disabled. The resolver never builds a provider of
+        # its own: that would reach for GEMINI_API_KEY behind the caller's back
+        # (and crash the whole migration when it is unset), and any call it
+        # made would escape the caller's LLM-call count.
+        self.provider = provider
         self.cache = cache or ResolutionCache()
         self._syntax_check = syntax_check
         self.styling_engine = str(self.options.get("stylingEngine", "nativewind"))
 
     # -- lazy deps (only paid for if the LLM tier is actually reached) --------
-
-    @property
-    def provider(self) -> LLMProvider:
-        if self._provider is None:
-            self._provider = get_provider(self._config)
-        return self._provider
 
     def _parse_errors(self, code: str) -> int:
         check = self._syntax_check
@@ -185,6 +180,7 @@ class StylingResolver:
                     tier=ladder.tier,
                     response=ladder.response,
                     note=ladder.note,
+                    needsReview=ladder.needsReview,
                     componentName=residue.componentName,
                     sourceFile=residue.sourceFile,
                 )
@@ -195,6 +191,17 @@ class StylingResolver:
 
     def _resolve_llm(self, unit: list[str], residue: MappedResidue) -> LadderResult:
         snippet = " ".join(unit)
+        if self.provider is None:
+            # AI disabled: the unit stays residue (its classes are kept and its
+            # TODO survives) — never an error that takes the migration down.
+            return LadderResult(
+                tier=ResolutionTier.LLM,
+                response=ResolutionResponse(
+                    unresolvable=True,
+                    reason="No rule covers this class and AI is disabled "
+                    "(no GEMINI_API_KEY); left for a human.",
+                ),
+            )
         comps = [residue.componentName] if residue.componentName else []
 
         cached = self.cache.get(ISSUE_CODE, snippet, self.options, component_names=comps)
@@ -273,10 +280,10 @@ def resolve_styling(
 ) -> list[Resolution]:
     """Resolve a batch of styling residue through the three-tier ladder.
 
-    Callable from the emit pipeline, but **not yet wired into it** — wiring
-    arrives with the Validator repair loop. A shared ``cache`` across the batch
-    is what makes recurring residue (the same ``hover:`` in seven files) cost at
-    most one LLM call.
+    ``provider=None`` disables the LLM tier: whatever the rules cannot answer
+    comes back ``unresolvable``. A shared ``cache`` across the batch is what
+    makes recurring residue (the same ``hover:`` in seven files) cost at most
+    one LLM call.
     """
     resolver = StylingResolver(
         options, provider=provider, cache=cache, syntax_check=syntax_check

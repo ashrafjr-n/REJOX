@@ -45,6 +45,7 @@ def _result(
     note: str = "",
     unresolvable: bool = False,
     reason: Optional[str] = None,
+    needs_review: bool = False,
 ) -> LadderResult:
     return LadderResult(
         tier=tier,
@@ -56,6 +57,7 @@ def _result(
             reason=reason,
         ),
         note=note,
+        needsReview=needs_review,
     )
 
 
@@ -93,6 +95,7 @@ def _match_divide(classes: list[str]) -> Optional[LadderResult]:
         "RN has no `divide-*` descendant selector; the divider becomes a hairline "
         "border on each child after the first.",
         note="Apply this style to every child EXCEPT the first (index > 0).",
+        needs_review=True,
     )
 
 
@@ -119,6 +122,7 @@ def _match_animate_spin(classes: list[str]) -> Optional[LadderResult]:
             "Easing } from 'react-native-reanimated'; wrap the element in "
             "<Animated.View style={spinStyle}>."
         ),
+        needs_review=True,
     )
 
 
@@ -138,6 +142,7 @@ def _match_backdrop(classes: list[str]) -> Optional[LadderResult]:
             "import { BlurView } from 'expo-blur'; render it as the first, "
             "absolutely-filled child behind the content."
         ),
+        needs_review=True,
     )
 
 
@@ -152,6 +157,7 @@ def _match_position(classes: list[str]) -> Optional[LadderResult]:
             "with the ScrollView's `stickyHeaderIndices` instead.",
             confidence="medium",
             note="Add this element's index to the parent ScrollView `stickyHeaderIndices`.",
+            needs_review=True,
         )
     if bases == ["fixed"]:
         return _result(
@@ -160,6 +166,8 @@ def _match_position(classes: list[str]) -> Optional[LadderResult]:
             "RN has no `position: fixed`; an absolutely-positioned, edge-pinned "
             "element is the closest equivalent for an overlay bar.",
             confidence="medium",
+            note="Apply this style to the element (as a style prop or NativeWind classes).",
+            needs_review=True,
         )
     return None
 
@@ -192,6 +200,7 @@ def _match_motion_drop(classes: list[str]) -> Optional[LadderResult]:
             "guessed. It is decorative, so removal is safe.",
             confidence="low",
             note="Removed. Re-add with Reanimated if the animation matters.",
+            needs_review=True,
         )
     return None
 

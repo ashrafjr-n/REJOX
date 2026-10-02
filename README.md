@@ -179,9 +179,9 @@ reproducible with `rejox migrate test-projects/sample-app --yes`:
 | Analysed | 21 components · 4 pages · 4 routes · 2 endpoints · 1 store |
 | Predicted before migrating | Coverage **83%** · Confidence **98%** · Risk **LOW** |
 | Emitted | 27 files, 13 ordered plan steps |
-| LLM calls | **0** — every residue unit resolved by rule |
+| LLM calls | **0** — every residue unit answered by a rule; the ones that still need hand-written React Native (a gradient, a blur, a grid's child widths) are flagged in the file, never dropped |
 | `tsc` / Metro | **PASS** (0 errors) / **PASS** |
-| Validated coverage — **strict** | **62%** of files migrate with nothing left to do |
+| Validated coverage — **strict** | **38%** of files migrate with nothing left to do |
 | Validated coverage — compiles + bundles | **100%** of files type-check and bundle |
 
 Two lenses, always both, strict first: *strict* counts a file only when not one

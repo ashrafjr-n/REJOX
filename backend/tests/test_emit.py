@@ -9,6 +9,7 @@ provenance, and that web-only assets are skipped.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -84,7 +85,9 @@ def test_navigator_generated_from_route_table(emitted: EmittedProject) -> None:
     # is generated from the route table, so NO NAV_CONTAINER TODO survives. The
     # navigator SHAPE decision is a Planner question, not code residue.
     assert "REJOX-TODO(NAV_CONTAINER)" not in text
-    assert "REJOX-TODO" not in text
+    # The only TODO is the chrome Layout wrapped around the routes, which the
+    # navigator replaced (see test_chrome_the_navigator_replaces_is_named_not_lost).
+    assert set(re.findall(r"REJOX-TODO\((\w+)\)", text)) == {"NAV_CHROME"}
 
 
 def test_navigator_matches_the_chosen_shape(tmp_path_factory) -> None:
@@ -142,27 +145,34 @@ def test_resolvers_run_in_emit_and_clear_resolvable_residue(emitted: EmittedProj
     by_path = {f.path: f for f in emitted.files}
     out = _out(emitted)
 
-    # ProductCard's CSS Module + hover are now RESOLVED by the AI Resolution
-    # Engine in emit: no CSS_MODULE/TW_UNSUPPORTED residue, the .module.css import
-    # is gone (inlined as a StyleSheet), and provenance is rule-resolved.
+    # ProductCard's CSS Module + hover are RESOLVED by the AI Resolution Engine
+    # in emit: no CSS_MODULE/TW_UNSUPPORTED residue, and the .module.css import
+    # is gone (inlined as a StyleSheet). What the StyleSheet could not carry — a
+    # transition, object-fit, the unapplied :hover variant — is still owed by a
+    # human, so it stays residue as CSS_STRUCTURAL rather than vanishing.
     pc = by_path["src/components/ProductCard.tsx"]
     pc_codes = {u.code for u in pc.unhandled}
     assert "CSS_MODULE" not in pc_codes
     assert "TW_UNSUPPORTED" not in pc_codes
-    assert pc.provenance != ConfidenceSource.UNHANDLED
+    assert pc_codes == {"CSS_STRUCTURAL"}
+    assert pc.provenance == ConfidenceSource.UNHANDLED
     pc_text = (out / "src" / "components" / "ProductCard.tsx").read_text()
-    assert ".module.css" not in pc_text
+    # The import is gone; the file name survives only in the TODOs that cite it.
+    assert not [ln for ln in pc_text.splitlines() if ".module.css" in ln and not ln.startswith("//")]
     assert "StyleSheet.create(" in pc_text
 
     # No .module.css file is emitted anywhere (that is what broke Metro).
     assert list(out.rglob("*.module.css")) == []
 
-    # Navbar keeps ONLY genuinely-unresolvable residue: a runtime <Link to>.
+    # Navbar keeps the runtime <Link to>, plus what its resolved classes still
+    # owe: backdrop-blur needs a <BlurView>, sticky needs stickyHeaderIndices.
     nav = by_path["src/components/Navbar.tsx"]
     nav_codes = {u.code for u in nav.unhandled}
     assert "NAV_ACTIVE" not in nav_codes      # resolved to a static className
     assert "TW_UNSUPPORTED" not in nav_codes  # hover/backdrop/… resolved
-    assert nav_codes == {"NAV_LINK"}          # only the runtime link remains
+    assert nav_codes == {"NAV_LINK", "TW_STRUCTURAL"}
+    owed = " ".join(u.snippet for u in nav.unhandled if u.code == "TW_STRUCTURAL")
+    assert "backdrop-blur" in owed and "sticky" in owed
 
     # A supported-only component (Footer) is clean deterministic.
     footer = by_path["src/components/Footer.tsx"]
@@ -171,6 +181,22 @@ def test_resolvers_run_in_emit_and_clear_resolvable_residue(emitted: EmittedProj
         ConfidenceSource.DETERMINISTIC_WARNING,
     )
     assert footer.unhandled == []
+
+
+def test_chrome_the_navigator_replaces_is_named_not_lost(emitted: EmittedProject) -> None:
+    """Layout rendered <Navbar> and <Footer> around its <Outlet>. The navigator
+    replaces Layout wholesale, so neither is rendered anywhere in the output —
+    the app runs with its navigation bar gone. That has to be said, in the file
+    that replaced it."""
+    nav = {f.path: f for f in emitted.files}["src/navigation/AppNavigator.tsx"]
+    assert [u.code for u in nav.unhandled] == ["NAV_CHROME"]
+    assert nav.provenance == ConfidenceSource.UNHANDLED
+    [chrome] = nav.unhandled
+    assert "src/components/Layout.tsx" in chrome.snippet
+    assert "<Navbar>" in chrome.snippet and "<Footer>" in chrome.snippet
+    text = (_out(emitted) / "src" / "navigation" / "AppNavigator.tsx").read_text()
+    assert text.startswith("// ===== REJOX-TODO: 1 item(s) need attention =====")
+    assert "REJOX-TODO(NAV_CHROME)" in text
 
 
 # --- Assets ------------------------------------------------------------------
@@ -237,6 +263,16 @@ def test_jsx_components_are_converted(emitted_js: EmittedProject) -> None:
     assert "src/components/Header.jsx" in converted
     assert "src/pages/Home.jsx" in converted
     assert "src/pages/About.jsx" in converted
+
+
+def test_the_header_app_rendered_around_its_routes_is_named(emitted_js: EmittedProject) -> None:
+    """src/App.jsx renders <Header /> above <Routes>. The navigator replaces
+    App wholesale, so the header is emitted as a file and rendered by nothing."""
+    nav = {f.path: f for f in emitted_js.files}["src/navigation/AppNavigator.tsx"]
+    [chrome] = [u for u in nav.unhandled if u.code == "NAV_CHROME"]
+    assert chrome.snippet.startswith("src/App.jsx rendered <Header>")
+    # The screens it routed to are not chrome — they ARE the navigator.
+    assert "<Home>" not in chrome.snippet and "<NotFound>" not in chrome.snippet
 
 
 def test_jsx_target_extension_is_rewritten_to_tsx(emitted_js: EmittedProject) -> None:

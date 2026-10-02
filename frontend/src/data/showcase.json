@@ -1003,8 +1003,8 @@
     "tscErrorCount": 0,
     "tscPassed": true,
     "validatedCompilingCoverage": 100.0,
-    "validatedConfidence": 97.5,
-    "validatedStrictCoverage": 61.5
+    "validatedConfidence": 98.0,
+    "validatedStrictCoverage": 38.5
   },
   "waves": [
     {
