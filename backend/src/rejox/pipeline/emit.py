@@ -765,8 +765,11 @@ def emit_project(
         )
         chrome = _navigator_chrome(kg, report, [app_source_file, *router_structure])
         if chrome:
-            header = [f"// ===== REJOX-TODO: {len(chrome)} item(s) need attention ====="]
-            header += [f"// REJOX-TODO({c.code}): {c.snippet}" for c in chrome]
+            lines = [f"// REJOX-TODO({c.code}): {c.snippet}" for c in chrome]
+            # The banner counts the generator's own inline markers too
+            # (NAV_SCREEN_PROPS), the way every other file's banner does.
+            items = _todo_items("\n".join(lines) + "\n" + nav_src)
+            header = [f"// ===== REJOX-TODO: {items} item(s) need attention =====", *lines]
             nav_src = "\n".join(header) + "\n\n" + nav_src
         nav_rel = "src/navigation/AppNavigator.tsx"
         nav_path = out_dir / nav_rel
