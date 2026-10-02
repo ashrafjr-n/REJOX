@@ -26,7 +26,7 @@ Vite, TypeScript or JavaScript, Tailwind CSS, React Router — and it hands back
 of everything it changed and everything that still needs a human.
 
 It is a **CLI you install from PyPI** (`uvx rejox`), not a hosted service: your code
-is read on your machine, transformed by deterministic AST codemods, and proven by
+is read on your machine, transformed by deterministic AST codemods, and checked by
 the real React Native toolchain (`tsc` + Metro) before you ever open it.
 
 > [!NOTE]
@@ -49,9 +49,11 @@ decision, never a whole file.
 </td>
 <td width="50%" valign="top">
 
-**Proven, not claimed**<br>
+**Checked, not claimed**<br>
 Every migration is installed, type-checked with `tsc` and bundled with Metro
-before Rejox calls it done. A failure is reported, never hidden.
+before Rejox calls it done. A failure is reported, never hidden — and what those
+two cannot see (a `<table>`, `document`, `localStorage`) is listed beside them as
+a runtime risk.
 
 </td>
 </tr>
@@ -89,8 +91,8 @@ rejox migrate ./my-react-app               # writes ./my-react-app-native
 cd my-react-app-native && npx expo start
 ```
 
-**Requirements:** Python 3.11+ (uv fetches one for you) and Node 20+ on `PATH`.
-Linux and macOS.
+**Requirements:** Python 3.11+ (uv fetches one for you) and Node 20+ with `npm` on
+`PATH` (`npm` installs the output to validate it). Linux and macOS.
 
 <p align="center">
   <img alt="Terminal replay of rejox migrate: 21 components analysed, 27 files emitted, 0 LLM calls, tsc and Metro pass" src="docs/assets/readme/terminal.svg" width="92%">
@@ -138,10 +140,12 @@ flowchart LR
 | Area | React (web) | React Native (Expo) |
 | --- | --- | --- |
 | **Elements** | `div`, `section`, `nav`, `ul`, `form` · `p`, `span`, `h1`–`h6` · `img` · `button` · `input` | `View` · `Text` · `Image` (with `source`) · `Pressable` · `TextInput` |
-| **Events** | `onClick` · `onChange` | `onPress` · `onChangeText` |
-| **Routing** | `react-router-dom` routes, `<Link to>`, `<NavLink>`, `useParams` | React Navigation — a navigator generated from your route table, `navigation.navigate(…)`, `useRoute`, `useIsFocused` |
+| **Events** | `onClick` · `onChange={(e) => set(e.target.value)}` | `onPress` · `onChangeText={(text) => set(text)}` |
+| **Routing** | `react-router-dom` routes, `<Link to>`, `<NavLink>`, `useParams`, `useNavigate` | React Navigation — a navigator generated from your route table, `navigation.navigate(…)` / `goBack()`, `useRoute`, `useIsFocused` |
+| **Links** | `<a href>` | `Linking.openURL(…)` for a URL, `navigation.navigate(…)` for a routed path |
 | **Tailwind** | utility classes | NativeWind `className`, untouched where it maps 1:1 |
-| **Tailwind residue** | `hover:` · `grid-cols-*` · `bg-gradient-*` · `backdrop-blur` · `animate-spin` · `space-x-*` | `active:` · `flex-wrap` rows · `expo-linear-gradient` · `expo-blur` · Reanimated · `gap-*` |
+| **Tailwind residue** | `hover:` · `space-x-*` · `grid-cols-*` | `active:` · `gap-*` · `flex-wrap` rows (each child's width left as a TODO) |
+| **Needs a new element** | `bg-gradient-*` · `backdrop-blur` · `animate-spin` · `divide-*` · `sticky` | removed from the className, with the `expo-linear-gradient` / `expo-blur` / Reanimated / border code to write in a `TW_STRUCTURAL` TODO — the element is not wrapped for you |
 | **CSS Modules** | `*.module.css` | inline `StyleSheet.create`, with `box-shadow`, `transform`, `:hover` and units translated |
 | **Storage** | `localStorage` / `sessionStorage` | `AsyncStorage` (with `await` placed correctly) or MMKV — your choice |
 | **Env** | `import.meta.env.VITE_X`, `.DEV`, `.PROD` | `process.env.EXPO_PUBLIC_X`, `__DEV__` |
@@ -268,15 +272,23 @@ Nothing is ever written inside the install directory.
 
 AI is **optional**, and Rejox is fully usable without it.
 
-- **No key set** → AI is disabled. The navigator defaults to a stack; everything
-  else is unchanged.
-- **`GEMINI_API_KEY` set** → one call decides the navigator *shape* (stack, tabs or
-  drawer) — the one genuine design judgment — returned as a validated spec, never
-  as code.
-- **If validation fails**, a repair loop may send the **offending line and its
-  compiler diagnostic** — never a whole file — capped at two rounds.
+- **No key set** → AI is disabled. The navigator defaults to a stack; a Tailwind
+  class or CSS declaration no rule covers stays in the code as a `REJOX-TODO`;
+  nothing else changes.
+- **`GEMINI_API_KEY` set** → the LLM is called only where no rule applies, and is
+  sent only what that one question needs — never a file:
+  - the navigator *shape* (stack, tabs or drawer): the route table (screen names,
+    paths, params) and the nav bar's link labels. One call per migration;
+    returned as a validated spec, never as code.
+  - a Tailwind class no rule covers: the class name alone. A CSS Module
+    declaration no rule covers: that one `property: value`. Cached, so the same
+    class costs one call however many files use it.
+  - if validation fails, the repair loop: the **offending line and its compiler
+    diagnostic**, at most two rounds.
 
-Your source code is never uploaded anywhere else.
+Every call is counted in the run summary (`Actual LLM calls`, and `llm.calls` in
+`--json`). On the bundled benchmark that count is **0**. Nothing else about your
+code is sent anywhere.
 
 ## Roadmap
 
@@ -301,7 +313,8 @@ with a minimal example — that is exactly how the conversion table grows.
 <summary><b>Can Rejox convert my React app to React Native automatically?</b></summary>
 
 For the patterns in the [conversion table](docs/CONVERSION-RULES.md), yes — and it
-proves the result compiles and bundles. What it cannot map (a runtime `<Link to>`,
+checks that the result compiles and bundles (which is not the same as running: what
+those checks cannot see is listed as a runtime risk). What it cannot map (a runtime `<Link to>`,
 a `<table>`, a web-only event) is left as a clearly marked `REJOX-TODO` and listed
 in the report. Expect a working project that still needs a human pass, not a
 finished app.
@@ -337,8 +350,9 @@ tested; Create React App projects have not been a focus yet.
 <details>
 <summary><b>Does my code leave my machine?</b></summary>
 
-Only with a `GEMINI_API_KEY` set, and then only the single navigator decision and,
-if the build fails, individual offending lines. See [AI and privacy](#ai-and-privacy).
+Only with a `GEMINI_API_KEY` set, and then only small pieces: the route table for
+the navigator decision, a class name or CSS declaration no rule covers, and — if the
+build fails — individual offending lines. Never a file. See [AI and privacy](#ai-and-privacy).
 
 </details>
 

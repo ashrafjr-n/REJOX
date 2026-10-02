@@ -7,6 +7,22 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
 
 ## [Unreleased]
 
+### Documentation
+
+- "At most one LLM call per migration" was false: residue no rule covers and
+  the repair loop can call too. The READMEs now list every call and exactly
+  what each sends — the route table and link labels, a class name or one CSS
+  declaration, an offending line — and that the summary counts them all.
+- "Proven, not claimed" became "Checked, not claimed": tsc + Metro passing
+  means the project compiles and bundles, not that it runs; the runtime risks
+  they cannot see are now named beside them.
+- `npm` is required (it installs the output to validate it), not only for
+  sdist builds.
+- The "What gets migrated" table no longer says gradients, blurs and spinners
+  become `expo-linear-gradient` / `expo-blur` / Reanimated: they are removed
+  and the code to write is left as a `TW_STRUCTURAL` TODO. `useNavigate`,
+  `<a href>` and the `onChange` handler rewrite are listed.
+
 ### Fixed
 
 - A migration with no `GEMINI_API_KEY` no longer crashes (exit 70) on a
