@@ -38,9 +38,27 @@ class MigrationSummary(BaseModel):
     risk: RiskLevel
     filesConverted: int
     filesSkipped: int
+    # REJOX-TODO items across the emitted files, as their banners count them.
     todoCount: int
     residue: list[ResidueItem]
+    # Residue tsc and Metro both accept that fails on the device (a web-only
+    # element, a browser global, an untouched storage call). Exit 0 does not
+    # cover these.
+    runtimeRisks: list[ResidueItem] = []
     # None when validation was skipped (--no-validate) or could not run.
     validation: Optional[ValidationResult]
     scores: Optional[ValidatedScores]
     llm: LlmUsage
+
+
+class MigrationFailure(BaseModel):
+    """What ``--json`` prints when ``rejox migrate`` stops without a summary.
+
+    A script reading stdout gets JSON on every exit, never an empty stream:
+    ``exitCode`` is the same code the process exits with, ``error`` the message
+    a person would read on stderr.
+    """
+
+    rejoxVersion: str
+    exitCode: int
+    error: str

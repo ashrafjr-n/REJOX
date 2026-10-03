@@ -137,3 +137,18 @@ def test_owed_items_are_never_lost_without_a_marker_to_replace() -> None:
     out = strip_resolved_todos("export const x = 1;\n", set(), {"CSS_MODULE": owed})
     assert "REJOX-TODO: 1 item(s)" in out
     assert "// REJOX-TODO(CSS_STRUCTURAL): dropped" in out
+
+
+def test_the_offline_provider_declines_rather_than_invents(tmp_path, monkeypatch) -> None:
+    """Fake mode used to answer every unknown prompt with `FAKE_RESPONSE[…]`,
+    which parses as a className — and an offline demo wrote it into the app."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("REJOX_AI_PROVIDER", "fake")
+    out = tmp_path / "rn"
+
+    result = runner.invoke(app, ["migrate", str(RESIDUE_APP), "--yes", "--no-validate", "--out", str(out)])
+    assert result.exit_code == 0, result.output
+
+    app_tsx = (out / "src" / "App.tsx").read_text()
+    assert "FAKE_RESPONSE" not in app_tsx
+    assert "animate-[wiggle_1s], group" in app_tsx  # still named as residue

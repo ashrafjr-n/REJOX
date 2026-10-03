@@ -138,6 +138,20 @@ def test_hero_gradient_resolves_via_pattern_to_linear_gradient() -> None:
 # --- Tier 3: LLM (only for genuinely novel classes) --------------------------
 
 
+class _Answers(FakeProvider):
+    """A model that answers every prompt with ``text``. FakeProvider declines a
+    prompt it has no canned answer for, which is right for an offline run and
+    useless for a test of what the resolver does WITH an answer."""
+
+    def __init__(self, text: str = "opacity-90") -> None:
+        super().__init__()
+        self._text = text
+
+    def complete(self, system: str, user: str, *, max_tokens: int):
+        self.register(system, user, self._text)
+        return super().complete(system, user, max_tokens=max_tokens)
+
+
 def test_only_novel_classes_reach_the_llm() -> None:
     provider = FakeProvider()
     # `mix-blend-multiply` has no static rule and no pattern — it is the residue
@@ -148,7 +162,7 @@ def test_only_novel_classes_reach_the_llm() -> None:
 
 
 def test_unparseable_llm_output_retries_once_then_unresolvable() -> None:
-    provider = FakeProvider()
+    provider = _Answers()
     # syntax_check reports an error for everything → parse gate always fails.
     res = resolve_styling(
         [MappedResidue(snippet="mix-blend-multiply", componentName="C")],
@@ -236,7 +250,7 @@ def test_confidence_source_maps_from_tier() -> None:
     assert confidence_source_for(pattern) is ConfidenceSource.DETERMINISTIC_WARNING
     assert confidence_source_for(static) is ConfidenceSource.DETERMINISTIC_WARNING
 
-    llm = _resolve_one("mix-blend-multiply", provider)[0]
+    llm = _resolve_one("mix-blend-multiply", _Answers())[0]
     assert confidence_source_for(llm) is ConfidenceSource.AI_VALIDATED
 
     unresolved = Resolution(

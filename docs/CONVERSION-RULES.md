@@ -113,6 +113,7 @@ comment so nothing is ever silently dropped:
 | `TW_UNSUPPORTED`| `hover:`/`group-*`/`grid-*`/gradients/`backdrop-*`/transitions/animations/`sticky`/`fixed`/`divide-*`/`peer-*`/`columns-*` that no rule resolves | no RN equivalent; re-expression (pressed state, flex reflow, expo-linear-gradient, Moti) is design |
 | `TW_STRUCTURAL` / `CSS_STRUCTURAL` | a class (or CSS Module declaration) a rule resolved but could only REMOVE: the RN structure it stands for — a `<LinearGradient>`, a `<BlurView>`, a grid's child widths, `resizeMode` — is in the TODO, ready to write | the structure wraps or changes other elements |
 | `EVENT_ADAPTER` | an `onChangeText` handler that reads more off the event than its value | handler body needs reshaping |
+| `SOURCE_SYNTAX` (warning) | the source file itself has syntax errors; the output is the parser's recovery of it — e.g. `<div>…</span>` comes out as matched tags | only the author knows what the broken code meant |
 | `FORM_SUBMIT`   | `onSubmit` semantics                                             | submission flow must move into state |
 | `PROPS_HTML_TYPE` | DOM types with no clean RN equivalent (post-map)               | props API redesign |
 | `WEB_ONLY_ELEMENT` | `table`/`canvas`/`iframe`/…                                   | needs a component redesign |

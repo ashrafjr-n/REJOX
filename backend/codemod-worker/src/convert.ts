@@ -27,7 +27,7 @@
 
 import { IndentationText, Project, QuoteKind } from 'ts-morph';
 import type { ConvertResult, Ctx, Options } from './types';
-import { commentSafe } from './util';
+import { commentSafe, recordWarning } from './util';
 import { transformNavigation } from './transforms/navigation';
 import { transformEvents } from './transforms/events';
 import { transformAttributes } from './transforms/attributes';
@@ -93,6 +93,20 @@ export function convert(
     namedImports: new Map(),
     defaultImports: new Map(),
   };
+
+  // A source with syntax errors still parses — the compiler recovers — and the
+  // recovery is what gets transformed. When that output is valid (a stray
+  // `</span>` closing a `<div>` comes out as matched tags), nothing downstream
+  // can tell the file was broken. So it is said here, once, up front.
+  const sourceErrors = syntacticErrorCount(source);
+  if (sourceErrors > 0) {
+    recordWarning(
+      ctx,
+      'SOURCE_SYNTAX',
+      `The source file has ${sourceErrors} syntax error(s); this output is the parser's recovery of it — compare it with the original.`,
+      1,
+    );
+  }
 
   transformNavigation(sf, ctx);
   transformEvents(sf, ctx);

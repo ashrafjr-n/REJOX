@@ -7,6 +7,22 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
 
 ## [Unreleased]
 
+### Documentation
+
+- "At most one LLM call per migration" was false: residue no rule covers and
+  the repair loop can call too. The READMEs now list every call and exactly
+  what each sends — the route table and link labels, a class name or one CSS
+  declaration, an offending line — and that the summary counts them all.
+- "Proven, not claimed" became "Checked, not claimed": tsc + Metro passing
+  means the project compiles and bundles, not that it runs; the runtime risks
+  they cannot see are now named beside them.
+- `npm` is required (it installs the output to validate it), not only for
+  sdist builds.
+- The "What gets migrated" table no longer says gradients, blurs and spinners
+  become `expo-linear-gradient` / `expo-blur` / Reanimated: they are removed
+  and the code to write is left as a `TW_STRUCTURAL` TODO. `useNavigate`,
+  `<a href>` and the `onChange` handler rewrite are listed.
+
 ### Fixed
 
 - A migration with no `GEMINI_API_KEY` no longer crashes (exit 70) on a
@@ -48,6 +64,46 @@ from the git tag (`v1.2.3`), never hand-edited in `pyproject.toml`.
   nowhere, silently. `AppNavigator.tsx` now carries a `NAV_CHROME` TODO naming it.
 - `peer-*` and `columns-*` classes, which NativeWind drops silently, are
   flagged as `TW_UNSUPPORTED`.
+- A green tsc + Metro run said nothing about `<table>`, `document` or an
+  untouched `localStorage` — all of which type-check, bundle and throw on the
+  device. They are now listed as "runtime risks" next to the validation result,
+  in the summary, and in `--json` (`runtimeRisks`).
+- "Remaining diagnostics (all map to known residue)" was printed, never
+  checked. The CLI now counts how many errors fall in files with a REJOX-TODO,
+  and calls an error in a file with none what it is: a Rejox bug.
+- The TODO count disagreed with itself (13 in the summary, 15 in the report,
+  19 in a file's own banner). Every place now counts items the way the banner
+  does, the summary table lists every flagged code, and a truncated table says
+  how many it left out.
+- `REJOX-REPORT.md` no longer says the AI engine "will resolve" the TODOs (no
+  later step does), and counts files with any TODO, not only those with residue.
+- An unused cache reads `n/a`, not `0%`.
+- With a `GEMINI_API_KEY` whose provider fails to start, the CLI said "no
+  GEMINI_API_KEY"; it now gives the real reason.
+- The offline `fake` provider answered unknown prompts with a placeholder that
+  parsed as a className, so a fake-mode run could write `FAKE_RESPONSE[…]` into
+  the app. It now declines (`UNRESOLVABLE`), and the class stays residue.
+- `--json` printed nothing on stdout when the run failed (a usage error, a
+  missing tool, an internal error). It now prints `{"exitCode", "error"}`, so
+  a script reading stdout always gets JSON.
+- An internal error part-way through writing the project left a half-written
+  `--out` that looked complete. A directory the run created is now removed; one
+  that already existed (`--force`) is never deleted, and gets a
+  `REJOX-INCOMPLETE.md` instead.
+- A source file the codemod could not convert was only a "skipped" count; the
+  CLI now names it as missing from the output, and its reason no longer breaks
+  the `REJOX-REPORT.md` list.
+- A source file with syntax errors is said to have them (`SOURCE_SYNTAX`): the
+  compiler's recovery can be valid code, so nothing else could tell.
+- The Ask stage offered choices the emitter never implemented: "Bare React
+  Native" produced the same Expo project; "RN StyleSheet" kept every
+  `className` with no NativeWind, so all styling was lost on the device; "Expo
+  Router" failed Metro around a placeholder `app/`; the icons question was read
+  by nothing. Only implemented options are offered now (Expo, NativeWind, React
+  Navigation; AsyncStorage or MMKV), a one-option question is stated rather than
+  asked, and `emit_project` refuses an answer the plan did not offer — so an API
+  client cannot request one of them either. Icon libraries are reported as
+  `needs-conversion` with their React Native counterpart, not as `unknown`.
 
 ## [0.1.1] - 2026-09-26
 

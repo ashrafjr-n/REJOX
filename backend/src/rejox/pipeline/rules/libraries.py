@@ -59,6 +59,30 @@ KNOWN_LIBRARIES: dict[str, LibrarySpec] = {
         "rnEquivalents": [], "notes": "Core; provided by React Native.",
     },
     # --- Needs conversion ----------------------------------------------------
+    # Web icon components render DOM <svg>: nothing converts them yet, so each
+    # one is named here with its RN counterpart rather than reported "unknown".
+    **{
+        name: {
+            "category": "ui", "status": "needs-conversion", "compatibility": 40,
+            "rnEquivalents": [_rn(rn, "same icon set for React Native")] if rn else [
+                _rn("@expo/vector-icons", "bundled with Expo; icon names differ")
+            ],
+            "notes": (
+                "Web icon components render DOM <svg>; they are not converted — "
+                "replace each import by hand"
+                + (f" ({rn} needs react-native-svg)." if rn else ".")
+            ),
+        }
+        for name, rn in {
+            "lucide-react": "lucide-react-native",
+            "react-feather": "react-native-feather",
+            "@heroicons/react": "react-native-heroicons",
+            "react-icons": None,
+            "@mui/icons-material": None,
+            "@fortawesome/react-fontawesome": "@fortawesome/react-native-fontawesome",
+            "@radix-ui/react-icons": None,
+        }.items()
+    },
     "react-dom": {
         "category": "other", "status": "needs-conversion", "compatibility": 90,
         "rnEquivalents": [_rn("react-native", "RN provides its own renderer")],

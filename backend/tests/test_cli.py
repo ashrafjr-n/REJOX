@@ -248,3 +248,213 @@ def test_internal_commands_are_hidden_but_still_run() -> None:
     for name in ("export-showcase", "export-graph", "sweep"):
         assert name not in listed
     assert runner.invoke(app, ["sweep", "--help"]).exit_code == 0
+
+
+# --- What the summary says has to be what is true -------------------------------
+
+
+def _web_only_project(root: Path) -> Path:
+    """A router-less app with the residue tsc and Metro both accept."""
+    (root / "src").mkdir(parents=True)
+    (root / "package.json").write_text(json.dumps({
+        "name": "web-only", "dependencies": {"react": "^18.2.0", "react-dom": "^18.2.0"},
+    }))
+    (root / "src" / "main.tsx").write_text(
+        'import { createRoot } from "react-dom/client";\nimport App from "./App";\n'
+        'createRoot(document.getElementById("root")!).render(<App />);\n'
+    )
+    (root / "src" / "App.tsx").write_text(
+        "export default function App() {\n"
+        "  document.title = 'Home';\n"
+        "  return <table><tbody><tr><td>cell</td></tr></tbody></table>;\n"
+        "}\n"
+    )
+    return root
+
+
+def test_runtime_risks_are_named_next_to_a_green_run(tmp_path, monkeypatch) -> None:
+    """`<table>` and `document` type-check (Expo's tsconfig carries the DOM lib)
+    and bundle; they throw on the device. Exit 0 must not read as "it works"."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    src = _web_only_project(tmp_path / "web-only")
+
+    result = runner.invoke(
+        app, ["migrate", str(src), "--json", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.stderr
+    summary = MigrationSummary.model_validate_json(result.stdout)
+    assert {(r.file, r.code) for r in summary.runtimeRisks} == {
+        ("src/App.tsx", "WEB_GLOBAL"), ("src/App.tsx", "WEB_ONLY_ELEMENT"),
+    }
+    assert "Runtime risks" in result.stderr
+
+
+def test_the_todo_count_is_the_files_own_count(tmp_path, monkeypatch) -> None:
+    """The summary, REJOX-REPORT.md and every file's banner state one number."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    out = tmp_path / "rn"
+
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--json", "--no-validate", "--out", str(out)])
+    assert result.exit_code == 0, result.stderr
+    summary = MigrationSummary.model_validate_json(result.stdout)
+
+    banners = [
+        int(m.group(1))
+        for f in out.rglob("*.ts*") if "node_modules" not in f.parts
+        for m in [re.search(r"===== REJOX-TODO: (\d+) item", f.read_text())] if m
+    ]
+    assert summary.todoCount == sum(banners) > 0
+    assert f"- REJOX-TODO items: **{summary.todoCount}**" in (out / "REJOX-REPORT.md").read_text()
+    assert "will resolve" not in (out / "REJOX-REPORT.md").read_text()
+
+
+def test_no_cache_lookup_is_not_a_zero_hit_rate(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    assert "0 lookup (n/a)" in _unrendered(result.output)
+    assert "(0%)" not in result.output
+
+
+def test_a_key_whose_provider_fails_is_not_reported_as_no_key(tmp_path, monkeypatch) -> None:
+    import rejox.ai.config as ai_config
+
+    monkeypatch.setenv("GEMINI_API_KEY", "set-but-broken")
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+
+    def broken(*_a, **_k):
+        raise RuntimeError("SDK missing")
+
+    monkeypatch.setattr(ai_config, "get_provider", broken)
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    said = _unrendered(result.output)
+    assert "GEMINI_API_KEY is set, but the Gemini provider could not start: SDK missing" in said
+    assert "no GEMINI_API_KEY" not in said
+
+
+def test_an_error_in_a_file_with_no_todo_is_called_a_bug(tmp_path, monkeypatch) -> None:
+    """"All map to known residue" used to be printed, never checked."""
+    from rejox.models.validation import Diagnostic
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    failed = ValidationResult(
+        passed=False, installed=True,
+        typecheck=StageResult(
+            ran=True, passed=False, errorCount=1,
+            diagnostics=[Diagnostic(source="typecheck", file="src/nowhere.tsx", line=1,
+                                    code="TS2304", message="Cannot find name 'x'.")],
+        ),
+        bundle=StageResult(),
+    )
+    monkeypatch.setattr(cli, "validate_project", lambda *a, **k: failed)
+
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--yes", "--out", str(tmp_path / "rn")])
+    assert result.exit_code == 1, result.output
+    said = _unrendered(result.output)
+    assert "0 of 1 in files with a REJOX-TODO" in said
+    assert "a Rejox bug" in said
+    assert "all map to known residue" not in said
+
+
+# --- Failing well: --json, partial output, files that did not convert ----------
+
+
+def test_json_reports_a_usage_error_as_json() -> None:
+    from rejox.models.summary import MigrationFailure
+
+    result = runner.invoke(app, ["migrate", "/does/not/exist", "--json"])
+    assert result.exit_code == 2
+    failure = MigrationFailure.model_validate_json(result.stdout)  # nothing but JSON
+    assert failure.exitCode == 2 and "Not a directory" in failure.error
+
+
+def test_json_reports_an_internal_error_as_json(tmp_path, monkeypatch) -> None:
+    from rejox.models.summary import MigrationFailure
+
+    def boom(_path):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli, "build_knowledge_graph", boom)
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--json", "--out", str(tmp_path / "rn")])
+    assert result.exit_code == 70
+    failure = MigrationFailure.model_validate_json(result.stdout)
+    assert failure.exitCode == 70 and "boom" in failure.error
+
+
+def _emit_then_crash(monkeypatch) -> None:
+    def half_written(plan, answers, kg, out_dir, **kwargs):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "App.tsx").write_text("// half of a project\n")
+        raise RuntimeError("crashed mid-emit")
+
+    monkeypatch.setattr(cli, "emit_project", half_written)
+
+
+def test_an_internal_error_removes_the_half_written_output_it_created(tmp_path, monkeypatch) -> None:
+    """A half-written project looks like a whole one. One this run created goes."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    _emit_then_crash(monkeypatch)
+    out = tmp_path / "rn"
+
+    result = runner.invoke(app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(out)])
+    assert result.exit_code == 70
+    assert not out.exists()
+    assert "was removed" in _unrendered(result.output)
+
+
+def test_an_internal_error_never_deletes_a_directory_it_did_not_create(tmp_path, monkeypatch) -> None:
+    """--force writes beside the user's own files; those are never deleted."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    _emit_then_crash(monkeypatch)
+    out = tmp_path / "rn"
+    out.mkdir()
+    (out / "keep.txt").write_text("mine")
+
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--force", "--out", str(out)]
+    )
+    assert result.exit_code == 70
+    assert (out / "keep.txt").read_text() == "mine"
+    assert (out / "REJOX-INCOMPLETE.md").is_file()
+
+
+def test_a_file_that_failed_to_convert_is_shown_not_just_counted(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    src = _web_only_project(tmp_path / "app")
+    (src / "src" / "util.ts").write_text("export const x = (;\n")  # a syntax error
+
+    result = runner.invoke(
+        app, ["migrate", str(src), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    said = _unrendered(result.output)
+    assert "1 file(s) could not be converted" in said
+    assert "src/util.ts" in said
+    assert "(1 failed to convert)" in said
+    report = (tmp_path / "rn" / "REJOX-REPORT.md").read_text()
+    [line] = [l for l in report.splitlines() if l.startswith("- `src/util.ts`")]
+    assert "syntactic error" in line  # the whole reason, on its one list line
+
+
+def test_a_one_option_question_is_stated_not_asked(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("REJOX_AI_PROVIDER", raising=False)
+    result = runner.invoke(
+        app, ["migrate", str(SAMPLE), "--yes", "--no-validate", "--out", str(tmp_path / "rn")]
+    )
+    assert result.exit_code == 0, result.output
+    said = _unrendered(result.output)
+    assert "Expo — the one option this version supports" in said
+    assert "Bare React Native" not in said and "Expo Router" not in said

@@ -138,12 +138,6 @@ def _build_dependencies(
         deps["@react-navigation/bottom-tabs"] = "^7.2.0"
         deps["react-native-screens"] = "~4.4.0"
         deps["react-native-safe-area-context"] = "~4.12.0"
-    elif navigation == "expo-router":
-        deps["expo-router"] = "~4.0.0"
-        deps["react-native-screens"] = "~4.4.0"
-        deps["react-native-safe-area-context"] = "~4.12.0"
-        deps["expo-linking"] = "~7.0.0"
-        deps["expo-constants"] = "~17.0.0"
 
     for lib in (*_CARRY_OVER, *extra_packages):
         if lib in deps or lib in dev:
@@ -213,7 +207,7 @@ def generate_scaffold(
         target.write_text(content)
         written.append(rel)
 
-    main = "expo-router/entry" if navigation == "expo-router" else "index.ts"
+    main = "index.ts"
 
     # package.json
     write("package.json", _render("package.json.tmpl", {
@@ -225,7 +219,7 @@ def generate_scaffold(
     }))
 
     # app.json
-    plugins = json.dumps(["expo-router"]) if navigation == "expo-router" else "[]"
+    plugins = "[]"
     write("app.json", _render("app.json.tmpl", {
         "APP_NAME": app_name,
         "APP_SLUG": slug,
@@ -274,26 +268,14 @@ def generate_scaffold(
         write("tailwind.config.js", _render("tailwind.config.js.tmpl", {}))
         write("nativewind-env.d.ts", _render("nativewind-env.d.ts.tmpl", {}))
 
-    # Entry points (skeleton only)
-    if navigation == "expo-router":
-        css_import = 'import "../global.css";\n' if nativewind else ""
-        write("app/_layout.tsx",
-              f'{css_import}import {{ Stack }} from "expo-router";\n\n'
-              "export default function RootLayout() {\n"
-              "  return <Stack />;\n}\n")
-        write("app/index.tsx",
-              'import { Text, View } from "react-native";\n\n'
-              "export default function Index() {\n"
-              '  return (\n    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>\n'
-              f"      <Text>{app_name} — scaffold ready</Text>\n"
-              "    </View>\n  );\n}\n")
-    else:
-        css_import = 'import "./global.css";\n' if nativewind else ""
-        write("App.tsx", _render("App.tsx.tmpl", {
-            "APP_CSS_IMPORT": css_import,
-            "APP_NAME": app_name,
-        }))
-        write("index.ts", _render("index.ts.tmpl", {}))
+    # Entry points (skeleton only). React Navigation is the one router emitted;
+    # an Expo Router variant scaffolded a placeholder app/ no route reached.
+    css_import = 'import "./global.css";\n' if nativewind else ""
+    write("App.tsx", _render("App.tsx.tmpl", {
+        "APP_CSS_IMPORT": css_import,
+        "APP_NAME": app_name,
+    }))
+    write("index.ts", _render("index.ts.tmpl", {}))
 
     # Empty src/ tree mirroring the source layout.
     for sub in ("components", "screens", "store", "api", "hooks"):

@@ -306,3 +306,42 @@ def test_plan_endpoint_reports_the_planner_failure(monkeypatch) -> None:
     resp = client.post("/api/plan", json={"path": str(SAMPLE_APP)})
     assert resp.status_code == 500
     assert "component waves" in resp.json()["detail"]
+
+
+# --- Every option offered is one the emitter implements ------------------------
+#
+# Bare RN, a StyleSheet target, Expo Router and an icons question were all
+# offered; none was implemented. Bare RN produced the same Expo project, the
+# StyleSheet target kept every className with no NativeWind (all styling lost
+# on the device), Expo Router failed Metro with a placeholder app/, and the
+# icons answer was read by nothing. An option exists only once it works.
+
+
+def test_only_implemented_options_are_offered(plan: MigrationPlan) -> None:
+    offered = {q.id: [o.id for o in q.options] for q in plan.questions}
+    assert offered["project-type"] == ["expo"]
+    assert offered["styling-engine"] == ["nativewind"]
+    assert offered["navigation-library"] == ["react-navigation"]
+
+
+def test_no_icons_question_even_with_an_icon_library(sample_kg: KnowledgeGraph) -> None:
+    kg = sample_kg.model_copy(deep=True)
+    kg.project.dependencies["lucide-react"] = "^0.400.0"
+    report = analyze_graph(kg)
+    assert "icons" not in {q.id for q in plan_migration(report, kg).questions}
+    # ...and the library is named for what it is, not "unknown".
+    [lucide] = [lib for lib in report.libraries if lib.name == "lucide-react"]
+    assert lucide.status == "needs-conversion"
+    assert "lucide-react-native" in {e.name for e in lucide.rnEquivalents}
+
+
+def test_an_answer_the_plan_never_offered_is_refused(plan: MigrationPlan, tmp_path) -> None:
+    from rejox.pipeline.emit import emit_project
+    from rejox.pipeline.planner import UnsupportedAnswer, check_answers
+
+    check_answers(plan, {"navigation-library": "react-navigation", "storage": "anything"})
+    with pytest.raises(UnsupportedAnswer, match="expo-router"):
+        check_answers(plan, {"navigation-library": "expo-router"})
+    with pytest.raises(UnsupportedAnswer, match="supported: expo"):
+        emit_project(plan, {"project-type": "bare-rn"}, _load("sample-app.kg.json"), tmp_path)
+    assert not any(tmp_path.iterdir())  # refused before anything was written

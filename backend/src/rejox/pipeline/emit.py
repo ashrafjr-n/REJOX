@@ -42,6 +42,7 @@ from rejox.models.plan import MigrationPlan
 from rejox.models.transformation import TransformResult, UnhandledItem
 from rejox.ai.navigation import build_navigator_spec, generate_navigator, unhoistable_screens
 from rejox.pipeline.analyzer import analyze_graph
+from rejox.pipeline.planner import check_answers
 from rejox.pipeline.resolve_apply import apply_resolutions
 from rejox.pipeline.rules.libraries import KNOWN_LIBRARIES
 from rejox.pipeline.scaffold import generate_scaffold
@@ -125,6 +126,10 @@ def _never_migrate(rel_path: str) -> Optional[str]:
 
 _TODO_RE = re.compile(r"REJOX-TODO\(([A-Z_]+)\)")
 
+# The skip reason of a source file the codemod could not convert — the one
+# kind of skip that is a failure rather than a decision, so callers look for it.
+TRANSFORM_FAILED_REASON = "transform failed, left out of the migration"
+
 # The provider chain and the declarations it reads are carried over as the entry
 # file's own SOURCE TEXT — the one thing in the output that never passes through
 # the codemod-worker. `import.meta` is the one construct where that matters: it
@@ -206,6 +211,20 @@ def _provenance(result: TransformResult) -> ConfidenceSource:
 
 def _todo_codes(code: str) -> list[str]:
     return sorted(set(_TODO_RE.findall(code)))
+
+
+_TODO_HEADER_LINE_RE = re.compile(r"^\s*//\s*REJOX-TODO\(([A-Z_]+)\)", re.MULTILINE)
+_TODO_INLINE_RE = re.compile(r"\{\s*/\*\s*REJOX-TODO\(([A-Z_]+)\)")
+
+
+def _todo_items(code: str) -> int:
+    """How many things a person has to look at in this file — the same number
+    its `===== REJOX-TODO: N item(s)` banner states. One header line per item;
+    an inline marker counts only when no header line already names its code
+    (a NAV_LINK has both, and is still one item)."""
+    header = _TODO_HEADER_LINE_RE.findall(code)
+    inline = [c for c in _TODO_INLINE_RE.findall(code) if c not in set(header)]
+    return len(header) + len(inline)
 
 
 # react-router's own components: never "chrome", whatever file renders them.
@@ -580,6 +599,7 @@ def emit_project(
             tier (static_map / pattern / rule / llm) actually resolved, and
             how many stayed ``unresolved``.
     """
+    check_answers(plan, answers)  # an option the plan never offered is refused
     report = report or analyze_graph(kg)
     src_root = Path(source_root or kg.project.root)
     out_dir = Path(out_dir)
@@ -645,9 +665,11 @@ def emit_project(
         try:
             result = transform_component(abs_src, options)
         except TransformerError as exc:
-            skipped.append(
-                SkippedFile(path=src_rel, reason=f"transform failed, left out of the migration: {exc}")
-            )
+            # One line: the reason lands in a Markdown list and a terminal row.
+            skipped.append(SkippedFile(
+                path=src_rel,
+                reason=f"{TRANSFORM_FAILED_REASON}: {' '.join(str(exc).split())}",
+            ))
             continue
 
         # NAV_CONTAINER (tier 2): a shared <Layout>/<Outlet>/<Routes> component
@@ -751,8 +773,11 @@ def emit_project(
         )
         chrome = _navigator_chrome(kg, report, [app_source_file, *router_structure])
         if chrome:
-            header = [f"// ===== REJOX-TODO: {len(chrome)} item(s) need attention ====="]
-            header += [f"// REJOX-TODO({c.code}): {c.snippet}" for c in chrome]
+            lines = [f"// REJOX-TODO({c.code}): {c.snippet}" for c in chrome]
+            # The banner counts the generator's own inline markers too
+            # (NAV_SCREEN_PROPS), the way every other file's banner does.
+            items = _todo_items("\n".join(lines) + "\n" + nav_src)
+            header = [f"// ===== REJOX-TODO: {items} item(s) need attention =====", *lines]
             nav_src = "\n".join(header) + "\n\n" + nav_src
         nav_rel = "src/navigation/AppNavigator.tsx"
         nav_path = out_dir / nav_rel
@@ -853,12 +878,13 @@ def emit_project(
         if never is not None:
             skipped.append(SkippedFile(path=f.path, reason=never))
 
-    todo_count = sum(len(f.todoCodes) for f in files) + sum(
-        len(f.unhandled) for f in files
+    # Counted from the emitted files themselves, item by item, so the summary,
+    # the report and each file's own TODO banner always state the same number.
+    todo_count = sum(
+        _todo_items((out_dir / f.path).read_text())
+        for f in files
+        if f.todoCodes and (out_dir / f.path).is_file()
     )
-    # todoCodes and unhandled overlap (each unhandled leaves a TODO); count
-    # residue by the emitted TODO comments, which is the ground truth.
-    todo_count = sum(len(f.todoCodes) for f in files)
 
     project = EmittedProject(
         outDir=str(out_dir),
@@ -887,27 +913,27 @@ def _render_report(project: EmittedProject, kg: KnowledgeGraph) -> str:
     lines: list[str] = []
     lines.append(f"# Rejox Migration Report — {kg.project.name}\n")
     lines.append(
-        "Deterministic emission of the React Native project. Every file below "
-        "was produced by rules (no AI). `unhandled` items are the residue the "
-        "AI Resolution Engine will resolve; each also leaves a "
-        "`// REJOX-TODO(<CODE>)` marker in the code.\n"
+        "The React Native project as emitted. Every `// REJOX-TODO(<CODE>)` "
+        "marker in the code is something no rule could finish — or a change a "
+        "rule made that a person should check — and is listed per file below. "
+        "They are for you: the only later step that touches code is the "
+        "validation repair loop (AI on, validation failed), and the run summary "
+        "lists every line it changed.\n"
     )
 
-    residue = [f for f in project.files if f.unhandled]
+    flagged = [f for f in project.files if f.todoCodes]
 
     lines.append("\n## Summary\n")
     lines.append(f"- Files emitted: **{len(project.files)}**")
-    lines.append(f"- Files with residue (TODOs): **{len(residue)}**")
-    lines.append(f"- Total REJOX-TODO items: **{project.todoCount}**")
+    lines.append(f"- Files with a REJOX-TODO: **{len(flagged)}**")
+    lines.append(f"- REJOX-TODO items: **{project.todoCount}**")
     lines.append(f"- Files skipped (web-only / not found): **{len(project.skipped)}**\n")
 
     lines.append("\n## Provenance (per file)\n")
-    lines.append("| File | From | Provenance | Residue |")
+    lines.append("| File | From | Provenance | REJOX-TODO codes |")
     lines.append("| ---- | ---- | ---------- | ------- |")
     for f in project.files:
-        codes = ", ".join(u.code for u in f.unhandled) or (
-            ", ".join(f.todoCodes) if f.todoCodes else "—"
-        )
+        codes = ", ".join(f.todoCodes) or "—"
         lines.append(
             f"| `{f.path}` | {f.sourceFile or '_(generated)_'} | "
             f"{f.provenance.value} | {codes} |"

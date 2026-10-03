@@ -80,7 +80,7 @@ def _live_run(monkeypatch):
 
     # Counter up front + boundary snapshots, mirroring the export command exactly,
     # so the per-phase deltas re-observed here can be compared to the exported ones.
-    inner, _ = _make_provider()
+    inner, _, _ = _make_provider()
     counter = _CountingProvider(inner)
     c_start = counter.calls
 

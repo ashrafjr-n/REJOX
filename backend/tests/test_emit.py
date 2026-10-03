@@ -227,9 +227,18 @@ def test_no_asset_is_skipped_for_being_missing(emitted: EmittedProject) -> None:
 
 
 def test_todo_count_matches_emitted_markers(emitted: EmittedProject) -> None:
-    # todoCount is the ground-truth residue count from the emitted TODO markers.
-    assert emitted.todoCount == sum(len(f.todoCodes) for f in emitted.files)
-    assert emitted.todoCount > 0
+    # todoCount counts ITEMS, as each file's own `REJOX-TODO: N item(s)` banner
+    # does — not distinct codes per file, which undercounted (five
+    # WEB_ONLY_ELEMENT lines are five things to fix, not one).
+    out = _out(emitted)
+    banners = 0
+    for f in emitted.files:
+        if not f.todoCodes:
+            continue
+        m = re.search(r"===== REJOX-TODO: (\d+) item", (out / f.path).read_text())
+        banners += int(m.group(1)) if m else 0
+    assert emitted.todoCount == banners > 0
+    assert emitted.todoCount >= sum(len(f.todoCodes) for f in emitted.files)
 
 
 # --- Plain JavaScript / .jsx sources -----------------------------------------
